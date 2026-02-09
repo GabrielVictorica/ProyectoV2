@@ -184,19 +184,7 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
                 .eq('year', year);
 
             if (organizationId && organizationId !== 'all') {
-                // Incluir agentes de la org + agentes externos que reportan a la org
-                const { data: reportingAgents } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('reports_to_organization_id', organizationId);
-
-                const reportingAgentIds = (reportingAgents || []).map((a: any) => a.id);
-
-                if (reportingAgentIds.length > 0) {
-                    query = query.or(`organization_id.eq.${organizationId},agent_id.in.(${reportingAgentIds.join(',')})`);
-                } else {
-                    query = query.eq('organization_id', organizationId);
-                }
+                query = query.eq('organization_id', organizationId);
             }
 
             const { data, error } = await query;

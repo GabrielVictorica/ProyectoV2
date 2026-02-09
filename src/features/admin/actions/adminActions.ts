@@ -794,19 +794,7 @@ export async function getTeamObjectivesSummaryAction(year: number, organizationI
         let query = adminClient.from('view_team_objectives_summary').select('*').eq('year', year);
 
         if (targetOrgId && targetOrgId !== 'all') {
-            // Incluir agentes de la org + agentes externos que reportan a la org
-            const { data: reportingAgents } = await adminClient
-                .from('profiles')
-                .select('id')
-                .eq('reports_to_organization_id', targetOrgId);
-
-            const reportingAgentIds = (reportingAgents || []).map((a: any) => a.id);
-
-            if (reportingAgentIds.length > 0) {
-                query = query.or(`organization_id.eq.${targetOrgId},agent_id.in.(${reportingAgentIds.join(',')})`);
-            } else {
-                query = query.eq('organization_id', targetOrgId);
-            }
+            query = query.eq('organization_id', targetOrgId);
         }
 
         const { data, error } = await (query as any);
