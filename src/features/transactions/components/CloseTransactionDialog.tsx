@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useAddTransaction, useUpdateTransaction, TransactionWithRelations } from '../hooks/useTransactions';
 import { useProperties } from '@/features/properties/hooks/useProperties';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,7 +85,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
 
     // Hooks adicionales para administración
     const { data: organizations = [] } = useOrganizations();
-    const { data: allUsers = [] } = useUsers();
+    const { data: allUsers = [] } = useTeamMembers();
 
     const profile = auth?.profile;
     const isGod = auth?.role === 'god';
@@ -124,11 +125,18 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     const watchPropertyId = form.watch('property_id');
     const watchOrgId = form.watch('organization_id');
 
-    // Filtrar agentes según la organización seleccionada
+    // Filtrar agentes según la organización seleccionada o el rol
     const filteredAgents = useMemo(() => {
-        if (!watchOrgId) return [];
-        return allUsers.filter((u: any) => u.organization_id === watchOrgId);
-    }, [allUsers, watchOrgId]);
+        if (!allUsers) return [];
+        return allUsers.filter((u: any) => {
+            if (isGod) {
+                // God elige organización, mostramos miembros y reportes cross-org de esa oficina
+                return u.organization_id === watchOrgId || u.reports_to_organization_id === watchOrgId;
+            }
+            // Para Parent, useTeamMembers ya filtró por RLS (miembros + reportes cross-org)
+            return true;
+        });
+    }, [allUsers, watchOrgId, isGod]);
 
     // Watch para detectar cambio de agente
     const watchAgentId = form.watch('agent_id');
@@ -342,8 +350,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                                                {allUsers
-                                                    .filter((u: any) => u.organization_id === profile?.organization_id)
+                                                {filteredAgents
                                                     .map((u: any) => (
                                                         <SelectItem key={u.id} value={u.id}>
                                                             {u.first_name} {u.last_name}
