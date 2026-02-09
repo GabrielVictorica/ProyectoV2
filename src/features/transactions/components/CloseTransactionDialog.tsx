@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -130,6 +130,19 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
         return allUsers.filter((u: any) => u.organization_id === watchOrgId);
     }, [allUsers, watchOrgId]);
 
+    // Watch para detectar cambio de agente
+    const watchAgentId = form.watch('agent_id');
+
+    // Efecto para actualizar split cuando se selecciona un agente diferente
+    useEffect(() => {
+        if (watchAgentId && watchAgentId !== auth?.id) {
+            const selectedAgent = allUsers.find((u: any) => u.id === watchAgentId);
+            if (selectedAgent?.default_split_percentage != null) {
+                form.setValue('agent_split_percentage', selectedAgent.default_split_percentage);
+            }
+        }
+    }, [watchAgentId, allUsers, auth?.id, form]);
+
     // Watch values para cálculos en vivo
     const watchPrice = form.watch('actual_price');
     const watchSides = form.watch('sides');
@@ -138,9 +151,9 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
 
     // Cálculos en tiempo real
     const calculations = useMemo(() => {
-        // Obtenemos el royalty de la organización (si está disponible en el perfil del auth)
-        // O lo dejamos en 0 si no se encuentra
-        const royaltyPercent = profile?.organization?.royalty_percentage ?? 0;
+        // Obtener royalty de la organización seleccionada (para God) o del perfil
+        const selectedOrg = organizations.find((o: any) => o.id === watchOrgId);
+        const royaltyPercent = selectedOrg?.royalty_percentage ?? profile?.organization?.royalty_percentage ?? 0;
 
         // El bruto total contempla los lados (puntas)
         const grossCommission = watchPrice * (watchCommissionPercent / 100) * watchSides;
@@ -161,12 +174,14 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             officeAmount,
             royaltyPercent
         };
-    }, [watchPrice, watchCommissionPercent, watchSplitPercent, watchSides, profile]);
+    }, [watchPrice, watchCommissionPercent, watchSplitPercent, watchSides, profile, watchOrgId, organizations]);
 
     const onSubmit = async (data: FormData) => {
         try {
             const input = {
                 property_id: data.property_id === 'manual' ? null : data.property_id,
+                organization_id: data.organization_id || undefined,
+                agent_id: data.agent_id || undefined,
                 transaction_date: data.transaction_date,
                 actual_price: data.actual_price,
                 sides: data.sides,

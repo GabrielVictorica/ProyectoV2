@@ -63,7 +63,7 @@ export function useAuth() {
                 organizationId: profile?.organization_id || null,
             };
         },
-        staleTime: 5 * 60 * 1000, // 5 minutos
+        staleTime: 60 * 1000, // 1 minuto para refrescar más rápido
         gcTime: 10 * 60 * 1000, // 10 minutos
     });
 }

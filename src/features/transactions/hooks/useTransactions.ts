@@ -154,7 +154,8 @@ export function useTransactions(filters?: TransactionFilters) {
             return result.data || [];
         },
         enabled: !!auth,
-        staleTime: 2 * 60 * 1000,
+        staleTime: 30 * 1000, // 30 segundos para refrescar más rápido
+        placeholderData: (previousData) => previousData, // Muestra datos anteriores mientras carga
     });
 }
 
@@ -203,7 +204,8 @@ export function useFinancialMetrics(filters?: TransactionFilters) {
             return result.data || [];
         },
         enabled: !!auth,
-        staleTime: 2 * 60 * 1000,
+        staleTime: 30 * 1000, // 30 segundos para refrescar más rápido
+        placeholderData: (previousData) => previousData, // Muestra datos anteriores mientras carga
     });
 }
 

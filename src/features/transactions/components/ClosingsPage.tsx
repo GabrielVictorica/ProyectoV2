@@ -82,12 +82,12 @@ export function ClosingsPage() {
 
     const { data: metrics, isLoading: loadingMetrics } = useAggregatedMetrics(filters);
 
-    // Cargar datos para filtros
-    const { data: organizations } = useOrganizations();
-    const { data: allUsers } = useUsers();
-
     const role = auth?.role;
     const isGodOrParent = role === 'god' || role === 'parent';
+
+    // Cargar datos para filtros (solo cuando el rol lo requiere)
+    const { data: organizations } = useOrganizations({ enabled: role === 'god' });
+    const { data: allUsers } = useUsers({ enabled: role === 'god' || role === 'parent' });
 
     // Generar años para el selector
     const years = Array.from({ length: 5 }, (_, i) => currentYear - i);

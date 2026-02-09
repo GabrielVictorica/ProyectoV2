@@ -23,6 +23,8 @@ const clientSchema = z.object({
     searchPropertyTypes: z.array(z.string()).default([]),
     searchBedrooms: z.array(z.string()).default([]),
     searchPaymentMethods: z.array(z.string()).default([]),
+    organizationId: z.string().uuid().optional(),
+    agentId: z.string().uuid().optional(),
 });
 
 const updateClientSchema = clientSchema.partial().extend({ id: z.string().uuid() });
@@ -43,12 +45,40 @@ export async function createClientAction(
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('organization_id, first_name, last_name')
+            .select('organization_id, first_name, last_name, role')
             .eq('id', user.id)
             .single();
 
         if (!profile) return { success: false, error: 'Perfil no encontrado' };
-        const organization_id = (profile as any).organization_id;
+
+        const isGodOrParent = (profile as any).role === 'god' || (profile as any).role === 'parent';
+        const isGod = (profile as any).role === 'god';
+
+        // Determinar org y agent a usar basado en permisos
+        let targetOrgId = (profile as any).organization_id;
+        let targetAgentId = user.id;
+
+        if (isGodOrParent && validatedData.agentId) {
+            targetAgentId = validatedData.agentId;
+        }
+        if (isGod && validatedData.organizationId) {
+            targetOrgId = validatedData.organizationId;
+        }
+
+        // Validar que el agente pertenece a la organización
+        if (targetAgentId !== user.id) {
+            const { data: targetAgent } = await supabase
+                .from('profiles')
+                .select('organization_id')
+                .eq('id', targetAgentId)
+                .single();
+
+            if (!targetAgent || (targetAgent as any).organization_id !== targetOrgId) {
+                return { success: false, error: 'El agente no pertenece a la organización seleccionada' };
+            }
+        }
+
+        const organization_id = targetOrgId;
 
         // 2. Lógica de Duplicados: Buscar clientes ACTIVOS en la misma organización
         const normalizedPhone = validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null;
@@ -82,7 +112,7 @@ export async function createClientAction(
             .from('clients' as any)
             .insert({
                 organization_id: organization_id,
-                agent_id: user.id,
+                agent_id: targetAgentId,
                 first_name: validatedData.firstName,
                 last_name: validatedData.lastName,
                 email: validatedData.email || null,
@@ -129,24 +159,41 @@ export async function updateClientAction(
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
+        // Obtener rol del usuario
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        const isGodOrParent = (profile as any)?.role === 'god' || (profile as any)?.role === 'parent';
+
+        // Construir payload de update
+        const updatePayload: any = {
+            first_name: validatedData.firstName,
+            last_name: validatedData.lastName,
+            email: validatedData.email || null,
+            phone: validatedData.phone ? validatedData.phone.replace(/[^\\d+]/g, '') : null,
+            type: validatedData.type,
+            status: validatedData.status,
+            motivation: validatedData.motivation,
+            budget_min: validatedData.budgetMin,
+            budget_max: validatedData.budgetMax,
+            preferred_zones: validatedData.preferredZones,
+            tags: validatedData.tags,
+            search_property_types: validatedData.searchPropertyTypes,
+            search_bedrooms: validatedData.searchBedrooms,
+            search_payment_methods: validatedData.searchPaymentMethods,
+        };
+
+        // Solo God/Parent puede reasignar agente
+        if (isGodOrParent && validatedData.agentId) {
+            updatePayload.agent_id = validatedData.agentId;
+        }
+
         const { data, error } = await (supabase
             .from('clients' as any) as any)
-            .update({
-                first_name: validatedData.firstName,
-                last_name: validatedData.lastName,
-                email: validatedData.email || null,
-                phone: validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null,
-                type: validatedData.type,
-                status: validatedData.status,
-                motivation: validatedData.motivation,
-                budget_min: validatedData.budgetMin,
-                budget_max: validatedData.budgetMax,
-                preferred_zones: validatedData.preferredZones,
-                tags: validatedData.tags,
-                search_property_types: validatedData.searchPropertyTypes,
-                search_bedrooms: validatedData.searchBedrooms,
-                search_payment_methods: validatedData.searchPaymentMethods,
-            })
+            .update(updatePayload)
             .eq('id', validatedData.id)
             .select()
             .single();

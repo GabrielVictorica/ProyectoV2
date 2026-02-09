@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,6 +31,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { isValidPhoneNumber } from 'react-phone-number-input';
 import type { Client } from '../types';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
 
 const clientSchema = z.object({
     firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -58,6 +60,8 @@ const clientSchema = z.object({
     searchPropertyTypes: z.array(z.string()).default([]),
     searchBedrooms: z.array(z.string()).default([]),
     searchPaymentMethods: z.array(z.string()).default([]),
+    organizationId: z.string().optional(),
+    agentId: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
@@ -81,6 +85,35 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
     const createClient = useCreateClient();
     const updateClient = useUpdateClient();
     const isEditing = !!client;
+
+    // Auth y roles
+    const { data: auth } = useAuth();
+    const role = auth?.profile?.role;
+    const isGod = role === 'god';
+    const isParent = role === 'parent';
+    const isGodOrParent = isGod || isParent;
+
+    // Solo cargar orgs/users si es necesario
+    const { data: organizations } = useOrganizations();
+    const { data: allUsers } = useUsers();
+
+    // Estado para org seleccionada
+    const [selectedOrgId, setSelectedOrgId] = useState<string>(
+        auth?.profile?.organization_id || ''
+    );
+
+    // Filtrar agentes por org
+    const filteredAgents = useMemo(() => {
+        if (!allUsers) return [];
+        return allUsers.filter((u: any) => u.organization_id === selectedOrgId);
+    }, [allUsers, selectedOrgId]);
+
+    // Sincronizar selectedOrgId cuando auth cargue
+    useEffect(() => {
+        if (auth?.profile?.organization_id && !selectedOrgId) {
+            setSelectedOrgId(auth.profile.organization_id);
+        }
+    }, [auth?.profile?.organization_id, selectedOrgId]);
 
     const parseNURC = (motivation: string | null, target: 'N' | 'U' | 'R' | 'C') => {
         if (!motivation) return '';
@@ -134,6 +167,8 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                 searchPropertyTypes: values.searchPropertyTypes,
                 searchBedrooms: values.searchBedrooms,
                 searchPaymentMethods: values.searchPaymentMethods,
+                organizationId: values.organizationId || undefined,
+                agentId: values.agentId || undefined,
             };
 
             const result = isEditing
@@ -281,6 +316,70 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                             </FormItem>
                                         )}
                                     />
+
+                                    {/* Selectores de Org/Agente para God/Parent */}
+                                    {isGodOrParent && (
+                                        <div className="grid grid-cols-2 gap-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                            {isGod && (
+                                                <FormField
+                                                    control={form.control}
+                                                    name="organizationId"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-purple-300 text-xs">Oficina</FormLabel>
+                                                            <Select
+                                                                value={field.value || selectedOrgId}
+                                                                onValueChange={(v) => {
+                                                                    field.onChange(v);
+                                                                    setSelectedOrgId(v);
+                                                                    form.setValue('agentId', '');
+                                                                }}
+                                                            >
+                                                                <FormControl>
+                                                                    <SelectTrigger className="bg-slate-800/50 border-slate-700 h-10">
+                                                                        <SelectValue placeholder="Mi oficina" />
+                                                                    </SelectTrigger>
+                                                                </FormControl>
+                                                                <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                                                                    {organizations?.map((org: any) => (
+                                                                        <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            )}
+                                            <FormField
+                                                control={form.control}
+                                                name="agentId"
+                                                render={({ field }) => (
+                                                    <FormItem className={isGod ? '' : 'col-span-2'}>
+                                                        <FormLabel className="text-purple-300 text-xs">Asignar a Agente</FormLabel>
+                                                        <Select
+                                                            value={field.value || '_self'}
+                                                            onValueChange={(v) => field.onChange(v === '_self' ? '' : v)}
+                                                        >
+                                                            <FormControl>
+                                                                <SelectTrigger className="bg-slate-800/50 border-slate-700 h-10">
+                                                                    <SelectValue placeholder="Yo mismo" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
+                                                                <SelectItem value="_self">Yo mismo</SelectItem>
+                                                                {filteredAgents.filter((a: any) => a.id !== auth?.id).map((agent: any) => (
+                                                                    <SelectItem key={agent.id} value={agent.id}>
+                                                                        {agent.first_name} {agent.last_name}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <FormField
                                             control={form.control}
