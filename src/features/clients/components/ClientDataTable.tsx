@@ -68,6 +68,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { parseNURC } from '../utils/clientUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
+import { Home, Bed } from "lucide-react";
 
 interface ClientDataTableProps {
     clients: (ClientWithAgent | AnonymousClient | ClientDisplay)[];
@@ -84,6 +86,7 @@ export function ClientDataTable({
     onDelete,
     onStatusChange
 }: ClientDataTableProps) {
+    const { data: propertyTypes } = usePropertyTypes();
     const isNetwork = scope === 'network';
     const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
@@ -116,7 +119,7 @@ export function ClientDataTable({
                         <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Cliente</TableHead>
                         <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12 text-center">NURC</TableHead>
                         <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Detalles</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Presupuesto</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12 w-[300px]">Búsqueda</TableHead>
                         {!isNetwork && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Contacto</TableHead>}
                         {scope === 'office' && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Agente</TableHead>}
                         <TableHead className="text-right text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Acciones</TableHead>
@@ -220,13 +223,39 @@ export function ClientDataTable({
 
                                 {/* COLUMNA: PRESUPUESTO */}
                                 <TableCell className="py-4">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-mono text-white">
-                                            ${client.budget_min.toLocaleString()} - ${client.budget_max.toLocaleString()}
-                                        </span>
-                                        <span className="text-[10px] text-white/40 truncate max-w-[120px]">
-                                            {client.preferred_zones.join(', ') || 'Sin zona'}
-                                        </span>
+                                    <div className="flex flex-col gap-1.5">
+                                        {/* Tipos y Ambientes */}
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                            {client.search_property_types?.slice(0, 3).map(typeId => {
+                                                const type = propertyTypes?.find(t => t.id === typeId);
+                                                if (!type) return null;
+                                                return (
+                                                    <Badge key={typeId} variant="outline" className="text-[9px] bg-blue-500/10 border-blue-500/20 text-blue-400 h-5 px-1.5 font-bold uppercase tracking-tighter">
+                                                        {type.name}
+                                                    </Badge>
+                                                );
+                                            })}
+                                            {client.search_bedrooms && client.search_bedrooms.length > 0 && (
+                                                <Badge variant="outline" className="h-5 px-1.5 gap-1 border-white/10 text-white/60 text-[9px] bg-white/5">
+                                                    <Bed className="w-2.5 h-2.5 opacity-50" />
+                                                    <span className="font-bold">{client.search_bedrooms.join(', ')} Amb.</span>
+                                                </Badge>
+                                            )}
+                                        </div>
+
+                                        {/* Presupuesto */}
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[11px] font-mono font-bold text-white tracking-tight">
+                                                USD {client.budget_min.toLocaleString()} - {client.budget_max.toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        {/* Zonas / Descripción de búsqueda (Sin restricciones) */}
+                                        <div className="text-[10px] text-white/40 leading-relaxed mt-0.5">
+                                            <span className="italic block break-words whitespace-normal">
+                                                {client.preferred_zones?.join(', ') || 'Zonas no definidas'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </TableCell>
 
