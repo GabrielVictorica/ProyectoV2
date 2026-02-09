@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useTransactions, useAggregatedMetrics, useDeleteTransaction } from '../hooks/useTransactions';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 import { CloseTransactionDialog } from './CloseTransactionDialog';
 import { formatCurrency } from '@/lib/formatters';
 import { TransactionWithRelations } from '../hooks/useTransactions';
@@ -87,7 +88,7 @@ export function ClosingsPage() {
 
     // Cargar datos para filtros (solo cuando el rol lo requiere)
     const { data: organizations } = useOrganizations({ enabled: role === 'god' });
-    const { data: allUsers } = useUsers({ enabled: role === 'god' || role === 'parent' });
+    const { data: allUsers } = useTeamMembers();
 
     // Generar años para el selector
     const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -112,12 +113,10 @@ export function ClosingsPage() {
             if (role === 'god') {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
-            if (role === 'parent') {
-                return u.organization_id === auth?.profile?.organization_id;
-            }
-            return u.id === auth?.id;
+            // Para Parent y externos, el hook useTeamMembers ya filtra por RLS
+            return true;
         });
-    }, [allUsers, selectedOrg, role, auth]);
+    }, [allUsers, selectedOrg, role]);
 
     const filteredTransactions = useMemo(() => {
         if (!transactions) return [];
