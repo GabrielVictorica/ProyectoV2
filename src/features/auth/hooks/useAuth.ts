@@ -41,24 +41,39 @@ export function useAuth() {
                 return null;
             }
 
-            // Obtener el perfil del usuario con su organización
-            const { data: profile, error: profileError } = await supabase
+            // Obtener el perfil del usuario (sin join inicial para depurar)
+            const profileResult = await (supabase
                 .from('profiles')
-                .select(`
-                    *,
-                    organization:organizations(*)
-                `)
+                .select('*')
                 .eq('id', user.id)
-                .single();
+                .single() as any);
+
+            const profile = profileResult.data;
+            const profileError = profileResult.error;
 
             if (profileError) {
-                console.error('Error fetching profile:', profileError);
+                console.error('Error fetching profile for user:', user.id, profileError);
+            } else if (!profile) {
+                console.warn('No profile found for user after success auth:', user.id);
+            } else {
+                console.log('Profile loaded successfully for role:', profile.role);
+            }
+
+            // Si hay perfil, podemos intentar traer la organización por separado o confiar en que se cargará luego
+            let organization = null;
+            if (profile?.organization_id) {
+                const { data: orgData } = await supabase
+                    .from('organizations')
+                    .select('*')
+                    .eq('id', profile.organization_id)
+                    .single();
+                organization = orgData;
             }
 
             return {
                 id: user.id,
                 email: user.email || '',
-                profile: profile || null,
+                profile: profile ? { ...profile, organization } : null,
                 role: profile?.role || null,
                 organizationId: profile?.organization_id || null,
             };

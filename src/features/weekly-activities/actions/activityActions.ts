@@ -84,14 +84,14 @@ export async function getWeeklyDataAction(
         // OPTIMIZACIÓN: Paralelizar queries de autorización
         const [requesterProfileResult, targetProfileResult] = await Promise.all([
             supabase.from('profiles' as any).select('role, organization_id').eq('id', user.id).single(),
-            adminClient.from('profiles' as any).select('organization_id').eq('id', agentId).single()
+            adminClient.from('profiles' as any).select('organization_id, reports_to_organization_id').eq('id', agentId).single()
         ]);
 
         if (!requesterProfileResult.data) return { success: false, error: 'Perfil no encontrado' };
         if (!targetProfileResult.data) return { success: false, error: 'Usuario destino no encontrado' };
 
         const userProfile = requesterProfileResult.data as { role: string; organization_id: string };
-        const targetProfile = targetProfileResult.data as { organization_id: string };
+        const targetProfile = targetProfileResult.data as { organization_id: string; reports_to_organization_id: string | null };
 
 
         // Lógica de autorización
@@ -99,8 +99,10 @@ export async function getWeeklyDataAction(
         const isOwner = user.id === agentId;
         const isSameOrg = userProfile.organization_id === targetProfile.organization_id;
         const isParent = userProfile.role === 'parent';
+        // Cross-org: Parent puede ver agentes que reportan a su org
+        const reportsToThisOrg = targetProfile.reports_to_organization_id === userProfile.organization_id;
 
-        const canSee = isGod || isOwner || (isParent && isSameOrg);
+        const canSee = isGod || isOwner || (isParent && (isSameOrg || reportsToThisOrg));
 
         if (!canSee) {
             return { success: false, error: 'No autorizado para ver estos datos' };

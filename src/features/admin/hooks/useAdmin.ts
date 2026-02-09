@@ -15,6 +15,7 @@ export const adminKeys = {
 export type UserWithOrganization = Profile & {
     organization: Organization | null;
     parent: Profile | null;
+    reports_to_organization_id?: string | null;
 };
 
 export type OrganizationWithBilling = Organization & {
@@ -32,17 +33,16 @@ export function useOrganizations(options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: adminKeys.organizations(),
         queryFn: async (): Promise<OrganizationWithBilling[]> => {
-            // Obtenemos organizaciones
-            const { data: orgs, error: orgsError } = await supabase
-                .from('organizations')
+            const { data: orgs, error: orgsError } = await (supabase
+                .from('organizations') as any)
                 .select('*')
                 .order('name');
 
             if (orgsError) throw orgsError;
 
             // Obtenemos conteos de billing records no pagados
-            const { data: billingInfo, error: billingError } = await supabase
-                .from('billing_records')
+            const { data: billingInfo, error: billingError } = await (supabase
+                .from('billing_records') as any)
                 .select('organization_id, status, first_due_date, due_date')
                 .neq('status', 'paid')
                 .neq('status', 'cancelled');
@@ -82,8 +82,8 @@ export function useUsers(options?: { enabled?: boolean }) {
         queryKey: adminKeys.users(),
         queryFn: async (): Promise<UserWithOrganization[]> => {
             // Primero obtenemos los perfiles con organizaciones
-            const { data, error } = await supabase
-                .from('profiles')
+            const { data, error } = await (supabase
+                .from('profiles') as any)
                 .select(`
                     *,
                     organization:organizations(*)
@@ -103,8 +103,8 @@ export function useUsers(options?: { enabled?: boolean }) {
             let parentsMap: Record<string, { first_name: string; last_name: string }> = {};
 
             if (parentIds.length > 0) {
-                const { data: parents } = await supabase
-                    .from('profiles')
+                const { data: parents } = await (supabase
+                    .from('profiles') as any)
                     .select('id, first_name, last_name')
                     .in('id', parentIds);
 
@@ -196,8 +196,8 @@ export function useCreateUser() {
                 }
 
                 // Crear el perfil
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
+                const { data: profile, error: profileError } = await (supabase
+                    .from('profiles') as any)
                     .insert({
                         id: signUpData.user.id,
                         first_name: userData.first_name,
@@ -222,8 +222,8 @@ export function useCreateUser() {
             }
 
             // Crear el perfil
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
+            const { data: profile, error: profileError } = await (supabase
+                .from('profiles') as any)
                 .insert({
                     id: authData.user.id,
                     first_name: userData.first_name,

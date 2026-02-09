@@ -55,6 +55,10 @@ export default function DashboardPage() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header - Instant Render */}
             <div className="flex flex-col gap-1">
+                {/* DEBUG BAR */}
+                <div className="mb-4 p-2 bg-red-900/40 border border-red-500/50 rounded text-[10px] font-mono text-red-200">
+                    DEBUG: UID={auth?.id} | ROLE={auth?.role} | PROFILE_ID={auth?.profile?.id} | FNAME={auth?.profile?.first_name}
+                </div>
                 <h1 className="text-3xl font-bold text-white tracking-tight">
                     {getGreeting()}, {auth?.profile?.first_name || 'Agente'}!
                 </h1>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useTeamStats, type TeamMember } from '@/features/team/hooks/useTeam';
-import { usePermissions } from '@/features/auth/hooks/useAuth';
+import { useTeamStats } from '@/features/team/hooks/useTeam';
+import { type TeamMember } from '@/features/team/actions/teamActions';
+import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,8 +55,10 @@ import React, { useState } from 'react';
 import { deleteUserAction, toggleUserStatusAction } from '@/features/admin/actions/adminActions';
 import { redirect } from 'next/navigation';
 import { formatCurrency } from '@/lib/formatters';
+import { cn } from '@/lib/utils';
 
 export default function TeamPage() {
+    const { data: auth } = useAuth();
     const { isGod, isParent } = usePermissions();
     const { data: team, isLoading, error, refetch } = useTeamStats();
     const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -109,11 +112,17 @@ export default function TeamPage() {
         );
     }
 
-    const parents = team?.filter(m => m.role === 'parent') || [];
-    const children = team?.filter(m => m.role === 'child' || m.role === 'god') || [];
+    const nativeMembers = (team as any[])?.filter(m => m.organization_id === auth?.profile?.organization_id) || [];
+    const externalReports = (team as any[])?.filter(m => m.organization_id !== auth?.profile?.organization_id && m.reports_to_organization_id === auth?.profile?.organization_id) || [];
 
-    const renderMemberRow = (member: TeamMember) => (
-        <TableRow key={member.id} className="border-slate-700/50 hover:bg-slate-700/30 transition-colors group">
+    const parents = nativeMembers.filter(m => m.role === 'parent');
+    const nativeChildren = nativeMembers.filter(m => m.role === 'child' || m.role === 'god');
+
+    const renderMemberRow = (member: TeamMember, isExternal: boolean = false) => (
+        <TableRow key={member.id} className={cn(
+            "border-slate-700/50 hover:bg-slate-700/30 transition-colors group",
+            isExternal && "bg-violet-500/5"
+        )}>
             <TableCell>
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:border-blue-500/50 transition-colors overflow-hidden">
@@ -126,33 +135,38 @@ export default function TeamPage() {
                         )}
                     </div>
                     <div>
-                        <p className="text-white font-medium flex items-center gap-2">
-                            {member.first_name} {member.last_name}
+                        <div className="flex items-center gap-2">
+                            <p className="text-white font-medium">
+                                {member.first_name} {member.last_name}
+                            </p>
                             {!member.is_active && (
                                 <Badge variant="destructive" className="h-4 px-1 text-[8px] uppercase">Inactivo</Badge>
                             )}
-                        </p>
-                        <p className="text-slate-500 text-xs">{member.email}</p>
+                            {isExternal && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] uppercase bg-violet-500/20 text-violet-400 border-violet-500/30">Externo</Badge>
+                            )}
+                        </div>
+                        <p className="text-slate-500 text-xs">{(member as any).email}</p>
                     </div>
                 </div>
             </TableCell>
             <TableCell>
                 <Badge variant="outline" className={`text-[10px] uppercase font-bold ${member.role === 'parent' ? 'text-blue-400 border-blue-400/30' : 'text-green-400 border-green-400/30'}`}>
-                    {member.role === 'parent' ? 'Broker' : 'Agente'}
+                    {member.role === 'parent' ? 'Broker' : (member.role === 'god' ? 'Admin' : 'Agente')}
                 </Badge>
             </TableCell>
             <TableCell className="text-center">
                 <Badge className="bg-slate-700/50 text-slate-300 border-slate-600 font-mono">
-                    {member.property_count}
+                    {(member as any).property_count}
                 </Badge>
             </TableCell>
             <TableCell className="text-center">
                 <Badge className="bg-green-500/10 text-green-400 border-green-500/20 font-mono">
-                    {member.sales_count}
+                    {(member as any).sales_count}
                 </Badge>
             </TableCell>
             <TableCell className="text-right text-white font-mono">
-                {formatCurrency(member.sales_volume)}
+                {formatCurrency((member as any).sales_volume)}
             </TableCell>
             <TableCell>
                 <div className="flex items-center gap-2">
@@ -161,7 +175,7 @@ export default function TeamPage() {
                             <Phone className="h-4 w-4" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={member.email}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={member.email || ''}>
                         <Mail className="h-4 w-4" />
                     </Button>
                 </div>
@@ -183,7 +197,7 @@ export default function TeamPage() {
                             Ver Cartera
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                            onClick={() => handleToggleStatus(member.id, member.is_active)}
+                            onClick={() => handleToggleStatus(member.id, !!member.is_active)}
                             className="text-slate-300 focus:bg-slate-800 cursor-pointer"
                         >
                             <Power className="mr-2 h-4 w-4" />
@@ -223,11 +237,11 @@ export default function TeamPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                        Mi Equipo
+                        Equipo y Colaboradores
                     </h1>
                     <p className="text-slate-400 mt-1 flex items-center gap-2">
                         <Users className="h-4 w-4 text-blue-500" />
-                        Gestión de estructura y rendimiento comercial
+                        Gestión de estructura interna y reportes externos
                     </p>
                 </div>
                 {isGod && (
@@ -252,23 +266,23 @@ export default function TeamPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {/* Render de Brokers primero si existen */}
+                        {/* Miembros Propios de la Oficina */}
                         {parents.length > 0 && (
                             <>
                                 <TableRow className="bg-blue-500/5 hover:bg-blue-500/5 border-none">
                                     <TableCell colSpan={7} className="py-2">
                                         <p className="text-blue-400 text-[10px] font-bold uppercase tracking-widest pl-2 flex items-center gap-2">
-                                            <Building className="h-3 w-3" /> Directivos
+                                            <Building className="h-3 w-3" /> Staff Directivo
                                         </p>
                                     </TableCell>
                                 </TableRow>
-                                {parents.map(renderMemberRow)}
+                                {parents.map(m => renderMemberRow(m))}
                             </>
                         )}
 
                         {/* Equipos por Broker */}
                         {parents.map(parent => {
-                            const myAgents = children.filter(c => c.parent_id === parent.id);
+                            const myAgents = nativeChildren.filter(c => c.parent_id === parent.id);
                             if (myAgents.length === 0) return null;
 
                             return (
@@ -280,25 +294,39 @@ export default function TeamPage() {
                                             </p>
                                         </TableCell>
                                     </TableRow>
-                                    {myAgents.map(renderMemberRow)}
+                                    {myAgents.map(m => renderMemberRow(m))}
                                 </React.Fragment>
                             );
                         })}
 
                         {/* Agentes sin supervisor */}
-                        {children.filter(c => !c.parent_id || !parents.some(p => p.id === c.parent_id)).length > 0 && (
+                        {nativeChildren.filter(c => !c.parent_id || !parents.some(p => p.id === c.parent_id)).length > 0 && (
                             <>
                                 <TableRow className="bg-slate-800/30 hover:bg-slate-800/30 border-none">
                                     <TableCell colSpan={7} className="py-2">
                                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest pl-2">
-                                            Agentes Generales
+                                            Agentes de Planta
                                         </p>
                                     </TableCell>
                                 </TableRow>
-                                {children
+                                {nativeChildren
                                     .filter(c => !c.parent_id || !parents.some(p => p.id === c.parent_id))
-                                    .map(renderMemberRow)
+                                    .map(m => renderMemberRow(m))
                                 }
+                            </>
+                        )}
+
+                        {/* Colaboradores Externos (Cross-Org Reports) */}
+                        {externalReports.length > 0 && (
+                            <>
+                                <TableRow className="bg-violet-500/10 hover:bg-violet-500/10 border-none">
+                                    <TableCell colSpan={7} className="py-2">
+                                        <p className="text-violet-400 text-[10px] font-bold uppercase tracking-widest pl-2 flex items-center gap-2">
+                                            <TrendingUp className="h-3 w-3" /> Colaboradores Externos (Reportan aquí)
+                                        </p>
+                                    </TableCell>
+                                </TableRow>
+                                {externalReports.map(m => renderMemberRow(m, true))}
                             </>
                         )}
                     </TableBody>

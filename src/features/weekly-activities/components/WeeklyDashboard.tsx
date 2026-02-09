@@ -18,7 +18,8 @@ import { es } from 'date-fns/locale';
 import { useObjectives } from '@/features/objectives/hooks/useObjectives';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 import type { UserWithOrganization, OrganizationWithBilling } from '@/features/admin/hooks/useAdmin';
 
 export function WeeklyDashboard() {
@@ -35,24 +36,20 @@ export function WeeklyDashboard() {
         }
     }, [auth, selectedAgentId]);
 
-    // Hooks for filters
     const { data: organizations } = useOrganizations();
-    const { data: allUsers } = useUsers();
+    const { data: teamMembers, isLoading: teamLoading } = useTeamMembers();
 
     // Filtered users based on role and organization
     const filteredUsers = React.useMemo(() => {
-        if (!allUsers) return [];
-        return (allUsers as UserWithOrganization[]).filter(u => {
+        if (!teamMembers) return [];
+        return teamMembers.filter(u => {
             if (isGod) {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
-            if (isParent) {
-                // Broker can see users in their org, including God users assigned to that org
-                return u.organization_id === auth?.profile?.organization_id;
-            }
-            return false; // Child sees nothing in the list anyway as the selector is hidden
+            // Los Parents y Externos ya vienen filtrados por RLS del Server Action
+            return true;
         });
-    }, [allUsers, isGod, isParent, selectedOrg, auth]);
+    }, [teamMembers, isGod, selectedOrg]);
 
     const { weeklyData, isLoading } = useWeeklyActivities(currentWeekStart, selectedAgentId);
 
@@ -190,7 +187,7 @@ export function WeeklyDashboard() {
                                 className="bg-transparent text-sm font-medium text-white/60 focus:outline-none px-3 py-1.5 rounded-xl hover:bg-white/[0.04] cursor-pointer"
                             >
                                 <option value="" disabled className="bg-slate-900">Seleccionar agente</option>
-                                {(filteredUsers as UserWithOrganization[]).map(user => (
+                                {(filteredUsers as any[]).map(user => (
                                     <option key={user.id} value={user.id} className="bg-slate-900">
                                         {user.first_name} {user.last_name} {user.id === auth?.profile?.id ? '(Yo)' : ''}
                                     </option>

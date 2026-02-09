@@ -274,7 +274,7 @@ export async function getClientsAction(
 
         let query = supabase
             .from('clients')
-            .select('*, agent:profiles(id, first_name, last_name, phone)', { count: 'exact' });
+            .select('*, agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)', { count: 'exact' });
 
         if (filters?.type) query = query.eq('type', filters.type);
         if (filters?.status) query = query.eq('status', filters.status);
@@ -334,7 +334,7 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
                 .select(`
                     *,
                     organization:organizations(name),
-                    agent:profiles(id, first_name, last_name, phone)
+                    agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)
                 `)
                 .neq('agent_id', user.id);
         } else if (isParent) {
@@ -345,7 +345,7 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
                 .select(`
                     *,
                     organization:organizations(name),
-                    agent:profiles(id, first_name, last_name, phone)
+                    agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)
                 `)
                 .neq('agent_id', user.id);
         } else {

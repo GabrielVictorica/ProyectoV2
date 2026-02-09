@@ -16,7 +16,8 @@ import { ObjectivesListingsFunnel } from './ObjectivesListingsFunnel';
 import { ObjectivesAgentTable } from './ObjectivesAgentTable';
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 
 
 export function ObjectivesPage() {
@@ -50,7 +51,7 @@ export function ObjectivesPage() {
 
     // Hooks para datos de filtros
     const { data: organizations } = useOrganizations();
-    const { data: allUsers } = useUsers();
+    const { data: teamMembers } = useTeamMembers();
     // Determinar si estamos en vista de equipo
     // Es team view si es God/Parent Y está en 'all'
     const isTeamView = isGodOrParent && selectedAgentId === 'all';
@@ -92,17 +93,15 @@ export function ObjectivesPage() {
 
     // Agentes filtrados por organización
     const filteredAgents = useMemo(() => {
-        if (!allUsers) return [];
-        return allUsers.filter((u) => {
+        if (!teamMembers) return [];
+        return teamMembers.filter((u) => {
             if (isGod) {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
-            if (isParent) {
-                return u.organization_id === auth?.profile?.organization_id;
-            }
-            return u.id === auth?.profile?.id;
+            // Parents y Externos ya vienen filtrados por RLS/Server Action
+            return true;
         });
-    }, [allUsers, selectedOrg, isGod, isParent, auth]);
+    }, [teamMembers, isGod, selectedOrg]);
 
     // Handlers
     const handleResetFilters = () => {
@@ -223,8 +222,8 @@ export function ObjectivesPage() {
                     onOpenChange={setIsDialogOpen}
                     agentId={effectiveAgentId}
                     agentName={
-                        allUsers?.find((u: { id: string }) => u.id === effectiveAgentId)
-                            ? `${allUsers.find((u: { id: string }) => u.id === effectiveAgentId)?.first_name} ${allUsers.find((u: { id: string }) => u.id === effectiveAgentId)?.last_name}`
+                        teamMembers?.find((u: { id: string }) => u.id === effectiveAgentId)
+                            ? `${teamMembers.find((u: { id: string }) => u.id === effectiveAgentId)?.first_name} ${teamMembers.find((u: { id: string }) => u.id === effectiveAgentId)?.last_name}`
                             : 'Agente'
                     }
                     year={selectedYear}

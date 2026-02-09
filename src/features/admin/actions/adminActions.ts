@@ -746,21 +746,21 @@ export async function getAgentProgressAction(agentId: string, year: number) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
-        // OPTIMIZACIÓN: Paralelizar queries de autorización + datos
         const [profileResult, targetProfileResult, progressResult] = await Promise.all([
-            supabase.from('profiles' as any).select('role, organization_id').eq('id', user.id).single(),
-            adminClient.from('profiles' as any).select('organization_id').eq('id', agentId).single(),
-            adminClient.from('view_agent_progress' as any).select('*').eq('agent_id', agentId).eq('year', year).maybeSingle()
+            (supabase.from('profiles') as any).select('role, organization_id').eq('id', user.id).single(),
+            (adminClient.from('profiles') as any).select('organization_id, reports_to_organization_id').eq('id', agentId).single(),
+            (adminClient.from('view_agent_progress') as any).select('*').eq('agent_id', agentId).eq('year', year).maybeSingle()
         ]);
 
         if (!profileResult.data) return { success: false, error: 'Perfil no encontrado' };
         if (!targetProfileResult.data) return { success: false, error: 'Agente no encontrado' };
 
         const userProfile = profileResult.data as { role: string; organization_id: string };
-        const targetProfile = targetProfileResult.data as { organization_id: string };
+        const targetProfile = targetProfileResult.data as { organization_id: string; reports_to_organization_id: string | null };
         const isSameOrg = userProfile.organization_id === targetProfile.organization_id;
+        const reportsToMyOrg = targetProfile.reports_to_organization_id === userProfile.organization_id;
 
-        const canSee = userProfile.role === 'god' || user.id === agentId || (userProfile.role === 'parent' && isSameOrg);
+        const canSee = userProfile.role === 'god' || user.id === agentId || (userProfile.role === 'parent' && (isSameOrg || reportsToMyOrg));
         if (!canSee) return { success: false, error: 'No autorizado para ver estos objetivos' };
 
         if (progressResult.error) throw progressResult.error;
@@ -797,7 +797,7 @@ export async function getTeamObjectivesSummaryAction(year: number, organizationI
             query = query.eq('organization_id', targetOrgId);
         }
 
-        const { data, error } = await query;
+        const { data, error } = await (query as any);
         if (error) throw error;
 
         return { success: true, data };

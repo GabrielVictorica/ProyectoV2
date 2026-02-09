@@ -43,7 +43,20 @@ export async function GET(request: NextRequest) {
         if (profile.role === 'god') {
             if (organizationId) query = query.eq('organization_id', organizationId);
         } else if (profile.role === 'parent') {
-            query = query.eq('organization_id', profile.organization_id);
+            // Parent ve: su org + agentes que reportan a su org
+            const { data: reportingAgents } = await (adminClient as any)
+                .from('profiles')
+                .select('id')
+                .eq('reports_to_organization_id', profile.organization_id);
+
+            const reportingAgentIds = (reportingAgents || []).map((a: any) => a.id);
+
+            if (reportingAgentIds.length > 0) {
+                // Ver métricas de su org O métricas de agentes que reportan a su org
+                query = query.or(`organization_id.eq.${profile.organization_id},agent_id.in.(${reportingAgentIds.join(',')})`);
+            } else {
+                query = query.eq('organization_id', profile.organization_id);
+            }
         } else {
             // Child solo ve sus propias métricas
             query = query.eq('agent_id', user.id);

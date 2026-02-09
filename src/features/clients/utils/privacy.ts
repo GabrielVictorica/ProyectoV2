@@ -27,9 +27,11 @@ export function applyPrivacyPolicy(
     const isParent = userProfile.role === 'parent';
     const isOwner = client.agent_id === currentUserId;
     const isSameOrg = client.organization_id === userProfile.organization_id;
+    // Cross-org: El agente del cliente reporta a la org del Parent
+    const agentReportsToMyOrg = client.agent?.reports_to_organization_id === userProfile.organization_id;
 
-    // Lógica Regla de Oro: Visibilidad jerárquica
-    const canSeePII = isGod || (isParent && isSameOrg) || isOwner;
+    // Lógica Regla de Oro: Visibilidad jerárquica + cross-org
+    const canSeePII = isGod || (isParent && (isSameOrg || agentReportsToMyOrg)) || isOwner;
 
     // Mapeo base de datos auxiliares (Network info)
     const organizationName = client.organization?.name || client.organization_name || 'Inmobiliaria';
