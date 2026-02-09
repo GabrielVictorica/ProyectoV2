@@ -14,12 +14,12 @@ export async function POST() {
         }
 
         const { data: profile } = await supabase
-            .from('profiles')
+            .from('profiles' as any)
             .select('role')
             .eq('id', user.id)
             .single();
 
-        if (profile?.role !== 'god') {
+        if ((profile as any)?.role !== 'god') {
             return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
         }
 
