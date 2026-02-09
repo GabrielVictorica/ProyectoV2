@@ -6,6 +6,7 @@ export interface ClientDisplay extends Client {
     agent_name?: string;
     agent_phone?: string;
     organization_name?: string;
+    motivation: string | null;
 }
 
 export interface UserProfile {
@@ -50,7 +51,8 @@ export function applyPrivacyPolicy(
             is_anonymous: false,
             organization_name: organizationName,
             agent_name: agentName,
-            agent_phone: agentPhone
+            agent_phone: agentPhone,
+            motivation: client.motivation || null
         };
     }
 
@@ -65,6 +67,7 @@ export function applyPrivacyPolicy(
         anonymous_label: client.anonymous_label || `Cliente Activo (${client.type || 'Interesado'})`,
         organization_name: organizationName,
         agent_name: agentName,
-        agent_phone: agentPhone
+        agent_phone: agentPhone,
+        motivation: client.motivation || null
     };
 }

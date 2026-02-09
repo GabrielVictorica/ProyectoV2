@@ -128,9 +128,8 @@ export function ClientDataTable({
                         const isNetwork = scope === 'network';
                         const isActuallyAnonymous = client.is_anonymous;
 
-                        const motivation = client.anonymous_label || `Búsqueda en ${client.organization_name || 'Red'}`;
-
-                        const nurc = parseNURC(motivation);
+                        const motivationForNURC = client.motivation || client.anonymous_label || '';
+                        const nurc = parseNURC(motivationForNURC);
 
                         const agentPhone = client.agent_phone;
 
