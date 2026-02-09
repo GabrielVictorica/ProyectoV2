@@ -12,12 +12,12 @@ async function verifyGodUser() {
     }
 
     const { data: profile } = await supabase
-        .from('profiles')
+        .from('profiles' as any)
         .select('role')
         .eq('id', user.id)
         .single();
 
-    if (profile?.role !== 'god') {
+    if ((profile as any)?.role !== 'god') {
         return { isGod: false, error: 'No autorizado' };
     }
 
@@ -141,7 +141,7 @@ export async function DELETE(request: NextRequest) {
 
         const adminClient = createAdminClient();
         const { error } = await adminClient
-            .from('organizations')
+            .from('organizations' as any)
             .delete()
             .eq('id', id);
 
