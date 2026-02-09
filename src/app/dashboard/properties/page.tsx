@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { useProperties } from '@/features/properties/hooks/useProperties';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,8 +14,17 @@ import { formatCurrency } from '@/lib/formatters';
 
 export default function PropertiesPage() {
     const { data: auth } = useAuth();
-    const { isGod, isParent } = usePermissions();
+    const { isGod, isParent, isLoading: authLoading } = usePermissions();
     const { data: properties, isLoading, error } = useProperties();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!authLoading && !isGod) {
+            router.push('/dashboard/clients');
+        }
+    }, [isGod, authLoading, router]);
+
+    if (authLoading || (!isGod && !authLoading)) return null;
 
     if (isLoading) {
         return (
@@ -116,8 +127,6 @@ export default function PropertiesPage() {
                                         </div>
                                         <CloseTransactionDialog
                                             propertyId={property.id}
-                                            propertyTitle={property.title}
-                                            organizationId={property.agent.organization?.id}
                                             trigger={
                                                 <Button size="sm" variant="ghost" className="h-8 text-green-400 hover:text-green-300 hover:bg-green-500/10 p-2">
                                                     <Plus className="h-4 w-4" />
@@ -150,4 +159,3 @@ export default function PropertiesPage() {
         </div>
     );
 }
-

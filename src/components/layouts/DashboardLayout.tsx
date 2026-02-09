@@ -146,6 +146,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     // Dynamic items based on roles
     const dynamicItems = useMemo(() => {
+        const main = MAIN_ITEMS.filter(item => {
+            if (item.href === '/dashboard' || item.href === '/dashboard/properties') {
+                return isGod;
+            }
+            return true;
+        });
+
         const team = (isGod || isParent) ? [
             { href: '/dashboard/team', label: 'Mi Equipo', icon: Users }
         ] : [];
@@ -156,7 +163,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             { href: '/dashboard/admin/billing', label: 'Finanzas', icon: DollarSign },
         ] : [];
 
-        return { team, admin };
+        return { main, team, admin };
     }, [isGod, isParent, canManageUsers]);
 
     const badge = useMemo(() => {
@@ -193,7 +200,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     {/* Navigation */}
                     <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
                         {/* Main Items */}
-                        {MAIN_ITEMS.map((item) => (
+                        {dynamicItems.main.map((item) => (
                             <NavigationLink
                                 key={item.href}
                                 item={item}

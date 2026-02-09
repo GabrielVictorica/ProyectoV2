@@ -139,7 +139,7 @@ export function useLogout() {
  * Helper para verificar permisos basados en rol
  */
 export function usePermissions() {
-    const { data: auth } = useAuth();
+    const { data: auth, isLoading } = useAuth();
 
     const isGod = auth?.role === 'god';
     const isParent = auth?.role === 'parent';
@@ -161,5 +161,6 @@ export function usePermissions() {
         role: auth?.role,
         organizationId: auth?.organizationId,
         auth,
+        isLoading,
     };
 }

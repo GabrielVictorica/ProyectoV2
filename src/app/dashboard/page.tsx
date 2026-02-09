@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +12,19 @@ import { DashboardSkeleton } from '@/features/dashboard/components/DashboardSkel
 
 export default function DashboardPage() {
     const { data: auth } = useAuth();
-    const { isGod, isParent, role } = usePermissions();
+    const { isGod, isParent, role, isLoading: authLoading } = usePermissions();
     const { data: stats, isLoading } = useDashboardStats();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!authLoading && !isGod) {
+            router.push('/dashboard/clients');
+        }
+    }, [isGod, authLoading, router]);
+
+    if (authLoading || (!isGod && !authLoading)) {
+        return <DashboardSkeleton />;
+    }
 
     const getGreeting = () => {
         const hour = new Date().getHours();
