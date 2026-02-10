@@ -133,15 +133,17 @@ export function ClientsDashboard() {
                         />
                     </div>
 
+                    <Button
+                        onClick={() => {
+                            setSelectedClient(undefined);
+                            setIsFormOpen(true);
+                        }}
+                        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-10 px-6 shadow-lg shadow-purple-500/20"
+                    >
+                        <Plus className="w-4 h-4 mr-2" /> Agregar Cliente
+                    </Button>
+
                     <Dialog open={isFormOpen} onOpenChange={(open) => !open && handleCloseForm()}>
-                        <DialogTrigger asChild>
-                            <Button
-                                onClick={() => setSelectedClient(undefined)}
-                                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-10 px-6 shadow-lg shadow-purple-500/20"
-                            >
-                                <Plus className="w-4 h-4 mr-2" /> Agregar Cliente
-                            </Button>
-                        </DialogTrigger>
                         <DialogContent className="max-w-4xl bg-slate-900 border-slate-800">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-bold text-white">
