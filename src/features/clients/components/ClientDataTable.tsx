@@ -155,7 +155,7 @@ export function ClientDataTable({
                                         <div className="flex flex-col">
                                             <span className="font-bold text-sm text-white group-hover:text-violet-400 transition-colors">
                                                 {isActuallyAnonymous
-                                                    ? client.anonymous_label
+                                                    ? (client.first_name || client.anonymous_label || 'Cliente Protegido')
                                                     : `${client.first_name || 'Cliente'} ${client.last_name || ''}`}
                                             </span>
                                             {isActuallyAnonymous && (

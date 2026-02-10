@@ -57,14 +57,16 @@ export function applyPrivacyPolicy(
     }
 
     // Retorno Anonimizado (Strip PII)
+    const displayName = client.display_name || 'Cliente Protegido';
+
     return {
         ...client,
-        first_name: 'Cliente',
-        last_name: '(Oculto)',
+        first_name: displayName,
+        last_name: '',
         email: null,
         phone: null,
         is_anonymous: true,
-        anonymous_label: client.anonymous_label || `Cliente Activo (${client.type || 'Interesado'})`,
+        anonymous_label: client.anonymous_label || displayName,
         organization_name: organizationName,
         agent_name: agentName,
         agent_phone: agentPhone,

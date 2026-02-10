@@ -43,7 +43,7 @@ import { Loader2, UserCog } from 'lucide-react';
 const formSchema = z.object({
     firstName: z.string().min(2, 'Mínimo 2 caracteres'),
     lastName: z.string().min(2, 'Mínimo 2 caracteres'),
-    parentId: z.string().optional(),
+    supervisorIds: z.array(z.string()).optional().default([]),
     phone: z.string().optional(),
     defaultSplitPercentage: z.coerce.number().min(0, 'Mínimo 0').max(100, 'Máximo 100'),
     organizationId: z.string().uuid('Selecciona una organización').optional(),
@@ -58,7 +58,7 @@ interface User {
     email?: string;
     role: string | null;
     organization_id: string | null;
-    parent_id: string | null;
+    supervisor_ids?: string[];
     phone: string | null;
     default_split_percentage: number | null;
 }
@@ -96,7 +96,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
         defaultValues: {
             firstName: user.first_name || '',
             lastName: user.last_name || '',
-            parentId: user.parent_id || 'none',
+            supervisorIds: user.supervisor_ids || [],
             phone: user.phone || '',
             defaultSplitPercentage: user.default_split_percentage || 45,
             organizationId: user.organization_id || '',
@@ -146,7 +146,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
         setError(null);
         const submissionData = {
             ...data,
-            parentId: data.parentId === 'none' ? undefined : data.parentId
+            supervisorIds: data.supervisorIds || []
         };
 
         const result = await updateUserAction(user.id, submissionData as any);
@@ -219,31 +219,67 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                         {(user.role === 'child' || user.role === 'god') && (
                             <FormField
                                 control={form.control}
-                                name="parentId"
+                                name="supervisorIds"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200">Broker / Supervisor (Opcional)</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                    <SelectValue placeholder={loadingParents ? "Cargando..." : "Sin supervisor"} />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-slate-800 border-slate-700">
-                                                <SelectItem value="none" className="text-slate-400 focus:bg-slate-700">
-                                                    Sin supervisor
-                                                </SelectItem>
-                                                {parentUsers.map((parent) => (
-                                                    <SelectItem
-                                                        key={parent.id}
-                                                        value={parent.id}
-                                                        className="text-slate-200 focus:bg-slate-700"
-                                                    >
-                                                        {parent.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-slate-200 text-sm font-medium">Supervisores (Opcional - Multinivel)</FormLabel>
+                                            {field.value.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => field.onChange([])}
+                                                    className="text-xs text-slate-400 hover:text-white"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 max-h-[150px] overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+                                            {loadingParents ? (
+                                                <div className="flex items-center justify-center p-4 text-slate-400 text-xs gap-2">
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    Cargando supervisores...
+                                                </div>
+                                            ) : parentUsers.length === 0 ? (
+                                                <div className="text-slate-500 text-xs italic p-2">
+                                                    No hay supervisores disponibles en esta organización.
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    {parentUsers.map((parent) => {
+                                                        const isSelected = field.value.includes(parent.id);
+                                                        return (
+                                                            <div
+                                                                key={parent.id}
+                                                                onClick={() => {
+                                                                    const current = field.value;
+                                                                    if (isSelected) {
+                                                                        field.onChange(current.filter(id => id !== parent.id));
+                                                                    } else {
+                                                                        field.onChange([...current, parent.id]);
+                                                                    }
+                                                                }}
+                                                                className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm ${isSelected
+                                                                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-200'
+                                                                        : 'hover:bg-slate-700/60 text-slate-300 border border-transparent'
+                                                                    }`}
+                                                            >
+                                                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isSelected
+                                                                        ? 'bg-blue-500 border-blue-400'
+                                                                        : 'border-slate-500 bg-transparent'
+                                                                    }`}>
+                                                                    {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                                </div>
+                                                                {parent.name}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <FormDescription className="text-slate-500 text-[11px]">
+                                            Selecciona uno o más Brokers para que supervisen a este agente simultáneamente.
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -260,8 +296,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                                         <Select
                                             onValueChange={(val) => {
                                                 field.onChange(val);
-                                                // Resetear supervisor al cambiar org
-                                                form.setValue('parentId', 'none');
+                                                // Resetear supervisores al cambiar org
+                                                form.setValue('supervisorIds', []);
                                             }}
                                             value={field.value}
                                             defaultValue={field.value}

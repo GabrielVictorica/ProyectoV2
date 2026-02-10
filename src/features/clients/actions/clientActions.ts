@@ -367,6 +367,9 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
         const processed = (data || []).map((c: any) => {
             const clientData = {
                 ...c,
+                // Priorizar display_name de la vista anónima para evitar fugas
+                first_name: c.display_name || c.first_name || 'Cliente',
+                last_name: c.display_name ? '' : (c.last_name || ''),
                 organization_name: c.organization?.name || c.organization_name || 'Inmobiliaria',
                 agent_name: c.agent ? `${c.agent.first_name || ''} ${c.agent.last_name || ''}`.trim() : (c.agent_name || 'Agente'),
                 agent_phone: c.agent?.phone || c.agent_phone || null

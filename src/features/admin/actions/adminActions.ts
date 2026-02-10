@@ -75,7 +75,7 @@ const createUserSchema = z.object({
     lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
     role: z.enum(['parent', 'child'], { message: 'Rol inválido' }),
     organizationId: z.string().uuid('ID de organización inválido'),
-    parentId: z.string().uuid('ID de supervisor inválido').optional().or(z.literal('')),
+    supervisorIds: z.array(z.string().uuid()).optional().default([]),
     phone: z.string().optional(),
     defaultSplitPercentage: z.coerce.number().min(0).max(100).default(45),
 });
@@ -84,7 +84,7 @@ const updateUserSchema = z.object({
     firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
     lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
     phone: z.string().optional().or(z.literal('')),
-    parentId: z.string().uuid('ID de supervisor inválido').optional().or(z.literal('')),
+    supervisorIds: z.array(z.string().uuid()).optional().default([]),
     defaultSplitPercentage: z.coerce.number().min(0).max(100),
     organizationId: z.string().uuid('ID de organización inválido').optional().or(z.literal('')),
 });
@@ -333,6 +333,24 @@ export async function createUserAction(
         const validatedData = createUserSchema.parse(formData);
         const adminClient = createAdminClient();
 
+        // 2. Validar que todos los supervisores pertenecen a la misma organización
+        if (validatedData.supervisorIds && validatedData.supervisorIds.length > 0) {
+            const { data: supervisors, error: supervisorCheckError } = await adminClient
+                .from('profiles')
+                .select('id, organization_id')
+                .in('id', validatedData.supervisorIds);
+
+            if (supervisorCheckError) throw supervisorCheckError;
+
+            const invalidSupervisors = supervisors?.filter(s => s.organization_id !== validatedData.organizationId);
+            if (invalidSupervisors && invalidSupervisors.length > 0) {
+                return {
+                    success: false,
+                    error: 'Todos los supervisores deben pertenecer a la misma organización que el agente.'
+                };
+            }
+        }
+
         // 2. Crear usuario en Auth
         const { data: authData, error: authError2 } = await adminClient.auth.admin.createUser({
             email: validatedData.email,
@@ -358,7 +376,6 @@ export async function createUserAction(
                 last_name: validatedData.lastName,
                 role: validatedData.role as Database['public']['Enums']['user_role'],
                 organization_id: validatedData.organizationId,
-                parent_id: validatedData.parentId || null,
                 phone: validatedData.phone || null,
                 is_active: true,
                 default_split_percentage: validatedData.defaultSplitPercentage,
@@ -368,6 +385,25 @@ export async function createUserAction(
             // Rollback: eliminar usuario de auth si falla el perfil
             await adminClient.auth.admin.deleteUser(userId);
             throw profileError;
+        }
+
+        // 4. Insertar supervisores en la nueva tabla (N:N)
+        if (validatedData.supervisorIds && validatedData.supervisorIds.length > 0) {
+            const supervisorInserts = validatedData.supervisorIds.map(sid => ({
+                agent_id: userId,
+                supervisor_id: sid
+            }));
+
+            const { error: supervisorError } = await adminClient
+                .from('profile_supervisors' as any)
+                .insert(supervisorInserts);
+
+            if (supervisorError) {
+                console.error('Error inserting supervisors:', supervisorError);
+                // No hacemos rollback completo aquí para evitar borrar la cuenta ya creada, 
+                // pero informamos un error parcial si fuera necesario.
+                // En este caso, continuamos ya que el perfil principal está bien.
+            }
         }
 
         revalidatePath('/dashboard/admin/users');
@@ -406,19 +442,75 @@ export async function updateUserAction(
         const validatedData = updateUserSchema.parse(formData);
         const adminClient = createAdminClient();
 
+        // 1.5 Validar que todos los supervisores pertenecen a la misma organización
+        if (validatedData.supervisorIds && validatedData.supervisorIds.length > 0) {
+            // Obtener la organización del usuario (si no se pasó en el form)
+            let orgId = validatedData.organizationId;
+            if (!orgId) {
+                const { data: currentProfile } = await adminClient
+                    .from('profiles')
+                    .select('organization_id')
+                    .eq('id', userId)
+                    .single();
+                orgId = currentProfile?.organization_id;
+            }
+
+            if (orgId) {
+                const { data: supervisors, error: supervisorCheckError } = await adminClient
+                    .from('profiles')
+                    .select('id, organization_id')
+                    .in('id', validatedData.supervisorIds);
+
+                if (supervisorCheckError) throw supervisorCheckError;
+
+                const invalidSupervisors = supervisors?.filter(s => s.organization_id !== orgId);
+                if (invalidSupervisors && invalidSupervisors.length > 0) {
+                    return {
+                        success: false,
+                        error: 'Todos los supervisores deben pertenecer a la misma organización que el agente.'
+                    };
+                }
+            }
+        }
+
         const { error } = await adminClient
             .from('profiles' as any)
             .update({
                 first_name: validatedData.firstName,
                 last_name: validatedData.lastName,
                 phone: validatedData.phone || null,
-                parent_id: validatedData.parentId || null,
                 default_split_percentage: validatedData.defaultSplitPercentage,
                 organization_id: validatedData.organizationId || undefined,
             } as any)
             .eq('id', userId);
 
         if (error) throw error;
+
+        // 2. Sincronizar supervisores (N:N)
+        // Eliminamos los actuales y re-insertamos los nuevos
+        const { error: deleteError } = await adminClient
+            .from('profile_supervisors' as any)
+            .delete()
+            .eq('agent_id', userId);
+
+        if (deleteError) {
+            console.error('Error deleting old supervisors:', deleteError);
+        }
+
+        if (validatedData.supervisorIds && validatedData.supervisorIds.length > 0) {
+            const supervisorInserts = validatedData.supervisorIds.map(sid => ({
+                agent_id: userId,
+                supervisor_id: sid
+            }));
+
+            const { error: insertError } = await adminClient
+                .from('profile_supervisors' as any)
+                .insert(supervisorInserts);
+
+            if (insertError) {
+                console.error('Error inserting new supervisors:', insertError);
+            }
+        }
 
         revalidatePath('/dashboard/admin/users');
         revalidatePath('/dashboard/team');

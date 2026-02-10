@@ -42,7 +42,7 @@ export function WeeklyDashboard() {
     // Filtered users based on role and organization
     const filteredUsers = React.useMemo(() => {
         if (!teamMembers) return [];
-        return teamMembers.filter(u => {
+        return (teamMembers as any[]).filter(u => {
             if (isGod) {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }

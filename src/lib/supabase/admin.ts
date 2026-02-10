@@ -14,6 +14,10 @@ export function createAdminClient() {
         throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
     }
 
+    if (!supabaseServiceKey.startsWith('eyJ')) {
+        console.error('CRITICAL ERROR: SUPABASE_SERVICE_ROLE_KEY does not look like a valid JWT (should start with "eyJ"). Check your .env.local file.');
+    }
+
     return createClient<Database>(supabaseUrl, supabaseServiceKey, {
         auth: {
             autoRefreshToken: false,

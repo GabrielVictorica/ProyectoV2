@@ -57,7 +57,7 @@ export function useProperties(filters?: PropertyFilters) {
             id,
             first_name,
             last_name,
-            organization:organizations(id, name)
+            organization:organizations!organization_id(id, name)
           )
         `)
                 .order('created_at', { ascending: false });
@@ -116,7 +116,7 @@ export function useProperty(id: string) {
             id,
             first_name,
             last_name,
-            organization:organizations(id, name)
+            organization:organizations!organization_id(id, name)
           )
         `)
                 .eq('id', id)

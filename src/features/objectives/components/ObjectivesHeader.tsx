@@ -16,7 +16,9 @@ import {
     RefreshCw,
     Zap,
     ArrowLeft,
+    UserCircle,
 } from 'lucide-react';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface Organization {
     id: string;
@@ -66,6 +68,10 @@ export function ObjectivesHeader({
     onResetFilters,
     onOpenDialog,
 }: ObjectivesHeaderProps) {
+    const { data: auth } = useAuth();
+    const currentUserId = auth?.profile?.id;
+    const isCurrentUserSelected = selectedAgentId === currentUserId;
+
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -133,23 +139,43 @@ export function ObjectivesHeader({
 
                 {/* Selector Agente (God/Parent) */}
                 {isGodOrParent && (
-                    <Select
-                        value={selectedAgentId || 'all'}
-                        onValueChange={(v) => onAgentChange(v === 'all' ? 'all' : v)}
-                    >
-                        <SelectTrigger className="w-[180px] bg-slate-800 border-slate-700 text-white">
-                            <Users className="h-4 w-4 mr-2" />
-                            <SelectValue placeholder="Agente" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                            <SelectItem value="all" className="text-white">Todo el Equipo</SelectItem>
-                            {filteredAgents.map((ag) => (
-                                <SelectItem key={ag.id} value={ag.id} className="text-white">
-                                    {ag.first_name} {ag.last_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                        <Select
+                            value={selectedAgentId || 'all'}
+                            onValueChange={(v) => onAgentChange(v === 'all' ? 'all' : v)}
+                        >
+                            <SelectTrigger className="w-[180px] bg-slate-800 border-slate-700 text-white">
+                                <Users className="h-4 w-4 mr-2" />
+                                <SelectValue placeholder="Agente" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-800 border-slate-700">
+                                <SelectItem value="all" className="text-white">Todo el Equipo</SelectItem>
+                                {filteredAgents.map((ag) => (
+                                    <SelectItem key={ag.id} value={ag.id} className="text-white">
+                                        {ag.first_name} {ag.last_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Botón Mis Objetivos (Acceso rápido) */}
+                        <Button
+                            variant={isCurrentUserSelected ? 'default' : 'outline'}
+                            onClick={() => {
+                                if (currentUserId) {
+                                    onAgentChange(currentUserId);
+                                }
+                            }}
+                            className={`border-slate-700 ${isCurrentUserSelected
+                                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                                }`}
+                            disabled={isCurrentUserSelected}
+                        >
+                            <UserCircle className="h-4 w-4 mr-2" />
+                            Mis Objetivos
+                        </Button>
+                    </div>
                 )}
 
                 {/* Botón Limpiar Filtros */}

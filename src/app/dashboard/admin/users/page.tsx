@@ -8,6 +8,7 @@ import { CreateUserDialog } from '@/features/admin/components/CreateUserDialog';
 import { EditUserDialog } from '@/features/admin/components/EditUserDialog';
 import { CreateOrganizationDialog } from '@/features/admin/components/CreateOrganizationDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DynamicTypography } from '@/components/ui/DynamicTypography';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,6 +16,7 @@ import {
     Shield,
     Building2,
     User,
+    Users,
     MoreVertical,
     Power,
     Trash2,
@@ -184,34 +186,39 @@ export default function UsersPage() {
             </div>
 
             {/* Stats */}
+            {/* Stats - Watermark Style */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-slate-800/50 border-slate-700">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-400">Total Usuarios</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-white">{users?.length || 0}</div>
+                {/* Total Users */}
+                <Card className="relative overflow-hidden border border-purple-500/20 bg-gradient-to-br from-slate-900 to-purple-950/30 shadow-md hover:scale-[1.02] transition-transform group">
+                    <CardContent className="p-5 relative z-10 min-h-[90px] flex flex-col justify-center">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">Total Usuarios</p>
+                        <DynamicTypography value={users?.length || 0} className="text-white font-black tracking-tighter drop-shadow-md mt-1" baseSize="text-3xl" />
                     </CardContent>
+                    <div className="absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none text-purple-500">
+                        <Users className="w-24 h-24" />
+                    </div>
                 </Card>
-                <Card className="bg-slate-800/50 border-slate-700">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-400">Brokers (Parent)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-400">
-                            {users?.filter(u => u.role === 'parent').length || 0}
-                        </div>
+
+                {/* Brokers (Parent) */}
+                <Card className="relative overflow-hidden border border-blue-500/20 bg-gradient-to-br from-slate-900 to-blue-950/30 shadow-md hover:scale-[1.02] transition-transform group">
+                    <CardContent className="p-5 relative z-10 min-h-[90px] flex flex-col justify-center">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">Brokers (Parent)</p>
+                        <DynamicTypography value={users?.filter(u => u.role === 'parent').length || 0} className="text-blue-400 font-black tracking-tighter drop-shadow-md mt-1" baseSize="text-3xl" />
                     </CardContent>
+                    <div className="absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none text-blue-500">
+                        <Building2 className="w-24 h-24" />
+                    </div>
                 </Card>
-                <Card className="bg-slate-800/50 border-slate-700">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-400">Agentes (Child)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-400">
-                            {users?.filter(u => u.role === 'child').length || 0}
-                        </div>
+
+                {/* Agents (Child) */}
+                <Card className="relative overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-slate-900 to-emerald-950/30 shadow-md hover:scale-[1.02] transition-transform group">
+                    <CardContent className="p-5 relative z-10 min-h-[90px] flex flex-col justify-center">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">Agentes (Child)</p>
+                        <DynamicTypography value={users?.filter(u => u.role === 'child').length || 0} className="text-emerald-400 font-black tracking-tighter drop-shadow-md mt-1" baseSize="text-3xl" />
                     </CardContent>
+                    <div className="absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none text-emerald-500">
+                        <User className="w-24 h-24" />
+                    </div>
                 </Card>
             </div>
 

@@ -15,6 +15,8 @@ import {
     Activity,
     BarChart3,
     Zap,
+    ShieldCheck,
+    AlertTriangle,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import type { ViewAgentProgress, ViewTeamObjectivesSummary } from '../types/supabase';
@@ -114,20 +116,23 @@ export function ObjectivesKPIGrid({
         const isOnTrack = (progress.run_rate_projection || 0) >= progress.annual_billing_goal;
         const hasListingsGoal = (progress.listings_goal_annual || 0) > 0;
 
-        // MODO INDIVIDUAL UNIFICADO (7 Tarjetas)
-        // Eliminamos variantes 'financial' vs 'operational' para la vista individual.
-        // Mostramos todo en un solo bloque limpio.
-
-        // Si se nos pasa 'variant="operational"', retornamos null para no renderizar nada (ya que todo estará en el principal)
-        // O mejor, modificaremos ObjectivesPage para no llamarlo.
-        // Aquí asumiremos que si variant es 'financial' (default), renderizamos TODO el set unificado.
-
+        // MODO INDIVIDUAL UNIFICADO
         if (variant === 'operational') return null;
 
         const criticalNumberTarget = Math.ceil(progress.weekly_pl_pb_target || 5.1);
 
+        // Cálculos de Validación Financiera
+        const annualGoal = progress.annual_billing_goal || 0;
+        const splitPct = progress.split_percentage || 50;
+        const monthlyExpenses = progress.monthly_living_expenses || 0;
+
+        // Ingreso Neto Mensual: (Meta Anual * Split%) / 12
+        const netMonthlyIncome = (annualGoal * (splitPct / 100)) / 12;
+        const monthlySurplus = netMonthlyIncome - monthlyExpenses;
+        const isCovered = monthlySurplus >= 0;
+
         return (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* 1. Reuniones Verdes (Semanal) */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                     <ObjectivesKPICard
@@ -170,6 +175,23 @@ export function ObjectivesKPIGrid({
                         progressValue={progress.weekly_critical_activities_count || 0}
                         progressTotal={criticalNumberTarget}
                         subtitle={`Meta Semanal: ${criticalNumberTarget}`}
+                    />
+                </motion.div>
+
+                {/* 4. Validación Financiera (Nuevo) - Movido al final */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
+                    <ObjectivesKPICard
+                        title="Validación Financiera"
+                        value={isCovered ? 'Cubierto' : 'Déficit'}
+                        icon={isCovered ? <ShieldCheck className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                        loading={isLoading}
+                        color={isCovered ? 'green' : 'red'}
+                        subtitle={
+                            monthlyExpenses > 0
+                                ? `${isCovered ? '+' : ''}${formatCurrency(monthlySurplus)}/mes`
+                                : 'Sin gastos definidos'
+                        }
+                        isString
                     />
                 </motion.div>
             </div>

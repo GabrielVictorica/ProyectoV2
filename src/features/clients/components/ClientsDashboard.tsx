@@ -14,8 +14,8 @@ import {
     Calculator, Tag as TagIcon, Building2,
     ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
-import type { UserWithOrganization } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 import {
     Dialog,
     DialogContent,
@@ -64,12 +64,14 @@ export function ClientsDashboard() {
 
     // Admin Data
     const { data: organizations } = useOrganizations();
-    const { data: allUsers } = useUsers();
+    // Team Data (SSOT)
+    const { data: allUsers } = useTeamMembers();
 
-    const filteredAgents = (allUsers || []).filter(u => {
+    const filteredAgents = (allUsers || []).filter((u: any) => {
+        // Si es Dios y elige una oficina, filtramos. Si elige "Todas", ve a todos los 16.
         if (isGod) return selectedOrg === 'all' || u.organization_id === selectedOrg;
-        if (isParent) return u.organization_id === (user?.profile as any)?.organization_id;
-        return false;
+        // Para Parent, useTeamMembers ya devolvió solo los de su oficina/reportes
+        return true;
     });
 
     const { data, isLoading } = useClients({
@@ -199,7 +201,7 @@ export function ClientsDashboard() {
                                         className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                                     >
                                         <option value="all">Todos los Agentes</option>
-                                        {filteredAgents.map(agent => (
+                                        {filteredAgents.map((agent: any) => (
                                             <option key={agent.id} value={agent.id}>{agent.first_name} {agent.last_name}</option>
                                         ))}
                                     </select>

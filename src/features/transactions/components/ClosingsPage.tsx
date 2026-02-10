@@ -60,6 +60,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { DynamicTypography } from '@/components/ui/DynamicTypography';
 
 export function ClosingsPage() {
     const { data: auth } = useAuth();
@@ -349,7 +350,7 @@ export function ClosingsPage() {
                 </motion.div>
                 <motion.div variants={itemVariants}>
                     <KPICard
-                        title="Finanzas"
+                        title={role === 'parent' ? "Facturación BRUTA" : "Finanzas"}
                         value={formatCurrency(metrics?.totalGrossCommission || 0)}
                         icon={<BarChart3 className="h-5 w-5" />}
                         loading={loadingMetrics}
@@ -399,7 +400,7 @@ export function ClosingsPage() {
                     <>
                         <motion.div variants={itemVariants}>
                             <KPICard
-                                title="Bolsillo Oficina"
+                                title="Facturación Neta"
                                 value={formatCurrency(metrics?.totalOfficeIncome || 0)}
                                 icon={<Building2 className="h-5 w-5" />}
                                 loading={loadingMetrics}
@@ -595,6 +596,8 @@ export function ClosingsPage() {
 }
 
 // KPI Card Component
+// KPI Card Component - Compact "Watermark" Style
+// Solves: Height (compact), Overlap (icon is background), Aesthetics (Premium/Artistic)
 function KPICard({
     title,
     value,
@@ -610,37 +613,68 @@ function KPICard({
     color: 'green' | 'blue' | 'purple' | 'yellow';
     isString?: boolean;
 }) {
-    const colorClasses = {
-        green: 'from-green-500/20 to-emerald-500/20 border-green-500/30',
-        blue: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30',
-        purple: 'from-purple-500/20 to-pink-500/20 border-purple-500/30',
-        yellow: 'from-yellow-500/20 to-orange-500/20 border-yellow-500/30',
+    // Definimos estilos basados en el color solicitado
+    const themes = {
+        green: {
+            bg: 'bg-gradient-to-br from-slate-900 to-emerald-950/30',
+            border: 'border-emerald-500/20',
+            text: 'text-emerald-500',
+            glow: 'shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+        },
+        blue: {
+            bg: 'bg-gradient-to-br from-slate-900 to-blue-950/30',
+            border: 'border-blue-500/20',
+            text: 'text-blue-500',
+            glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+        },
+        purple: {
+            bg: 'bg-gradient-to-br from-slate-900 to-purple-950/30',
+            border: 'border-purple-500/20',
+            text: 'text-purple-500',
+            glow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+        },
+        yellow: {
+            bg: 'bg-gradient-to-br from-slate-900 to-amber-950/30',
+            border: 'border-amber-500/20',
+            text: 'text-amber-500',
+            glow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+        },
     };
 
-    const iconColors = {
-        green: 'text-green-400',
-        blue: 'text-blue-400',
-        purple: 'text-purple-400',
-        yellow: 'text-yellow-400',
-    };
+    const t = themes[color];
 
     return (
-        <Card className={`bg-gradient-to-br ${colorClasses[color]} border`}>
-            <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-slate-400 text-xs font-medium">{title}</p>
-                        {loading ? (
-                            <Skeleton className="h-7 w-24 mt-1 bg-slate-700" />
-                        ) : (
-                            <p className="text-white text-2xl font-bold mt-1">
-                                {isString ? value : value.toLocaleString()}
-                            </p>
-                        )}
-                    </div>
-                    <div className={iconColors[color]}>{icon}</div>
+        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md`}>
+            <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
+                <div className="flex flex-col gap-1">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">
+                        {title}
+                    </p>
+
+                    {loading ? (
+                        <Skeleton className="h-8 w-32 bg-slate-800/50 mt-1" />
+                    ) : (
+                        <div className="flex items-baseline gap-1 z-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            {isString && !isNaN(Number(value)) && (
+                                <span className="text-slate-500 font-medium text-sm self-center opacity-70 mb-0.5">$</span>
+                            )}
+                            <DynamicTypography
+                                value={isString ? value : value.toLocaleString()}
+                                className="text-white font-black tracking-tighter drop-shadow-md"
+                                baseSize="text-3xl"
+                            />
+                        </div>
+                    )}
                 </div>
             </CardContent>
+
+            {/* Watermark Icon - Background Layer */}
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+                {/* Clone icon to enforce large size without changing prop */}
+                <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
+                    {icon}
+                </div>
+            </div>
         </Card>
     );
 }

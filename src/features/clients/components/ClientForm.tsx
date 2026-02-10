@@ -32,7 +32,8 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { isValidPhoneNumber } from 'react-phone-number-input';
 import type { Client } from '../types';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useOrganizations, useUsers } from '@/features/admin/hooks/useAdmin';
+import { useOrganizations } from '@/features/admin/hooks/useAdmin';
+import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 
 const clientSchema = z.object({
     firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -95,7 +96,7 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
 
     // Solo cargar orgs/users si es necesario
     const { data: organizations } = useOrganizations();
-    const { data: allUsers } = useUsers();
+    const { data: allUsers } = useTeamMembers();
 
     // Estado para org seleccionada
     const [selectedOrgId, setSelectedOrgId] = useState<string>(
@@ -105,8 +106,12 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
     // Filtrar agentes por org
     const filteredAgents = useMemo(() => {
         if (!allUsers) return [];
-        return allUsers.filter((u: any) => u.organization_id === selectedOrgId);
-    }, [allUsers, selectedOrgId]);
+        return (allUsers as any[]).filter((u: any) => {
+            if (isGod) return u.organization_id === selectedOrgId;
+            // Para parent/child, useTeamMembers ya filtró por RLS/Action
+            return true;
+        });
+    }, [allUsers, selectedOrgId, isGod]);
 
     // Sincronizar selectedOrgId cuando auth cargue
     useEffect(() => {

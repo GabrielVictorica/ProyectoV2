@@ -86,7 +86,7 @@ export function useUsers(options?: { enabled?: boolean }) {
                 .from('profiles') as any)
                 .select(`
                     *,
-                    organization:organizations(*)
+                    organization:organizations!organization_id(*)
                 `)
                 .order('created_at', { ascending: false });
 

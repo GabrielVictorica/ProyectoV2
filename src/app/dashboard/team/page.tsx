@@ -282,7 +282,7 @@ export default function TeamPage() {
 
                         {/* Equipos por Broker */}
                         {parents.map(parent => {
-                            const myAgents = nativeChildren.filter(c => c.parent_id === parent.id);
+                            const myAgents = nativeChildren.filter(c => c.supervisor_ids?.includes(parent.id));
                             if (myAgents.length === 0) return null;
 
                             return (
@@ -300,7 +300,7 @@ export default function TeamPage() {
                         })}
 
                         {/* Agentes sin supervisor */}
-                        {nativeChildren.filter(c => !c.parent_id || !parents.some(p => p.id === c.parent_id)).length > 0 && (
+                        {nativeChildren.filter(c => !c.supervisor_ids || c.supervisor_ids.length === 0).length > 0 && (
                             <>
                                 <TableRow className="bg-slate-800/30 hover:bg-slate-800/30 border-none">
                                     <TableCell colSpan={7} className="py-2">
@@ -310,7 +310,7 @@ export default function TeamPage() {
                                     </TableCell>
                                 </TableRow>
                                 {nativeChildren
-                                    .filter(c => !c.parent_id || !parents.some(p => p.id === c.parent_id))
+                                    .filter(c => !c.supervisor_ids || c.supervisor_ids.length === 0)
                                     .map(m => renderMemberRow(m))
                                 }
                             </>

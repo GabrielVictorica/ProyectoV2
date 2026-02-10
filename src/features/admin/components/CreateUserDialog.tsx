@@ -48,7 +48,7 @@ const formSchema = z.object({
     password: z.string().min(6, 'Mínimo 6 caracteres'),
     role: z.enum(['parent', 'child']),
     organizationId: z.string().uuid('Selecciona una organización'),
-    parentId: z.string().optional(),
+    supervisorIds: z.array(z.string()).optional().default([]),
     phone: z.string().optional(),
     defaultSplitPercentage: z.coerce.number().min(0, 'Mínimo 0').max(100, 'Máximo 100'),
 });
@@ -87,9 +87,9 @@ export function CreateUserDialog({ onSuccess, preselectedOrgId }: Props) {
             lastName: '',
             email: '',
             password: '',
-            role: 'parent',
+            role: 'child',
             organizationId: preselectedOrgId || '',
-            parentId: '',
+            supervisorIds: [],
             phone: '',
             defaultSplitPercentage: 45,
         },
@@ -138,13 +138,12 @@ export function CreateUserDialog({ onSuccess, preselectedOrgId }: Props) {
     const onSubmit = async (data: FormData) => {
         setError(null);
 
-        // Convertir 'none' de vuelta a undefined para la base de datos
         const submissionData = {
             ...data,
-            parentId: data.parentId === 'none' ? undefined : data.parentId
+            supervisorIds: data.supervisorIds || []
         };
 
-        const result = await createUserAction(submissionData);
+        const result = await createUserAction(submissionData as any);
 
         if (result.success) {
             form.reset();
@@ -318,36 +317,73 @@ export function CreateUserDialog({ onSuccess, preselectedOrgId }: Props) {
                             />
                         </div>
 
-                        {selectedRole === 'child' && parentUsers.length > 0 && (
+                        {selectedRole === 'child' && (
                             <FormField
                                 control={form.control}
-                                name="parentId"
+                                name="supervisorIds"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200">Supervisor (Opcional)</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                    <SelectValue placeholder={loadingParents ? "Cargando..." : "Sin supervisor"} />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-slate-800 border-slate-700">
-                                                <SelectItem value="none" className="text-slate-400 focus:bg-slate-700">
-                                                    Sin supervisor
-                                                </SelectItem>
-                                                {parentUsers.map((parent) => (
-                                                    <SelectItem
-                                                        key={parent.id}
-                                                        value={parent.id}
-                                                        className="text-slate-200 focus:bg-slate-700"
-                                                    >
-                                                        {parent.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormDescription className="text-slate-500 text-xs">
-                                            El supervisor podrá ver los datos de este agente
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-slate-200 text-sm font-medium">Supervisores (Opcional - Multinivel)</FormLabel>
+                                            {field.value.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => field.onChange([])}
+                                                    className="text-xs text-slate-400 hover:text-white"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 max-h-[150px] overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+                                            {loadingParents ? (
+                                                <div className="flex items-center justify-center p-4 text-slate-400 text-xs gap-2">
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    Cargando supervisores...
+                                                </div>
+                                            ) : selectedOrgId && parentUsers.length === 0 ? (
+                                                <div className="text-slate-500 text-xs italic p-2 text-center">
+                                                    No hay supervisores disponibles en esta organización.
+                                                </div>
+                                            ) : !selectedOrgId ? (
+                                                <div className="text-slate-500 text-xs italic p-2 text-center">
+                                                    Selecciona una organización primero.
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    {parentUsers.map((parent) => {
+                                                        const isSelected = field.value.includes(parent.id);
+                                                        return (
+                                                            <div
+                                                                key={parent.id}
+                                                                onClick={() => {
+                                                                    const current = field.value;
+                                                                    if (isSelected) {
+                                                                        field.onChange(current.filter(id => id !== parent.id));
+                                                                    } else {
+                                                                        field.onChange([...current, parent.id]);
+                                                                    }
+                                                                }}
+                                                                className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors text-sm ${isSelected
+                                                                        ? 'bg-blue-600/20 border border-blue-500/30 text-blue-200'
+                                                                        : 'hover:bg-slate-700/60 text-slate-300 border border-transparent'
+                                                                    }`}
+                                                            >
+                                                                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isSelected
+                                                                        ? 'bg-blue-500 border-blue-400'
+                                                                        : 'border-slate-500 bg-transparent'
+                                                                    }`}>
+                                                                    {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                                                </div>
+                                                                {parent.name}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <FormDescription className="text-slate-500 text-[11px]">
+                                            El supervisor podrá ver los datos de este agente. Puedes seleccionar múltiples supervisores.
                                         </FormDescription>
                                         <FormMessage />
                                     </FormItem>

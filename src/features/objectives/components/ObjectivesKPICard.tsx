@@ -3,6 +3,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DynamicTypography } from '@/components/ui/DynamicTypography';
 import { cn } from '@/lib/utils';
 
 interface ObjectivesKPICardProps {
@@ -63,77 +64,79 @@ export function ObjectivesKPICard({
     const percentage = progressTotal > 0 ? Math.min(100, (progressValue / progressTotal) * 100) : 0;
     const isCompleted = percentage >= 100;
 
-    // Dynamic progress color based on completion if not forced by prop color (optional logic, sticking to theme for now)
+    // Helper for Watermark Styling
+    const getTheme = (c: string) => {
+        const themes: any = {
+            green: { bg: 'bg-gradient-to-br from-slate-900 to-emerald-950/30', border: 'border-emerald-500/20', text: 'text-emerald-500', glow: 'shadow-[0_0_15px_rgba(16,185,129,0.1)]' },
+            blue: { bg: 'bg-gradient-to-br from-slate-900 to-blue-950/30', border: 'border-blue-500/20', text: 'text-blue-500', glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]' },
+            purple: { bg: 'bg-gradient-to-br from-slate-900 to-purple-950/30', border: 'border-purple-500/20', text: 'text-purple-500', glow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]' },
+            yellow: { bg: 'bg-gradient-to-br from-slate-900 to-amber-950/30', border: 'border-amber-500/20', text: 'text-amber-500', glow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]' },
+            cyan: { bg: 'bg-gradient-to-br from-slate-900 to-cyan-950/30', border: 'border-cyan-500/20', text: 'text-cyan-500', glow: 'shadow-[0_0_15px_rgba(6,182,212,0.1)]' },
+            amber: { bg: 'bg-gradient-to-br from-slate-900 to-amber-950/30', border: 'border-amber-500/20', text: 'text-amber-500', glow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]' },
+            red: { bg: 'bg-gradient-to-br from-slate-900 to-red-950/30', border: 'border-red-500/20', text: 'text-red-500', glow: 'shadow-[0_0_15px_rgba(239,68,68,0.1)]' },
+        };
+        return themes[c] || themes.blue;
+    };
+
+    const t = getTheme(color);
     const progressColorRaw = progressColors[color] || 'bg-white';
 
     return (
-        <Card className={cn(
-            'bg-gradient-to-br border transition-all duration-300 hover:scale-[1.02] hover:shadow-lg relative overflow-hidden',
-            colorClasses[color]
-        )}>
-            <CardContent className="py-4 px-5 relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="space-y-1 min-w-0 flex-1">
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider truncate" title={title}>
-                            {title}
-                        </p>
-                        {loading ? (
-                            <Skeleton className="h-7 w-20 bg-slate-700" />
-                        ) : (
+        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md`}>
+            <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
+                <div className="flex flex-col gap-1">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10 truncate" title={title}>
+                        {title}
+                    </p>
+
+                    {loading ? (
+                        <Skeleton className="h-8 w-24 bg-slate-800 lg:w-32 mt-1" />
+                    ) : (
+                        <div className="flex flex-col z-10">
                             <div className="flex items-baseline gap-2">
-                                <p className="text-white text-xl md:text-2xl font-black truncate">
-                                    {isString ? value : typeof value === 'number' ? value.toLocaleString() : value}
-                                </p>
+                                <DynamicTypography
+                                    value={isString ? value : typeof value === 'number' ? value.toLocaleString() : value}
+                                    className="text-white font-black tracking-tighter drop-shadow-md"
+                                    baseSize="text-3xl"
+                                />
                                 {showProgress && !isString && (
-                                    <div className="flex items-baseline gap-1.5">
-                                        <span className="text-xs text-slate-500 font-medium">
+                                    <div className="flex items-baseline gap-1.5 opacity-80">
+                                        <span className="text-[10px] text-slate-500 font-medium">
                                             / {progressTotal}
-                                        </span>
-                                        <span className={cn(
-                                            "text-xs font-bold",
-                                            percentage >= 100 ? "text-green-400" :
-                                                percentage >= 67 ? "text-emerald-400" :
-                                                    percentage >= 34 ? "text-yellow-400" : "text-rose-400"
-                                        )}>
-                                            {percentage.toFixed(0)}%
                                         </span>
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                    <div className={cn('shrink-0 ml-3', iconColors[color])}>
-                        {icon}
-                    </div>
+
+                            {/* Progress Bar within the safe zone */}
+                            {showProgress && (
+                                <div className="mt-2 space-y-1 w-full max-w-[80%]">
+                                    <div className="h-1 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm">
+                                        <div
+                                            className={cn("h-full rounded-full transition-all duration-1000 ease-out", progressColorRaw)}
+                                            style={{ width: `${percentage}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center text-[9px] text-slate-400 font-medium">
+                                        <span>{percentage.toFixed(0)}%</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!showProgress && subtitle && (
+                                <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1">{subtitle}</p>
+                            )}
+                        </div>
+                    )}
                 </div>
-
-                {/* Progress Bar Section */}
-                {showProgress && !loading && (
-                    <div className="mt-2 space-y-1">
-                        <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden">
-                            <div
-                                className={cn("h-full rounded-full transition-all duration-1000 ease-out", progressColorRaw)}
-                                style={{ width: `${percentage}%` }}
-                            />
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
-                            <span>{percentage.toFixed(0)}%</span>
-                            <span>{subtitle || (isCompleted ? '¡Logrado!' : 'En proceso')}</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Fallback subtitle if no progress bar */}
-                {!showProgress && subtitle && (
-                    <p className="text-slate-500 text-[10px] truncate mt-1">{subtitle}</p>
-                )}
             </CardContent>
 
-            {/* Background Glow Effect */}
-            <div className={cn(
-                "absolute -bottom-10 -right-10 w-24 h-24 rounded-full blur-3xl opacity-20",
-                progressColors[color]
-            )} />
+            {/* Watermark Icon - Background Layer */}
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+                <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
+                    {icon}
+                </div>
+            </div>
         </Card>
     );
 }

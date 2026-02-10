@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Building, Users, Home, TrendingUp, Eye, Calendar, DollarSign, Award, ArrowUpRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { DashboardSkeleton } from '@/features/dashboard/components/DashboardSkeleton';
+import { DynamicTypography } from '@/components/ui/DynamicTypography';
 
 export default function DashboardPage() {
     const { data: auth } = useAuth();
@@ -39,30 +40,61 @@ export default function DashboardPage() {
             value: stats?.propertiesCount.toString() || '0',
             description: stats?.propertiesCount === 1 ? 'Propiedad activa' : 'Propiedades activas',
             icon: Building,
-            color: 'from-blue-500 to-cyan-500',
+            color: 'blue' as const,
         },
         {
             title: isParent ? 'Clientes Oficina' : 'Mis Clientes',
             value: stats?.clientsCount.toString() || '0',
             description: 'Prospectos activos',
             icon: Users,
-            color: 'from-purple-500 to-pink-500',
+            color: 'purple' as const,
         },
         {
             title: isParent ? 'Ventas Oficina' : 'Mis Ventas',
             value: formatCurrency(stats?.totalSalesVolume || 0),
             description: 'Volumen total operado',
             icon: DollarSign,
-            color: 'from-green-500 to-emerald-500',
+            color: 'green' as const,
         },
         {
             title: 'Comisiones',
             value: formatCurrency(stats?.totalCommissions || 0),
             description: isParent ? 'Total recaudado' : 'Tu producción',
             icon: Award,
-            color: 'from-orange-500 to-red-500',
+            color: 'orange' as const,
         },
     ];
+
+    // Helper for Watermark Styles
+    const getTheme = (color: string) => {
+        const themes: any = {
+            green: {
+                bg: 'bg-gradient-to-br from-slate-900 to-emerald-950/30',
+                border: 'border-emerald-500/20',
+                text: 'text-emerald-500',
+                glow: 'shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+            },
+            blue: {
+                bg: 'bg-gradient-to-br from-slate-900 to-blue-950/30',
+                border: 'border-blue-500/20',
+                text: 'text-blue-500',
+                glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+            },
+            purple: {
+                bg: 'bg-gradient-to-br from-slate-900 to-purple-950/30',
+                border: 'border-purple-500/20',
+                text: 'text-purple-500',
+                glow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+            },
+            orange: {
+                bg: 'bg-gradient-to-br from-slate-900 to-amber-950/30',
+                border: 'border-amber-500/20',
+                text: 'text-amber-500',
+                glow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+            },
+        };
+        return themes[color] || themes.blue;
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -82,30 +114,38 @@ export default function DashboardPage() {
                 </p>
             </div>
 
-            {/* Stats Grid - Individual Skeletons or Grouped */}
+            {/* Stats Grid - Watermark Style */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {dashboardStats.map((stat) => (
-                    <Card key={stat.title} className="bg-slate-800/40 border-white/[0.06] backdrop-blur-md overflow-hidden group hover:border-violet-500/30 transition-all duration-300">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardDescription className="text-slate-400/80 font-medium">
-                                    {stat.title}
-                                </CardDescription>
-                                <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.color} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform duration-300`}>
-                                    <stat.icon className="h-4 w-4 text-white" />
+                {dashboardStats.map((stat) => {
+                    const t = getTheme(stat.color);
+                    return (
+                        <Card key={stat.title} className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md`}>
+                            <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">
+                                        {stat.title}
+                                    </p>
+
+                                    {isLoading ? (
+                                        <div className="h-8 w-24 bg-white/5 animate-pulse rounded-md mt-1" />
+                                    ) : (
+                                        <div className="flex items-baseline gap-1 z-10">
+                                            <DynamicTypography value={stat.value} className="text-white font-black tracking-tighter drop-shadow-md" baseSize="text-3xl" />
+                                        </div>
+                                    )}
+                                    <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 z-10">{stat.description}</p>
+                                </div>
+                            </CardContent>
+
+                            {/* Watermark Icon */}
+                            <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+                                <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
+                                    <stat.icon />
                                 </div>
                             </div>
-                        </CardHeader>
-                        <CardContent>
-                            {isLoading ? (
-                                <div className="h-8 w-24 bg-white/5 animate-pulse rounded-md" />
-                            ) : (
-                                <div className="text-2xl font-bold text-white tracking-tight">{stat.value}</div>
-                            )}
-                            <p className="text-xs text-slate-500 mt-1">{stat.description}</p>
-                        </CardContent>
-                    </Card>
-                ))}
+                        </Card>
+                    );
+                })}
             </div>
 
             {/* Main Content */}

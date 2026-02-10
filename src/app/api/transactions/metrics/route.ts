@@ -43,7 +43,17 @@ export async function GET(request: NextRequest) {
         if (profile.role === 'god') {
             if (organizationId) query = query.eq('organization_id', organizationId);
         } else if (profile.role === 'parent') {
-            // Parent ve: su org + agentes que reportan a su org
+            // Parent ve: su org + agentes que reportan a su org + agentes supervisados directamente (N:N)
+
+            // 1. Agentes que supervisa directamente (N:N)
+            const { data: directSupervised } = await (adminClient as any)
+                .from('profile_supervisors')
+                .select('agent_id')
+                .eq('supervisor_id', user.id);
+
+            const directIds = (directSupervised || []).map((a: any) => a.agent_id);
+
+            // 2. Agentes de organizaciones que reportan a la suya (Cross-Org)
             const { data: reportingAgents } = await (adminClient as any)
                 .from('profiles')
                 .select('id')
@@ -51,9 +61,12 @@ export async function GET(request: NextRequest) {
 
             const reportingAgentIds = (reportingAgents || []).map((a: any) => a.id);
 
-            if (reportingAgentIds.length > 0) {
-                // Ver métricas de su org O métricas de agentes que reportan a su org
-                query = query.or(`organization_id.eq.${profile.organization_id},agent_id.in.(${reportingAgentIds.join(',')})`);
+            // Unificar IDs únicos
+            const allAllowedAgentIds = [...new Set([...directIds, ...reportingAgentIds])];
+
+            if (allAllowedAgentIds.length > 0) {
+                // Ver métricas de su org O de agentes bajo su supervisión/reporte
+                query = query.or(`organization_id.eq.${profile.organization_id},agent_id.in.(${allAllowedAgentIds.join(',')})`);
             } else {
                 query = query.eq('organization_id', profile.organization_id);
             }
