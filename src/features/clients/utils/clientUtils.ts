@@ -33,3 +33,34 @@ export function parseNURC(motivation: string | null): NURCProfile {
 
     return profile;
 }
+// Helper para generar texto de búsqueda apto para portapapeles (WhatsApp)
+// Helper para generar texto de búsqueda apto para portapapeles (WhatsApp)
+export function generateSearchClipboardText(client: any, propertyTypes: any[]): string {
+    // Tipos de Propiedad
+    const types = (client.search_property_types || [])
+        .map((id: string) => propertyTypes.find(t => t.id === id)?.name || '')
+        .filter(Boolean)
+        .join(', ');
+
+    // NURC
+    const motivation = client.motivation || client.anonymous_label || '';
+    const nurc = parseNURC(motivation);
+
+    // Construcción del mensaje sin datos personales del cliente
+    const lines = [
+        `🔍 *Búsqueda Activa*: ${client.type === 'buyer' ? 'Comprador' : 'Vendedor'}`,
+        '',
+        `🏠 *Propiedad*: ${types || 'No especificado'}`,
+        `📍 *Zonas*: ${(client.preferred_zones || []).join(', ') || 'A definir'}`,
+        `💰 *Presupuesto*: USD ${client.budget_min?.toLocaleString()} - ${client.budget_max?.toLocaleString()}`,
+        `🛏️ *Dormitorios*: ${(client.search_bedrooms || []).join(', ') || 'Indistinto'}`,
+        '',
+        `🎯 *Perfil NURC*:`,
+        `• N (Necesidad): ${nurc.n || '-'}`,
+        `• U (Urgencia): ${nurc.u || '-'}`,
+        `• R (Realismo): ${nurc.r || '-'}`,
+        `• C (Capacidad): ${nurc.c || '-'}`
+    ];
+
+    return lines.filter(line => line !== null).join('\n');
+}

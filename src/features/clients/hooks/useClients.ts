@@ -64,11 +64,12 @@ export interface ClientFilters {
     type?: string;
     status?: string;
     search?: string;
-    scope?: 'personal' | 'office' | 'network';
+    scope?: 'personal' | 'office' | 'network' | 'global';
     organizationId?: string;
     agentId?: string;
     page?: number;
     limit?: number;
+    enabled?: boolean;
 }
 
 /**
@@ -90,8 +91,8 @@ export function useClients(filters?: ClientFilters) {
             // Prepare filters for the server action
             const actionFilters = {
                 ...filters,
-                agentId: filters?.scope === 'personal' ? user?.profile?.id : filters?.agentId,
-                organizationId: filters?.scope === 'office' ? filters?.organizationId : user?.profile?.organization_id
+                agentId: (filters?.scope === 'personal') ? user?.profile?.id : filters?.agentId,
+                organizationId: (filters?.scope === 'office' || filters?.scope === 'personal') ? user?.profile?.organization_id : filters?.organizationId
             };
 
             // Normal paginated view
@@ -102,6 +103,7 @@ export function useClients(filters?: ClientFilters) {
             return actionResult.data!;
         },
         staleTime: 5 * 60 * 1000,
+        enabled: filters?.enabled ?? true,
     });
 }
 
