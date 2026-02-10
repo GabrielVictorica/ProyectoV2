@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,41 +51,78 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MoreVertical, Edit2, Trash2, Ban, Archive, CheckCircle } from 'lucide-react';
 
 export function ClientsDashboard() {
-    const { auth: user } = usePermissions();
+    const { auth: user, isLoading: isLoadingPermissions } = usePermissions();
     const { isGod, isParent } = usePermissions();
-    const [activeTab, setActiveTab] = useState<'personal' | 'office' | 'network'>('personal');
+
+    // Configuración inicial de pestañas según Rol
+    const defaultTab = isGod ? 'global' : (isParent ? 'office' : 'personal');
+    const [activeTab, setActiveTab] = useState<'personal' | 'office' | 'network' | 'global'>(defaultTab);
+
+    // Sincronizar pestaña activa cuando cargan los permisos
+    useEffect(() => {
+        if (!isLoadingPermissions && user) {
+            const newDefault = isGod ? 'global' : (isParent ? 'office' : 'personal');
+            setActiveTab(newDefault);
+        }
+    }, [isLoadingPermissions, isGod, isParent, user]);
+
     const [search, setSearch] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | undefined>(undefined);
+
+    // Filtros
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
+
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 12;
 
-    // Admin Data
-    const { data: organizations } = useOrganizations();
-    // Team Data (SSOT)
-    const { data: allUsers } = useTeamMembers();
+    // Admin Data (Para filtros de Organizaciones)
+    const { data: organizations } = useOrganizations({ enabled: isGod || activeTab === 'network' });
 
+    // Team Data (Para filtros de Agentes)
+    // Parent: Ve su equipo. God: Ve equipo de la org seleccionada.
+    const { data: allUsers, isLoading: isLoadingTeam } = useTeamMembers();
+
+    // Lógica para filtrar agentes en el selector
     const filteredAgents = (allUsers || []).filter((u: any) => {
-        // Si es Dios y elige una oficina, filtramos. Si elige "Todas", ve a todos los 16.
-        if (isGod) return selectedOrg === 'all' || u.organization_id === selectedOrg;
-        // Para Parent, useTeamMembers ya devolvió solo los de su oficina/reportes
+        if (isGod) {
+            return selectedOrg === 'all' ? true : u.organization_id === selectedOrg;
+        }
+        // Parent ya trae solo su equipo en useTeamMembers
         return true;
     });
 
-    const { data, isLoading } = useClients({
+    // Lógica de queries para useClients
+    // Definimos qué parámetros enviar al hook según la pestaña activa
+    const queryFilters = {
         scope: activeTab,
         search: search,
-        organizationId: (activeTab === 'office' || activeTab === 'network') ? selectedOrg : undefined,
-        agentId: activeTab === 'office' ? selectedAgentId : undefined,
         page: page,
-        limit: PAGE_SIZE
-    });
+        limit: PAGE_SIZE,
+        organizationId: undefined as string | undefined,
+        agentId: undefined as string | undefined,
+    };
+
+    if (activeTab === 'global') {
+        queryFilters.organizationId = selectedOrg;
+        queryFilters.agentId = selectedAgentId;
+    } else if (activeTab === 'office') {
+        // Parent viendo su oficina. Org es automática (suya). Agente es filtrable.
+        queryFilters.agentId = selectedAgentId;
+    } else if (activeTab === 'network') {
+        // Viendo la red. Filtramos por Organización.
+        queryFilters.organizationId = selectedOrg;
+    }
+
+    const { data, isLoading: isLoadingClients } = useClients(queryFilters as any);
 
     const clients = data?.clients || [];
     const totalClients = data?.total || 0;
     const totalPages = Math.ceil(totalClients / PAGE_SIZE);
+
+    // Estado de carga compuesto
+    const isLoading = isLoadingPermissions || isLoadingClients;
 
     const updateClient = useUpdateClient();
     const deleteClient = useDeleteClient();
@@ -110,6 +147,7 @@ export function ClientsDashboard() {
         setSelectedClient(undefined);
     };
 
+    // Renderizado de Pestañas
     return (
         <div className="space-y-6">
             {/* Header Section */}
@@ -163,53 +201,74 @@ export function ClientsDashboard() {
             <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as any); setPage(1); }} className="w-full">
                 <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-6">
                     <TabsList className="bg-slate-900/50 border border-slate-800 p-1">
-                        <TabsTrigger value="personal" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
-                            <UserCheck className="w-4 h-4" /> Mis Clientes
-                        </TabsTrigger>
-                        {(isParent || isGod) && (
-                            <TabsTrigger value="office" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
-                                <Users className="w-4 h-4" /> Oficina
+                        {isGod ? (
+                            <TabsTrigger value="global" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
+                                <Users className="w-4 h-4" /> Mis Clientes (Global)
+                            </TabsTrigger>
+                        ) : (
+                            <>
+                                {/* "Mis Clientes" tiene diferente scope para Parent y Child */}
+                                <TabsTrigger value={isParent ? "office" : "personal"} className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
+                                    <UserCheck className="w-4 h-4" /> Mis Clientes
+                                </TabsTrigger>
+                            </>
+                        )}
+
+                        {!isGod && (
+                            <TabsTrigger value="network" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
+                                <Building2 className="w-4 h-4" /> Búsquedas de la Red
                             </TabsTrigger>
                         )}
-                        <TabsTrigger value="network" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white gap-2">
-                            <Building2 className="w-4 h-4" /> Búsquedas de la Red
-                        </TabsTrigger>
                     </TabsList>
 
                     <div className="flex items-center gap-4">
-                        {(activeTab === 'office' || activeTab === 'network') && (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
-                                <Filter className="w-3 h-3 text-slate-500" />
-                                {(isGod || activeTab === 'network') && (
+                        {/* Filtros */}
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+                            {/* Filtro de Organización: Para GOD (siempre) y para Red (Todos) */}
+                            {(isGod || activeTab === 'network') && (
+                                <>
+                                    <Filter className="w-3 h-3 text-slate-500" />
                                     <select
                                         value={selectedOrg}
                                         onChange={(e) => {
                                             setSelectedOrg(e.target.value);
-                                            setSelectedAgentId('all');
+                                            setSelectedAgentId('all'); // Reset agente al cambiar org
                                             setPage(1);
                                         }}
-                                        className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                        className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50 max-w-[150px]"
                                     >
-                                        <option value="all">Todas las Oficinas</option>
+                                        <option value="all">Todas las Org.</option>
                                         {organizations?.map(org => (
                                             <option key={org.id} value={org.id}>{org.name}</option>
                                         ))}
                                     </select>
-                                )}
-                                {activeTab === 'office' && (
-                                    <select
-                                        value={selectedAgentId}
-                                        onChange={(e) => { setSelectedAgentId(e.target.value); setPage(1); }}
-                                        className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50"
-                                    >
-                                        <option value="all">Todos los Agentes</option>
-                                        {filteredAgents.map((agent: any) => (
-                                            <option key={agent.id} value={agent.id}>{agent.first_name} {agent.last_name}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-                        )}
+                                </>
+                            )}
+
+                            {/* Filtro de Agente: Para GOD (si org != all o global) y PARENT (en su oficina) */}
+                            {((isGod && activeTab === 'global') || (isParent && activeTab === 'office')) && (
+                                <select
+                                    value={selectedAgentId}
+                                    onChange={(e) => { setSelectedAgentId(e.target.value); setPage(1); }}
+                                    className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50 max-w-[150px]"
+                                    disabled={isLoadingTeam}
+                                >
+                                    <option value="all">Todos los Agentes</option>
+                                    {isLoadingTeam ? (
+                                        <option disabled>Cargando equipo...</option>
+                                    ) : filteredAgents.length === 0 ? (
+                                        <option disabled>(Sin agentes encontrados)</option>
+                                    ) : (
+                                        filteredAgents.map((agent: any) => (
+                                            <option key={agent.id} value={agent.id}>
+                                                {agent.first_name} {agent.last_name}
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            )}
+                        </div>
+
                         <div className="flex items-center gap-2 text-xs text-slate-500 italic">
                             {totalClients > 0 && (
                                 <>Mostrando {(page - 1) * PAGE_SIZE + 1} - {Math.min(page * PAGE_SIZE, totalClients)} de {totalClients} resultados</>
@@ -242,20 +301,24 @@ export function ClientsDashboard() {
                                     <div>
                                         <h3 className="text-xl font-bold text-white">No se encontraron clientes</h3>
                                         <p className="text-slate-500 max-w-xs mx-auto text-sm mt-2">
-                                            Comienza registrando tu primer cliente para activar el seguimiento detallado.
+                                            {activeTab === 'network' ? 'No hay búsqueda en la red con estos filtros.' : 'Comienza registrando tu primer cliente.'}
                                         </p>
                                     </div>
-                                    <Button
-                                        onClick={() => setIsFormOpen(true)}
-                                        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-12 px-8 shadow-xl shadow-purple-500/20 transition-all hover:scale-105 active:scale-95"
-                                    >
-                                        <Plus className="w-5 h-5 mr-2" /> Agregar Cliente
-                                    </Button>
+                                    {activeTab !== 'network' && (
+                                        <Button
+                                            onClick={() => setIsFormOpen(true)}
+                                            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-12 px-8 shadow-xl shadow-purple-500/20 transition-all hover:scale-105 active:scale-95"
+                                        >
+                                            <Plus className="w-5 h-5 mr-2" /> Agregar Cliente
+                                        </Button>
+                                    )}
                                 </div>
                             ) : (
                                 <ClientDataTable
                                     clients={clients}
-                                    scope={activeTab}
+                                    scope={activeTab === 'global' ? 'office' : (activeTab as any)}
+                                    // Hack visual: Si es Global, usamos el formato 'office' que muestra datos completos
+                                    // Si es network, usa el formato network (protegido)
                                     onEdit={handleEdit}
                                     onDelete={handleDelete}
                                     onStatusChange={handleStatusChange}

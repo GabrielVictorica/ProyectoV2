@@ -12,7 +12,7 @@ export interface TeamMember extends Profile {
  * Server Action para obtener los miembros del equipo visibles para el usuario.
  * Centraliza la lógica de "Misma Organización" + "Reportes Cross-Org" (Gabriel -> Analia).
  */
-import { createAdminClient } from '@/lib/supabase/admin';
+
 
 export async function getTeamMembersAction() {
     const supabase = await createClient();
@@ -34,59 +34,59 @@ export async function getTeamMembersAction() {
 
     let members: any[] = [];
 
-    // 2. Lógica de "Nuclear Option" (Service Role Bypass)
-    // Solo para God y Parent, usamos el cliente Admin para saltarnos RLS y garantizar visibilidad
-    if (isGod || isParent) {
-        const adminClient = createAdminClient();
+    // 2. Estrategia "Solid Foundation" (RLS Nativo)
+    // En lugar de usar adminClient y filtrar manualmente en JS, confiamos en las Políticas RLS de la BD.
+    // - God: RLS le permite ver todo.
+    // - Parent: RLS le permite ver su org + reportes + supervisados.
+    // - Child: RLS le permite ver... (lo que tenga configurado).
 
-        // Traemos TODOS los perfiles (con límite de seguridad) y sus supervisores
-        // Esto es muy rápido para <1000 usuarios
-        const { data: allProfiles, error } = await adminClient
-            .from('profiles')
-            .select('*, profile_supervisors!profile_supervisors_agent_id_fkey(supervisor_id)')
-            .order('first_name', { ascending: true })
-            .limit(1000);
+    // Fetch Profiles
+    const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, organization_id, reports_to_organization_id')
+        .order('first_name', { ascending: true })
+        .limit(1000); // Límite de seguridad
 
-        if (error) {
-            console.error('Error fetching profiles with admin client:', error);
-            throw error;
-        }
-
-        // Filtrado en Memoria (JavaScript) - Infalible
-        if (isGod) {
-            // God ve todo
-            members = allProfiles || [];
-        } else if (isParent) {
-            // Parent ve: 
-            // 1. Su propia organización
-            // 2. Reportes a su organización
-            // 3. Supervisados directos
-            const myOrgId = profile.organization_id;
-
-            members = (allProfiles || []).filter((p: any) => {
-                const isInMyOrg = p.organization_id === myOrgId;
-                const reportsToMyOrg = p.reports_to_organization_id === myOrgId;
-                const isSupervisedByMe = (p.profile_supervisors || []).some((ps: any) => ps.supervisor_id === user.id);
-
-                return isInMyOrg || reportsToMyOrg || isSupervisedByMe;
-            });
-        }
-    } else {
-        // 3. Child (Standard RLS)
-        // Usamos el cliente normal, respetando las políticas de la base de datos
-        const { data: childView, error } = await supabase
-            .from('profiles')
-            .select('*, profile_supervisors!profile_supervisors_agent_id_fkey(supervisor_id)')
-            .order('first_name', { ascending: true });
-
-        if (error) throw error;
-        members = childView || [];
+    if (profilesError) {
+        console.error('CRITICAL ERROR query profiles in getTeamMembersAction:', profilesError);
+        throw profilesError;
     }
 
-    // 4. Enriquecer con metadata de "Externo" y aplanar supervisors
-    return members.map((m: any) => ({
-        ...m,
-        is_external: m.organization_id !== profile.organization_id,
-        supervisor_ids: (m.profile_supervisors || []).map((ps: any) => ps.supervisor_id)
-    }));
+    // Fetch Supervisors
+    // RLS permite ver 'profile_supervisors' a autenticados.
+    const { data: supervisorsData, error: supervisorsError } = await supabase
+        .from('profile_supervisors')
+        .select('agent_id, supervisor_id');
+
+    if (supervisorsError) {
+        console.error('Error fetching supervisors:', supervisorsError);
+    }
+
+    const allProfiles = profilesData || [];
+    const allSupervisors = supervisorsData || [];
+
+    // Log para Dios si está vacío
+    if (isGod && allProfiles.length === 0) {
+        console.warn('[getTeamMembersAction] God user found 0 profiles. Check RLS or DB data.');
+    }
+
+    // 3. Enriquecer con metadata
+    // Ya no filtramos manualmente, asumimos que lo que vino de la DB es lo que el usuario puede ver.
+    members = allProfiles.map((m: any) => {
+        const supervisors = allSupervisors
+            .filter((s: any) => s.agent_id === m.id)
+            .map((s: any) => ({ supervisor_id: s.supervisor_id }));
+
+        return {
+            ...m,
+            is_external: m.organization_id !== profile.organization_id,
+            supervisor_ids: supervisors.map((s: any) => s.supervisor_id),
+            // Compatibilidad
+            profile_supervisors: supervisors
+        };
+    });
+
+    return members;
 }
+
+

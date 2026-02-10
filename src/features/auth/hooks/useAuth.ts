@@ -128,9 +128,11 @@ export function useLogout() {
             }
         },
         onSuccess: () => {
-            // Limpiar todas las queries de auth
-            queryClient.removeQueries({ queryKey: authKeys.all });
-            router.push('/login');
+            // Limpieza TOTAL del caché (borra todas las queries de todas las features)
+            queryClient.clear();
+
+            // Forzar recarga absoluta del navegador para limpiar memoria React
+            window.location.href = '/login';
         },
     });
 }

@@ -65,11 +65,12 @@ import {
 import type { ClientWithAgent, AnonymousClient } from '../types';
 import { type ClientDisplay } from '../utils/privacy';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { parseNURC } from '../utils/clientUtils';
+import { parseNURC, generateSearchClipboardText } from '../utils/clientUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
-import { Home, Bed } from "lucide-react";
+import { Home, Bed, Copy } from "lucide-react";
+import { toast } from 'sonner';
 
 interface ClientDataTableProps {
     clients: (ClientWithAgent | AnonymousClient | ClientDisplay)[];
@@ -248,6 +249,18 @@ export function ClientDataTable({
                                             <span className="text-[11px] font-mono font-bold text-white tracking-tight">
                                                 USD {client.budget_min.toLocaleString()} - {client.budget_max.toLocaleString()}
                                             </span>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 rounded-full text-white/20 hover:text-white hover:bg-white/10 ml-1"
+                                                onClick={() => {
+                                                    const text = generateSearchClipboardText(client, propertyTypes || []);
+                                                    navigator.clipboard.writeText(text);
+                                                    toast.success('Búsqueda copiada');
+                                                }}
+                                            >
+                                                <Copy className="w-2.5 h-2.5" />
+                                            </Button>
                                         </div>
 
                                         {/* Zonas / Descripción de búsqueda (Sin restricciones) */}
@@ -369,6 +382,18 @@ export function ClientDataTable({
                                                 <DropdownMenuContent align="end" className="w-48 bg-[#09090b] border-white/10 text-slate-300">
                                                     <DropdownMenuLabel className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Gestión</DropdownMenuLabel>
                                                     <DropdownMenuSeparator className="bg-white/5" />
+
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            const text = generateSearchClipboardText(client, propertyTypes || []);
+                                                            navigator.clipboard.writeText(text);
+                                                            toast.success('Búsqueda copiada al portapapeles');
+                                                        }}
+                                                        className="gap-2 cursor-pointer focus:bg-white/5"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" /> Copiar Búsqueda
+                                                    </DropdownMenuItem>
+
                                                     <DropdownMenuItem onClick={() => onEdit?.(client)} className="gap-2 cursor-pointer focus:bg-white/5">
                                                         <Edit2 className="w-3.5 h-3.5" /> Editar Datos
                                                     </DropdownMenuItem>

@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useTransactions, useAggregatedMetrics, useDeleteTransaction } from '../hooks/useTransactions';
-import { useOrganizations } from '@/features/admin/hooks/useAdmin';
-import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
+import { useClosingsDashboard, closingsKeys } from '../hooks/useClosings';
+import { useDeleteTransaction } from '../hooks/useTransactions'; // Mantener delete legacy
 import { CloseTransactionDialog } from './CloseTransactionDialog';
 import { formatCurrency } from '@/lib/formatters';
-import { TransactionWithRelations } from '../hooks/useTransactions';
 import { Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -50,23 +49,24 @@ import {
     Handshake,
     CheckCircle2,
     Calendar,
-    Target,
-    Layers,
-    Users,
     Building2,
-    Filter,
+    Users,
     X,
-    Search
+    Search,
+    Layers
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { DynamicTypography } from '@/components/ui/DynamicTypography';
 
 export function ClosingsPage() {
-    const { data: auth } = useAuth();
+    const { data: auth, isLoading: isLoadingAuth } = useAuth();
+    const queryClient = useQueryClient();
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
     const [selectedMonth, setSelectedMonth] = useState<number | undefined>(undefined);
+    // Inicializar filtros de org/agente en 'all' o null dependiendo de la lógica, 
+    // pero el hook useClosingsDashboard ya maneja 'all' interno.
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [selectedAgent, setSelectedAgent] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -78,46 +78,86 @@ export function ClosingsPage() {
         agentId: selectedAgent !== 'all' ? selectedAgent : undefined,
     };
 
-    // Hooks para datos
-    const { data: transactions = [], isLoading: loadingTransactions } = useTransactions(filters);
-    const { mutateAsync: deleteTransaction } = useDeleteTransaction();
+    // NUEVO HOOK UNIFICADO (Reemplaza useTransactions, useAggregatedMetrics, useOrganizations, useTeamMembers)
+    // Se habilita solo cuando tenemos auth para evitar llamadas sin token
+    const { data: dashboardData, isLoading: isLoadingDashboard, refetch, error: dashboardError, isError } = useClosingsDashboard(filters, auth?.id);
 
-    const { data: metrics, isLoading: loadingMetrics } = useAggregatedMetrics(filters);
+    // Error feedback
+    if (isError) {
+        console.error('Error loading closings dashboard:', dashboardError);
+        toast.error('Error al cargar datos del tablero. Intenta recargar.');
+    }
+
+    // Legacy Delete Hook (Se mantiene porque la lógica de borrado es la misma)
+    const { mutateAsync: deleteTransaction } = useDeleteTransaction();
 
     const role = auth?.role;
     const isGodOrParent = role === 'god' || role === 'parent';
 
-    // Cargar datos para filtros (solo cuando el rol lo requiere)
-    const { data: organizations } = useOrganizations({ enabled: role === 'god' });
-    const { data: allUsers } = useTeamMembers();
+    // Desestructuración de datos del nuevo hook
+    const transactions = dashboardData?.transactions || [];
+    const metrics = dashboardData?.aggregatedMetrics;
+    const teamMembers = dashboardData?.teamMembers || [];
+    // Extraer organizaciones únicas de las transacciones o perfiles si fuera necesario para GOD, 
+    // pero para filtros GOD generalmente necesita todas las organizaciones.
+    // El nuevo endpoint NO devuelve lista de organizaciones (solo transactions/metrics/team).
+    // Si GOD necesita filtrar por organizaciones que NO tienen transacciones, necesitaríamos useOrganizations.
+    // Pero por performance, asumimos que filtra sobre lo que hay o usamos useQuery separado si es GOD.
+    // Para simplificar y no romper: Si es GOD, mantenemos useOrganizations aparte (es ligera).
+    // O mejor, extraemos las organizaciones de los miembros del equipo si es GOD.
+    // REVISIÓN: El original usaba useOrganizations({ enabled: role === 'god' }).
+    // Podemos mantenerlo o asumir que el filtro de orgs viene de otro lado. 
+    // MANTENDREMOS useOrganizations PERO SOLO PARA EL SELECTOR DE GOD (No bloqueante).
+    // Importación dinámica o condicional no es posible en hooks, así que...
+    /* 
+       IMPORTANTE: En el código original `useOrganizations` se usaba. 
+       Para no perder funcionalidad de filtrado en GOD, lo re-agregamos o usamos una lista derivada.
+       Como la promesa de "1 sola query" es para la carga principal, una query auxiliar pequeñita para el dropdown de God no afecta el LCP.
+    */
 
-    // Generar años para el selector
-    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-    const months = [
-        { value: 1, label: 'Enero' },
-        { value: 2, label: 'Febrero' },
-        { value: 3, label: 'Marzo' },
-        { value: 4, label: 'Abril' },
-        { value: 5, label: 'Mayo' },
-        { value: 6, label: 'Junio' },
-        { value: 7, label: 'Julio' },
-        { value: 8, label: 'Agosto' },
-        { value: 9, label: 'Septiembre' },
-        { value: 10, label: 'Octubre' },
-        { value: 11, label: 'Noviembre' },
-        { value: 12, label: 'Diciembre' },
-    ];
-
+    // Extraer agentes para el selector
     const filteredAgents = useMemo(() => {
-        if (!allUsers) return [];
-        return allUsers.filter(u => {
+        if (!teamMembers) return [];
+        return teamMembers.filter((u: any) => {
             if (role === 'god') {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
-            // Para Parent y externos, el hook useTeamMembers ya filtra por RLS
             return true;
         });
-    }, [allUsers, selectedOrg, role]);
+    }, [teamMembers, selectedOrg, role]);
+
+    // Extraer lista de organizaciones para el selector de Dios (derivado de los miembros o transacciones para no hacer otra call)
+    // Opcional: Si queremos todas las orgs del sistema, necesitamos useOrganizations.
+    // Vamos a derivarlo de los datos cargados para máxima velocidad si es posible, 
+    // pero si teamMembers solo trae gente con actividad... mejor usar el hook ligero de orgs.
+    // Al ser un dashboard de cierres, filtrar por orgs activas tiene sentido.
+    const activeOrgs = useMemo(() => {
+        if (role !== 'god') return [];
+        const orgs = new Map();
+        teamMembers.forEach((m: any) => {
+            if (m.organization_id && !orgs.has(m.organization_id)) {
+                // No tenemos el nombre de la org en profile flat... 
+                // Espera, el endpoint devuelve teamMembers con datos de profile.
+                // Profile no tiene nombre de org por defecto.
+            }
+        });
+        return []; // Fallback plan: re-implementar useOrganizations si es vital.
+    }, [teamMembers, role]);
+
+    // Re-implementamos useOrganizations solo para GOD y de forma no bloqueante
+    const [organizations, setOrganizations] = useState<any[]>([]);
+    useEffect(() => {
+        const loadOrganizations = async () => {
+            if (role === 'god' && organizations.length === 0) {
+                const { createClient } = await import('@/lib/supabase/client');
+                const sb = createClient();
+                const { data } = await sb.from('organizations').select('id, name').order('name');
+                if (data) setOrganizations(data);
+            }
+        };
+        loadOrganizations();
+    }, [role, organizations.length]);
+
 
     const filteredTransactions = useMemo(() => {
         if (!transactions) return [];
@@ -132,10 +172,18 @@ export function ClosingsPage() {
         });
     }, [transactions, searchQuery]);
 
+    const handleRefresh = () => {
+        // Invalidar la nueva query unificada
+        queryClient.invalidateQueries({ queryKey: closingsKeys.all });
+        // También invalidar las legacy por si acaso se usan en otros lados
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    };
+
     const handleDelete = async (id: string) => {
         try {
             await deleteTransaction(id);
             toast.success('Cierre eliminado con éxito');
+            handleRefresh();
         } catch (error) {
             toast.error('Error al eliminar el cierre');
         }
@@ -153,6 +201,26 @@ export function ClosingsPage() {
         hidden: { opacity: 0, y: 10 },
         visible: { opacity: 1, y: 0 }
     };
+
+    // Loading General (Auth + Dashboard)
+    const isLoading = isLoadingAuth || isLoadingDashboard;
+
+    // Generar años para el selector
+    const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+    const months = [
+        { value: 1, label: 'Enero' },
+        { value: 2, label: 'Febrero' },
+        { value: 3, label: 'Marzo' },
+        { value: 4, label: 'Abril' },
+        { value: 5, label: 'Mayo' },
+        { value: 6, label: 'Junio' },
+        { value: 7, label: 'Julio' },
+        { value: 8, label: 'Agosto' },
+        { value: 9, label: 'Septiembre' },
+        { value: 10, label: 'Octubre' },
+        { value: 11, label: 'Noviembre' },
+        { value: 12, label: 'Diciembre' },
+    ];
 
     return (
         <motion.div
@@ -314,7 +382,8 @@ export function ClosingsPage() {
                         </Button>
                     )}
 
-                    <CloseTransactionDialog />
+                    {/* Dialogo de Cierre con Refresh Callback */}
+                    <CloseTransactionDialog onSuccess={handleRefresh} />
                 </div>
             </div>
 
@@ -325,16 +394,16 @@ export function ClosingsPage() {
                         title="Operaciones"
                         value={metrics?.closedDealsCount || 0}
                         icon={<Handshake className="h-5 w-5" />}
-                        loading={loadingMetrics}
+                        loading={isLoading}
                         color="purple"
                     />
                 </motion.div>
                 <motion.div variants={itemVariants}>
                     <KPICard
                         title="Puntas"
-                        value={(metrics as any)?.totalPuntas || 0}
+                        value={metrics?.totalPuntas || 0}
                         icon={<Layers className="h-5 w-5" />}
-                        loading={loadingMetrics}
+                        loading={isLoading}
                         color="blue"
                     />
                 </motion.div>
@@ -343,7 +412,7 @@ export function ClosingsPage() {
                         title="Vol. de Ventas"
                         value={formatCurrency(metrics?.totalSalesVolume || 0)}
                         icon={<DollarSign className="h-5 w-5" />}
-                        loading={loadingMetrics}
+                        loading={isLoading}
                         color="green"
                         isString
                     />
@@ -353,7 +422,7 @@ export function ClosingsPage() {
                         title={role === 'parent' ? "Facturación BRUTA" : "Finanzas"}
                         value={formatCurrency(metrics?.totalGrossCommission || 0)}
                         icon={<BarChart3 className="h-5 w-5" />}
-                        loading={loadingMetrics}
+                        loading={isLoading}
                         color="yellow"
                         isString
                     />
@@ -367,7 +436,7 @@ export function ClosingsPage() {
                                 title="Royalty Dios"
                                 value={formatCurrency(metrics?.totalMasterIncome || 0)}
                                 icon={<Shield className="h-5 w-5" />}
-                                loading={loadingMetrics}
+                                loading={isLoading}
                                 color="purple"
                                 isString
                             />
@@ -377,7 +446,7 @@ export function ClosingsPage() {
                                 title="Neto Oficinas"
                                 value={formatCurrency(metrics?.totalOfficeIncome || 0)}
                                 icon={<Building2 className="h-5 w-5" />}
-                                loading={loadingMetrics}
+                                loading={isLoading}
                                 color="blue"
                                 isString
                             />
@@ -387,7 +456,7 @@ export function ClosingsPage() {
                                 title="Pago Agentes"
                                 value={formatCurrency(metrics?.totalNetIncome || 0)}
                                 icon={<Users className="h-5 w-5" />}
-                                loading={loadingMetrics}
+                                loading={isLoading}
                                 color="green"
                                 isString
                             />
@@ -403,7 +472,7 @@ export function ClosingsPage() {
                                 title="Facturación Neta"
                                 value={formatCurrency(metrics?.totalOfficeIncome || 0)}
                                 icon={<Building2 className="h-5 w-5" />}
-                                loading={loadingMetrics}
+                                loading={isLoading}
                                 color="blue"
                                 isString
                             />
@@ -413,7 +482,7 @@ export function ClosingsPage() {
                                 title="Pago Agentes"
                                 value={formatCurrency(metrics?.totalNetIncome || 0)}
                                 icon={<Users className="h-5 w-5" />}
-                                loading={loadingMetrics}
+                                loading={isLoading}
                                 color="green"
                                 isString
                             />
@@ -428,7 +497,7 @@ export function ClosingsPage() {
                             title="Mi Comisión"
                             value={formatCurrency(metrics?.totalNetIncome || 0)}
                             icon={<TrendingUp className="h-5 w-5" />}
-                            loading={loadingMetrics}
+                            loading={isLoading}
                             color="green"
                             isString
                         />
@@ -440,7 +509,7 @@ export function ClosingsPage() {
                         title="Ticket Prom."
                         value={formatCurrency(metrics?.averageTicket || 0)}
                         icon={<TrendingUp className="h-5 w-5" />}
-                        loading={loadingMetrics}
+                        loading={isLoading}
                         color="yellow"
                         isString
                     />
@@ -457,7 +526,7 @@ export function ClosingsPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {loadingTransactions ? (
+                    {isLoading ? (
                         <div className="flex items-center justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                         </div>
@@ -537,7 +606,7 @@ export function ClosingsPage() {
 
                                                     return (
                                                         <div className="flex justify-end gap-1">
-                                                            <CloseTransactionDialog transaction={tx} />
+                                                            <CloseTransactionDialog transaction={tx} onSuccess={handleRefresh} />
 
                                                             <AlertDialog>
                                                                 <AlertDialogTrigger asChild>
@@ -580,6 +649,7 @@ export function ClosingsPage() {
                                 Registra tu primera operación cerrada
                             </p>
                             <CloseTransactionDialog
+                                onSuccess={handleRefresh}
                                 trigger={
                                     <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
                                         <Handshake className="mr-2 h-4 w-4" />
@@ -596,8 +666,6 @@ export function ClosingsPage() {
 }
 
 // KPI Card Component
-// KPI Card Component - Compact "Watermark" Style
-// Solves: Height (compact), Overlap (icon is background), Aesthetics (Premium/Artistic)
 function KPICard({
     title,
     value,
@@ -613,7 +681,6 @@ function KPICard({
     color: 'green' | 'blue' | 'purple' | 'yellow';
     isString?: boolean;
 }) {
-    // Definimos estilos basados en el color solicitado
     const themes = {
         green: {
             bg: 'bg-gradient-to-br from-slate-900 to-emerald-950/30',
@@ -668,9 +735,7 @@ function KPICard({
                 </div>
             </CardContent>
 
-            {/* Watermark Icon - Background Layer */}
             <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
-                {/* Clone icon to enforce large size without changing prop */}
                 <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
                     {icon}
                 </div>

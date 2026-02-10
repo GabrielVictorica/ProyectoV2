@@ -80,34 +80,7 @@ export async function createClientAction(
 
         const organization_id = targetOrgId;
 
-        // 2. Lógica de Duplicados: Buscar clientes ACTIVOS en la misma organización
-        const normalizedPhone = validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null;
-        if (normalizedPhone || validatedData.email) {
-            const query = supabase
-                .from('clients' as any)
-                .select('agent_id, status, profiles!clients_agent_id_fkey(first_name, last_name)' as any)
-                .eq('organization_id', organization_id)
-                .eq('status', 'active'); // Solo nos importan los registros activos
-
-            const filters = [];
-            if (normalizedPhone) filters.push(`phone.eq.${normalizedPhone}`);
-            if (validatedData.email) filters.push(`email.eq.${validatedData.email}`);
-
-            query.or(filters.join(','));
-
-            const { data: existingClient } = await (query.maybeSingle() as any);
-
-            if (existingClient) {
-                const owner = (existingClient as any).profiles;
-                const ownerName = owner ? `${owner.first_name} ${owner.last_name}` : 'otro agente';
-                return {
-                    success: false,
-                    error: `Cliente Registrado: Este cliente ya está siendo atendido por ${ownerName}. ¡Contacta a tu colega para trabajar en equipo y cerrar esta venta juntos!`
-                };
-            }
-        }
-
-        // 3. Insertar el nuevo cliente
+        // 2. Insertar el nuevo cliente (La DB manejará duplicados con unique constraint)
         const { data, error } = await supabase
             .from('clients' as any)
             .insert({
@@ -133,7 +106,16 @@ export async function createClientAction(
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            // Manejo de errores de constraint
+            if (error.code === '23505') { // Unique violation
+                return {
+                    success: false,
+                    error: 'Este cliente ya existe en la organización (Email o Teléfono duplicado).'
+                };
+            }
+            throw error;
+        }
 
         revalidatePath('/dashboard/clients');
         return { success: true, data: data as Client };
@@ -276,9 +258,22 @@ export async function getClientsAction(
             .from('clients')
             .select('*, agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)', { count: 'exact' });
 
+        const isGod = (profile as any).role === 'god';
+        const isParent = (profile as any).role === 'parent';
+        const isChild = !isGod && !isParent;
+
         if (filters?.type) query = query.eq('type', filters.type);
         if (filters?.status) query = query.eq('status', filters.status);
-        if (filters?.agentId && filters.agentId !== 'all') query = query.eq('agent_id', filters.agentId);
+
+        // REGLA DE VISIBILIDAD ESTRICTA:
+        // Si es Child, SOLO ve sus propios clientes en esta acción ("Mis Clientes").
+        // Si es God/Parent, puede filtrar por agente.
+        if (isChild) {
+            query = query.eq('agent_id', user.id);
+        } else {
+            if (filters?.agentId && filters.agentId !== 'all') query = query.eq('agent_id', filters.agentId);
+        }
+
         if (filters?.organizationId && filters.organizationId !== 'all') query = query.eq('organization_id', filters.organizationId);
 
         if (filters?.search) {
@@ -313,6 +308,13 @@ export async function getClientsAction(
  * Obtiene los clientes de la red con visibilidad jerárquica robusta.
  * Estándar REMAX: Los datos sensibles se filtran en el servidor, no en el cliente.
  */
+
+
+
+/**
+ * Obtiene los clientes de la red con visibilidad jerárquica robusta.
+ * Estándar REMAX: Los datos sensibles se filtran en el servidor, no en el cliente.
+ */
 export async function getNetworkClientsAction(filters?: { organizationId?: string }): Promise<ActionResult<any[]>> {
     try {
         const supabase = await createClient();
@@ -328,7 +330,7 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
         let query;
 
         if (isGod) {
-            // DIOS: Visibilidad absoluta sobre la tabla maestra
+            // DIOS: No debería usar esta acción si tiene su propia vista global, pero por si acaso ve todo de todos.
             query = supabase
                 .from('clients')
                 .select(`
@@ -336,20 +338,17 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
                     organization:organizations(name),
                     agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)
                 `)
-                .neq('agent_id', user.id);
+                .neq('agent_id', user.id); // Networking = "Lo que no soy yo"
         } else if (isParent) {
-            // PADRE: Ve su oficina con PII y el resto anónimo
-            // Usamos una consulta que traiga los datos necesarios para que applyPrivacyPolicy decida
+            // PADRE: En "Red" ve clientes de OTRAS organizaciones (Anónimos)
+            // Su propia organización la ve en "Mis Clientes" (Oficina)
             query = supabase
-                .from('clients')
-                .select(`
-                    *,
-                    organization:organizations(name),
-                    agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)
-                `)
-                .neq('agent_id', user.id);
+                .from('view_anonymous_clients') // Usar vista por seguridad
+                .select('*')
+                .neq('organization_id', profile.organization_id);
         } else {
-            // HIJO: Solo ve la red anónima
+            // HIJO: Ve toda la red (incluyendo compañeros) de forma anónima
+            // "Mis Clientes" solo muestra los suyos.
             query = supabase
                 .from('view_anonymous_clients')
                 .select('*')

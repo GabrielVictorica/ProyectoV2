@@ -16,6 +16,7 @@ export function useTeamMembers() {
     return useQuery({
         queryKey: teamKeys.list(),
         queryFn: async () => await getTeamMembersAction(),
-        staleTime: 5 * 60 * 1000, // 5 minutos
+        staleTime: 30 * 1000, // 30 segundos (Balance entre frescura y performance)
+        refetchOnWindowFocus: true, // Asegurar que si vuelve a la pestaña, se actualice
     });
 }
