@@ -150,23 +150,27 @@ export async function updateClientAction(
 
         const isGodOrParent = (profile as any)?.role === 'god' || (profile as any)?.role === 'parent';
 
-        // Construir payload de update
-        const updatePayload: any = {
-            first_name: validatedData.firstName,
-            last_name: validatedData.lastName,
-            email: validatedData.email || null,
-            phone: validatedData.phone ? validatedData.phone.replace(/[^\\d+]/g, '') : null,
-            type: validatedData.type,
-            status: validatedData.status,
-            motivation: validatedData.motivation,
-            budget_min: validatedData.budgetMin,
-            budget_max: validatedData.budgetMax,
-            preferred_zones: validatedData.preferredZones,
-            tags: validatedData.tags,
-            search_property_types: validatedData.searchPropertyTypes,
-            search_bedrooms: validatedData.searchBedrooms,
-            search_payment_methods: validatedData.searchPaymentMethods,
-        };
+        // Construir payload de update de forma segura (solo lo definido)
+        const updatePayload: any = {};
+
+        if (validatedData.firstName !== undefined) updatePayload.first_name = validatedData.firstName;
+        if (validatedData.lastName !== undefined) updatePayload.last_name = validatedData.lastName;
+        if (validatedData.email !== undefined) updatePayload.email = validatedData.email || null;
+        if (validatedData.phone !== undefined) {
+            updatePayload.phone = validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null;
+        }
+        if (validatedData.type !== undefined) updatePayload.type = validatedData.type;
+        if (validatedData.status !== undefined) updatePayload.status = validatedData.status;
+        if (validatedData.source !== undefined) updatePayload.source = validatedData.source;
+        if (validatedData.motivation !== undefined) updatePayload.motivation = validatedData.motivation;
+        if (validatedData.budgetMin !== undefined) updatePayload.budget_min = validatedData.budgetMin;
+        if (validatedData.budgetMax !== undefined) updatePayload.budget_max = validatedData.budgetMax;
+        if (validatedData.preferredZones !== undefined) updatePayload.preferred_zones = validatedData.preferredZones;
+        if (validatedData.tags !== undefined) updatePayload.tags = validatedData.tags;
+        if (validatedData.searchPropertyTypes !== undefined) updatePayload.search_property_types = validatedData.searchPropertyTypes;
+        if (validatedData.searchBedrooms !== undefined) updatePayload.search_bedrooms = validatedData.searchBedrooms;
+        if (validatedData.searchPaymentMethods !== undefined) updatePayload.search_payment_methods = validatedData.searchPaymentMethods;
+        if (validatedData.preferences !== undefined) updatePayload.preferences = validatedData.preferences;
 
         // Solo God/Parent puede reasignar agente
         if (isGodOrParent && validatedData.agentId) {
@@ -308,14 +312,13 @@ export async function getClientsAction(
  * Obtiene los clientes de la red con visibilidad jerárquica robusta.
  * Estándar REMAX: Los datos sensibles se filtran en el servidor, no en el cliente.
  */
-
-
-
-/**
- * Obtiene los clientes de la red con visibilidad jerárquica robusta.
- * Estándar REMAX: Los datos sensibles se filtran en el servidor, no en el cliente.
- */
-export async function getNetworkClientsAction(filters?: { organizationId?: string }): Promise<ActionResult<any[]>> {
+export async function getNetworkClientsAction(
+    filters?: {
+        organizationId?: string,
+        page?: number,
+        limit?: number
+    }
+): Promise<ActionResult<{ clients: any[], total: number }>> {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -323,6 +326,11 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
 
         const profile = await getCurrentUserProfile(supabase, user.id);
         if (!profile) return { success: false, error: 'Perfil de usuario no encontrado' };
+
+        const page = filters?.page || 1;
+        const limit = filters?.limit || 12;
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
 
         const isGod = profile.role === 'god';
         const isParent = profile.role === 'parent';
@@ -337,21 +345,21 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
                     *,
                     organization:organizations(name),
                     agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)
-                `)
+                `, { count: 'exact' })
                 .neq('agent_id', user.id); // Networking = "Lo que no soy yo"
         } else if (isParent) {
             // PADRE: En "Red" ve clientes de OTRAS organizaciones (Anónimos)
             // Su propia organización la ve en "Mis Clientes" (Oficina)
             query = supabase
                 .from('view_anonymous_clients') // Usar vista por seguridad
-                .select('*')
+                .select('*', { count: 'exact' })
                 .neq('organization_id', profile.organization_id);
         } else {
             // HIJO: Ve toda la red (incluyendo compañeros) de forma anónima
             // "Mis Clientes" solo muestra los suyos.
             query = supabase
                 .from('view_anonymous_clients')
-                .select('*')
+                .select('*', { count: 'exact' })
                 .neq('agent_id', user.id);
         }
 
@@ -359,7 +367,10 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
             query = (query as any).eq('organization_id', filters.organizationId);
         }
 
-        const { data, error } = await (query as any).order('created_at', { ascending: false });
+        const { data, error, count } = await (query as any)
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
         if (error) throw error;
 
         // Mapeo defensivo y aplicación de política de privacidad
@@ -376,7 +387,13 @@ export async function getNetworkClientsAction(filters?: { organizationId?: strin
             return applyPrivacyPolicy(clientData, profile, user.id);
         });
 
-        return { success: true, data: processed };
+        return {
+            success: true,
+            data: {
+                clients: processed,
+                total: count || 0
+            }
+        };
     } catch (err) {
         console.error('Error fetching network clients:', err);
         return { success: false, error: 'Error al obtener clientes de la red' };
