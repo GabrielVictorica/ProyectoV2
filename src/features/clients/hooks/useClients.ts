@@ -83,9 +83,13 @@ export function useClients(filters?: ClientFilters) {
         queryKey: clientKeys.list(filters),
         queryFn: async (): Promise<{ clients: (ClientWithAgent | AnonymousClient)[], total: number }> => {
             if (filters?.scope === 'network') {
-                const actionResult = await getNetworkClientsAction({ organizationId: filters.organizationId });
+                const actionResult = await getNetworkClientsAction({
+                    organizationId: filters.organizationId,
+                    page: filters.page,
+                    limit: filters.limit
+                });
                 if (!actionResult.success) throw new Error(actionResult.error);
-                return { clients: actionResult.data!, total: actionResult.data!.length };
+                return actionResult.data!;
             }
 
             // Prepare filters for the server action
