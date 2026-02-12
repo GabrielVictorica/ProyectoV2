@@ -238,7 +238,7 @@ export function ClientDataTable({
                                             {client.search_bedrooms && client.search_bedrooms.length > 0 && (
                                                 <Badge variant="outline" className="h-5 px-1.5 gap-1 border-white/10 text-white/60 text-[9px] bg-white/5">
                                                     <Bed className="w-2.5 h-2.5 opacity-50" />
-                                                    <span className="font-bold">{client.search_bedrooms.join(', ')} Amb.</span>
+                                                    <span className="font-bold">{client.search_bedrooms.join(', ')} Dorm.</span>
                                                 </Badge>
                                             )}
                                         </div>

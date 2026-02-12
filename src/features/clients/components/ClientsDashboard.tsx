@@ -144,7 +144,7 @@ export function ClientsDashboard() {
                     </Button>
 
                     <Dialog open={isFormOpen} onOpenChange={(open) => !open && handleCloseForm()}>
-                        <DialogContent className="max-w-4xl bg-slate-900 border-slate-800">
+                        <DialogContent className="max-w-4xl bg-slate-900 border-slate-800 max-h-[95vh] flex flex-col overflow-hidden">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-bold text-white">
                                     {selectedClient ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
