@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import {
     Plus, Users, Mail, Phone, MapPin,
     Search, Filter, ShieldCheck, UserCheck,
     Calculator, Tag as TagIcon, Building2,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, DollarSign, Activity, CheckCircle2, Clock, TrendingUp
 } from 'lucide-react';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
 import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
@@ -27,6 +27,9 @@ import { ClientForm } from './ClientForm';
 import type { Client, AnonymousClient } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClientDataTable } from './ClientDataTable';
+import { SearchFilterSheet, defaultSearchFilters } from './SearchFilterSheet';
+import type { SearchFilters } from './SearchFilterSheet';
+import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
 
 import {
     DropdownMenu,
@@ -46,7 +49,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDeleteClient, useUpdateClient, clientKeys } from '../hooks/useClients';
+import { useDeleteClient, useUpdateClient, clientKeys, useSearchTags } from '../hooks/useClients';
 import { useQueryClient } from '@tanstack/react-query';
 import { MoreVertical, Edit2, Trash2, Ban, Archive, CheckCircle } from 'lucide-react';
 
@@ -76,6 +79,21 @@ export function ClientsDashboard() {
 
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 12;
+
+    // Advanced Filters
+    const [advancedFilters, setAdvancedFilters] = useState<SearchFilters>(defaultSearchFilters);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const { data: propertyTypes } = usePropertyTypes();
+    const { data: availableTags } = useSearchTags();
+
+    const advancedFilterCount =
+        advancedFilters.status.length +
+        advancedFilters.propertyTypes.length +
+        advancedFilters.paymentMethods.length +
+        (advancedFilters.budgetMin ? 1 : 0) +
+        (advancedFilters.budgetMax ? 1 : 0) +
+        advancedFilters.bedrooms.length +
+        advancedFilters.tags.length;
 
     // Admin Data (Para filtros de Organizaciones)
     const { data: organizations } = useOrganizations({ enabled: isGod || activeTab === 'network' });
@@ -115,7 +133,19 @@ export function ClientsDashboard() {
         queryFilters.organizationId = selectedOrg;
     }
 
-    const { data, isLoading: isLoadingClients } = useClients(queryFilters as any);
+    // Merge advanced filters
+    const mergedFilters = {
+        ...queryFilters,
+        statusFilter: advancedFilters.status.length > 0 ? advancedFilters.status : undefined,
+        propertyTypes: advancedFilters.propertyTypes.length > 0 ? advancedFilters.propertyTypes : undefined,
+        paymentMethods: advancedFilters.paymentMethods.length > 0 ? advancedFilters.paymentMethods : undefined,
+        budgetMin: advancedFilters.budgetMin,
+        budgetMax: advancedFilters.budgetMax,
+        bedrooms: advancedFilters.bedrooms.length > 0 ? advancedFilters.bedrooms : undefined,
+        tags: advancedFilters.tags.length > 0 ? advancedFilters.tags : undefined,
+    };
+
+    const { data, isLoading: isLoadingClients } = useClients(mergedFilters as any);
 
     const clients = data?.clients || [];
     const totalClients = data?.total || 0;
@@ -153,10 +183,10 @@ export function ClientsDashboard() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-4xl font-extrabold text-white tracking-tight">Gestión de Clientes</h1>
+                    <h1 className="text-4xl font-extrabold text-white tracking-tight">Búsquedas</h1>
                     <p className="text-slate-400 mt-2 flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-400" />
-                        Administra y perfila tus contactos de forma profesional
+                        <Search className="w-4 h-4 text-purple-400" />
+                        Gestiona las búsquedas activas de compradores
                     </p>
                 </div>
 
@@ -172,20 +202,43 @@ export function ClientsDashboard() {
                     </div>
 
                     <Button
+                        variant="outline"
+                        onClick={() => setIsFilterOpen(true)}
+                        className="relative bg-slate-900/50 border-slate-800 hover:bg-slate-800 text-white h-10 px-4"
+                    >
+                        <Filter className="w-4 h-4 mr-2" />
+                        Filtros
+                        {advancedFilterCount > 0 && (
+                            <Badge className="ml-2 bg-violet-600 text-white text-[10px] px-1.5 py-0 h-5 min-w-[20px] flex items-center justify-center">
+                                {advancedFilterCount}
+                            </Badge>
+                        )}
+                    </Button>
+
+                    <SearchFilterSheet
+                        open={isFilterOpen}
+                        onOpenChange={setIsFilterOpen}
+                        filters={advancedFilters}
+                        setFilters={(f) => { setAdvancedFilters(f); setPage(1); }}
+                        propertyTypes={propertyTypes || []}
+                        availableTags={availableTags || []}
+                    />
+
+                    <Button
                         onClick={() => {
                             setSelectedClient(undefined);
                             setIsFormOpen(true);
                         }}
                         className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-10 px-6 shadow-lg shadow-purple-500/20"
                     >
-                        <Plus className="w-4 h-4 mr-2" /> Agregar Cliente
+                        <Plus className="w-4 h-4 mr-2" /> Agregar Búsqueda
                     </Button>
 
                     <Dialog open={isFormOpen} onOpenChange={(open) => !open && handleCloseForm()}>
                         <DialogContent className="max-w-4xl bg-slate-900 border-slate-800 max-h-[95vh] flex flex-col overflow-hidden">
                             <DialogHeader>
                                 <DialogTitle className="text-2xl font-bold text-white">
-                                    {selectedClient ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}
+                                    {selectedClient ? 'Editar Búsqueda' : 'Registrar Nueva Búsqueda'}
                                 </DialogTitle>
                             </DialogHeader>
                             <ClientForm
@@ -285,7 +338,65 @@ export function ClientsDashboard() {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                     >
-                        <div className="min-h-[400px]">
+                        <div className="min-h-[400px] space-y-6">
+                            {/* Summary Cards */}
+                            {!isLoading && clients.length > 0 && (() => {
+                                const activeCount = clients.filter((c: any) => c.status === 'active').length;
+                                const closedCount = clients.filter((c: any) => c.status === 'closed').length;
+                                const budgets = clients.filter((c: any) => c.budget_max > 0);
+                                const minBudget = budgets.length > 0 ? Math.min(...budgets.map((c: any) => c.budget_min)) : 0;
+                                const maxBudget = budgets.length > 0 ? Math.max(...budgets.map((c: any) => c.budget_max)) : 0;
+                                const lastActivity = clients.reduce((latest: string, c: any) => {
+                                    const d = c.created_at || '';
+                                    return d > latest ? d : latest;
+                                }, '');
+                                const daysSince = lastActivity ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000) : -1;
+
+                                return (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-emerald-400/70 uppercase tracking-wider">Activas</span>
+                                            </div>
+                                            <span className="text-2xl font-black text-emerald-300">{activeCount}</span>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider">Cerradas</span>
+                                            </div>
+                                            <span className="text-2xl font-black text-blue-300">{closedCount}</span>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="h-7 w-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                                                    <DollarSign className="w-3.5 h-3.5 text-violet-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Rango USD</span>
+                                            </div>
+                                            <span className="text-lg font-black text-violet-300">
+                                                {minBudget > 0 ? `${(minBudget / 1000).toFixed(0)}k - ${(maxBudget / 1000).toFixed(0)}k` : '—'}
+                                            </span>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider">Última</span>
+                                            </div>
+                                            <span className="text-lg font-black text-amber-300">
+                                                {daysSince === 0 ? 'Hoy' : daysSince === 1 ? 'Ayer' : daysSince > 0 ? `Hace ${daysSince}d` : '—'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                             {isLoading ? (
                                 <div className="space-y-4">
                                     <div className="h-12 bg-slate-800/20 animate-pulse rounded-xl" />
@@ -299,9 +410,9 @@ export function ClientsDashboard() {
                                         <Users className="w-10 h-10 text-slate-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">No se encontraron clientes</h3>
+                                        <h3 className="text-xl font-bold text-white">No se encontraron búsquedas</h3>
                                         <p className="text-slate-500 max-w-xs mx-auto text-sm mt-2">
-                                            {activeTab === 'network' ? 'No hay búsqueda en la red con estos filtros.' : 'Comienza registrando tu primer cliente.'}
+                                            {activeTab === 'network' ? 'No hay búsqueda en la red con estos filtros.' : 'Comienza registrando tu primera búsqueda.'}
                                         </p>
                                     </div>
                                     {activeTab !== 'network' && (
@@ -309,7 +420,7 @@ export function ClientsDashboard() {
                                             onClick={() => setIsFormOpen(true)}
                                             className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-12 px-8 shadow-xl shadow-purple-500/20 transition-all hover:scale-105 active:scale-95"
                                         >
-                                            <Plus className="w-5 h-5 mr-2" /> Agregar Cliente
+                                            <Plus className="w-5 h-5 mr-2" /> Agregar Búsqueda
                                         </Button>
                                     )}
                                 </div>

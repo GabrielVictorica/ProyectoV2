@@ -28,7 +28,15 @@ import {
     Info,
     Trophy,
     History,
-    Send
+    Send,
+    Home,
+    Bed,
+    Copy,
+    RefreshCw,
+    Banknote,
+    CheckCircle2,
+    Archive,
+    Activity,
 } from "lucide-react";
 import {
     Sheet,
@@ -54,6 +62,10 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,8 +81,9 @@ import { parseNURC, generateSearchClipboardText } from '../utils/clientUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
-import { Home, Bed, Copy } from "lucide-react";
+
 import { toast } from 'sonner';
+import { SearchDetailSheet } from './SearchDetailSheet';
 
 interface ClientDataTableProps {
     clients: (ClientWithAgent | AnonymousClient | ClientDisplay)[];
@@ -89,27 +102,35 @@ export function ClientDataTable({
 }: ClientDataTableProps) {
     const { data: propertyTypes } = usePropertyTypes();
     const isNetwork = scope === 'network';
-    const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
+    const [selectedClient, setSelectedClient] = React.useState<ClientDisplay | null>(null);
+    const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+    const [selectedClientIdForHistory, setSelectedClientIdForHistory] = React.useState<string | null>(null);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
 
-    const { data: interactions, isLoading: isLoadingInteractions } = useInteractions(selectedClientId || '');
+    const { data: interactions, isLoading: isLoadingInteractions } = useInteractions(selectedClientIdForHistory || '');
     const addInteraction = useAddInteraction();
     const [newNote, setNewNote] = React.useState('');
     const [noteType, setNoteType] = React.useState<'nota' | 'propiedad_enviada' | 'llamada' | 'whatsapp' | 'email' | 'otro'>('nota');
 
     const handleAddNote = async () => {
-        if (!newNote.trim() || !selectedClientId) return;
+        if (!newNote.trim() || !selectedClientIdForHistory) return;
         await addInteraction.mutateAsync({
-            clientId: selectedClientId,
+            clientId: selectedClientIdForHistory,
             type: noteType,
             content: newNote
         });
         setNewNote('');
     };
 
-    const handleOpenHistory = (clientId: string) => {
-        setSelectedClientId(clientId);
+    const handleOpenHistory = (e: React.MouseEvent, clientId: string) => {
+        e.stopPropagation();
+        setSelectedClientIdForHistory(clientId);
         setIsHistoryOpen(true);
+    };
+
+    const handleRowClick = (client: ClientDisplay) => {
+        setSelectedClient(client);
+        setIsDetailOpen(true);
     };
 
     return (
@@ -117,312 +138,205 @@ export function ClientDataTable({
             <Table>
                 <TableHeader className="bg-white/[0.02]">
                     <TableRow className="hover:bg-transparent border-white/10">
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Cliente</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12 text-center">NURC</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Detalles</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12 w-[300px]">Búsqueda</TableHead>
-                        {!isNetwork && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Contacto</TableHead>}
-                        {scope === 'office' && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Agente</TableHead>}
-                        <TableHead className="text-right text-white/40 font-bold uppercase tracking-widest text-[10px] h-12">Acciones</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 px-4">Búsqueda / Perfil</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 text-center w-[100px]">NURC</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 w-[140px]">Presupuesto</TableHead>
+                        {scope === 'office' && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10">Agente</TableHead>}
+                        <TableHead className="text-right text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 px-4">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {clients.map((clientData) => {
+                        // Cast to ClientDisplay for uniform access in the table
                         const client = clientData as ClientDisplay;
-                        const isNetwork = scope === 'network';
-                        const isActuallyAnonymous = client.is_anonymous;
+                        const isActuallyAnonymous = !!client.is_anonymous;
+                        const nurc = parseNURC(client.motivation);
+                        const agentName = client.agent_name || 'Agente';
 
-                        const motivationForNURC = client.motivation || client.anonymous_label || '';
-                        const nurc = parseNURC(motivationForNURC);
+                        // Narrative text
+                        const propertyTypeNames = (client.search_property_types || [])
+                            .map(id => propertyTypes?.find(t => t.id === id)?.name)
+                            .filter(Boolean);
 
-                        const agentPhone = client.agent_phone;
+                        const narrativeProperty = propertyTypeNames.length > 0
+                            ? propertyTypeNames.join(', ')
+                            : 'Propiedad';
 
-                        const agentName = client.agent_name;
+                        const rooms = client.search_bedrooms && client.search_bedrooms.length > 0
+                            ? ` de ${client.search_bedrooms.join(', ')} dorm.`
+                            : '';
+
+                        const zones = client.preferred_zones && client.preferred_zones.length > 0
+                            ? ` en ${client.preferred_zones.join(', ')}`
+                            : '';
 
                         return (
-                            <TableRow key={client.id} className="group hover:bg-white/[0.02] border-white/5 transition-colors">
-                                {/* COLUMNA: CLIENTE */}
-                                <TableCell className="py-4">
+                            <TableRow
+                                key={client.id}
+                                className="group hover:bg-white/[0.04] border-white/5 transition-colors cursor-pointer h-[52px]"
+                                onClick={() => handleRowClick(client)}
+                            >
+                                {/* NARRATIVA */}
+                                <TableCell className="py-2 px-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-white/10">
+                                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 flex items-center justify-center border border-white/5 flex-shrink-0">
                                             {isActuallyAnonymous ? (
-                                                <Search className="w-4 h-4 text-violet-400" />
+                                                <Target className="w-3.5 h-3.5 text-violet-400 opacity-70" />
                                             ) : (
-                                                <span className="text-xs font-bold text-white uppercase">
-                                                    {(client.first_name || '?')[0]}{(client.last_name || '')[0] || ' '}
+                                                <span className="text-[10px] font-bold text-white/70 uppercase">
+                                                    {(client.first_name || '?')[0]}{(client.last_name || '')[0] || ''}
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-sm text-white group-hover:text-violet-400 transition-colors">
-                                                {isActuallyAnonymous
-                                                    ? (client.first_name || client.anonymous_label || 'Cliente Protegido')
-                                                    : `${client.first_name || 'Cliente'} ${client.last_name || ''}`}
-                                            </span>
-                                            {isActuallyAnonymous && (
-                                                <span className="text-[10px] text-violet-400/70 font-medium">Búsqueda compartida</span>
-                                            )}
-                                            <span className="text-[10px] text-white/40 flex items-center gap-1">
-                                                <Calendar className="w-3 h-3" />
-                                                Ingreso: {format(new Date(client.created_at), 'd MMM yyyy', { locale: es })}
-                                            </span>
+                                        <div className="flex flex-col min-w-0 overflow-hidden">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-[13px] text-white/90 group-hover:text-white transition-colors truncate">
+                                                    {isActuallyAnonymous
+                                                        ? (client.first_name || client.anonymous_label || 'Cliente Protegido')
+                                                        : `${client.first_name} ${client.last_name}`}
+                                                </span>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${client.status === 'active' ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                            </div>
+                                            <div className="text-[11px] text-white/50 truncate">
+                                                <span className={`font-bold uppercase text-[9px] mr-1 ${client.type === 'buyer' ? 'text-blue-400' : 'text-amber-400'}`}>
+                                                    {client.type === 'buyer' ? 'Compra' : 'Venta'}
+                                                </span>
+                                                <span className="text-white/70">{narrativeProperty}{rooms}</span>
+                                                <span className="italic text-white/40">{zones}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </TableCell>
 
-                                {/* COLUMNA: NURC (Text Profile View) */}
-                                <TableCell className="text-center py-4">
-                                    <TooltipProvider>
-                                        <div className="flex items-center justify-center gap-1.5">
-                                            {[
-                                                { id: 'n', label: 'Necesidad', icon: Target, color: 'text-emerald-400', bg: 'bg-emerald-500/10', text: nurc.n },
-                                                { id: 'u', label: 'Urgencia', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10', text: nurc.u },
-                                                { id: 'r', label: 'Realismo', icon: Eye, color: 'text-blue-400', bg: 'bg-blue-500/10', text: nurc.r },
-                                                { id: 'c', label: 'Capacidad', icon: Wallet, color: 'text-violet-400', bg: 'bg-violet-500/10', text: nurc.c }
-                                            ].map((item, i) => (
-                                                <Tooltip key={i} delayDuration={0}>
-                                                    <TooltipTrigger asChild>
-                                                        <div className={`p-1.5 rounded-md border transition-all ${item.text
-                                                            ? `${item.bg} border-white/10 opacity-100`
-                                                            : 'border-white/5 opacity-20'
-                                                            }`}>
-                                                            <item.icon className={`w-3.5 h-3.5 ${item.text ? item.color : 'text-white'}`} />
-                                                        </div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="top" className="p-3 border-white/10 bg-[#0c0c0e]/95 backdrop-blur-xl shadow-2xl max-w-[200px]">
-                                                        <div className="space-y-1.5">
-                                                            <div className="flex items-center gap-2 border-b border-white/5 pb-1.5 mb-1.5">
-                                                                <item.icon className={`w-3 h-3 ${item.color}`} />
-                                                                <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">{item.label}</span>
-                                                            </div>
-                                                            <p className="text-[11px] leading-relaxed text-slate-300 italic">
-                                                                {item.text || 'Sin descripción'}
-                                                            </p>
-                                                        </div>
-                                                    </TooltipContent>
-                                                </Tooltip>
+                                {/* NURC SEMAPHOR */}
+                                <TableCell className="py-2 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                        {[
+                                            { val: nurc.n, color: 'bg-emerald-400' },
+                                            { val: nurc.u, color: 'bg-amber-400' },
+                                            { val: nurc.r, color: 'bg-blue-400' },
+                                            { val: nurc.c, color: 'bg-violet-400' }
+                                        ].map((item, i) => (
+                                            <div
+                                                key={i}
+                                                className={`w-1.5 h-1.5 rounded-full ${item.val ? item.color : 'bg-white/10'}`}
+                                                title={item.val || 'Sin dato'}
+                                            />
+                                        ))}
+                                    </div>
+                                </TableCell>
+
+                                {/* PRESUPUESTO */}
+                                <TableCell className="py-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-[12px] font-mono font-bold text-white/90">
+                                            USD {(client.budget_min || 0).toLocaleString()} - {(client.budget_max || 0).toLocaleString()}
+                                        </span>
+                                        <div className="flex gap-1">
+                                            {client.search_payment_methods?.slice(0, 2).map(m => (
+                                                <span key={m} className="text-[8px] uppercase font-black text-white/30 tracking-tighter">
+                                                    {m === 'cash' ? 'Efectivo' : m === 'swap' ? 'Permuta' : m}
+                                                </span>
                                             ))}
                                         </div>
-                                    </TooltipProvider>
-                                </TableCell>
-
-                                {/* COLUMNA: DETALLES (Badge Tipo/Estado) */}
-                                <TableCell className="py-4">
-                                    <div className="flex flex-col gap-1.5">
-                                        <Badge variant="outline" className={`w-fit text-[9px] uppercase tracking-tighter font-bold border-white/10 ${client.type === 'buyer' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'
-                                            }`}>
-                                            {client.type === 'buyer' ? 'Comprador' : 'Vendedor'}
-                                        </Badge>
-                                        <div className="flex items-center gap-1">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${client.status === 'active' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]' :
-                                                client.status === 'closed' ? 'bg-blue-400' : 'bg-white/20'
-                                                }`} />
-                                            <span className="text-[10px] text-white/50 capitalize">{client.status}</span>
-                                        </div>
                                     </div>
                                 </TableCell>
 
-                                {/* COLUMNA: PRESUPUESTO */}
-                                <TableCell className="py-4">
-                                    <div className="flex flex-col gap-1.5">
-                                        {/* Tipos y Ambientes */}
-                                        <div className="flex flex-wrap gap-1.5 items-center">
-                                            {client.search_property_types?.slice(0, 3).map(typeId => {
-                                                const type = propertyTypes?.find(t => t.id === typeId);
-                                                if (!type) return null;
-                                                return (
-                                                    <Badge key={typeId} variant="outline" className="text-[9px] bg-blue-500/10 border-blue-500/20 text-blue-400 h-5 px-1.5 font-bold uppercase tracking-tighter">
-                                                        {type.name}
-                                                    </Badge>
-                                                );
-                                            })}
-                                            {client.search_bedrooms && client.search_bedrooms.length > 0 && (
-                                                <Badge variant="outline" className="h-5 px-1.5 gap-1 border-white/10 text-white/60 text-[9px] bg-white/5">
-                                                    <Bed className="w-2.5 h-2.5 opacity-50" />
-                                                    <span className="font-bold">{client.search_bedrooms.join(', ')} Dorm.</span>
-                                                </Badge>
-                                            )}
+                                {/* AGENTE (En office) */}
+                                {scope === 'office' && (
+                                    <TableCell className="py-2">
+                                        <div className="flex items-center gap-1.5 text-white/40">
+                                            <User className="w-3 h-3 opacity-50" />
+                                            <span className="text-[11px] font-medium truncate max-w-[80px]">{agentName}</span>
                                         </div>
+                                    </TableCell>
+                                )}
 
-                                        {/* Presupuesto */}
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-[11px] font-mono font-bold text-white tracking-tight">
-                                                USD {client.budget_min.toLocaleString()} - {client.budget_max.toLocaleString()}
-                                            </span>
+                                {/* ACCIONES */}
+                                <TableCell className="py-2 px-4 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                        {!isNetwork && (
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-5 w-5 rounded-full text-white/20 hover:text-white hover:bg-white/10 ml-1"
-                                                onClick={() => {
-                                                    const text = generateSearchClipboardText(client, propertyTypes || []);
-                                                    navigator.clipboard.writeText(text);
-                                                    toast.success('Búsqueda copiada');
-                                                }}
+                                                className="h-8 w-8 text-white/20 hover:text-white hover:bg-white/5"
+                                                onClick={(e) => handleOpenHistory(e, client.id)}
                                             >
-                                                <Copy className="w-2.5 h-2.5" />
+                                                <History className="w-3.5 h-3.5" />
                                             </Button>
-                                        </div>
-
-                                        {/* Zonas / Descripción de búsqueda (Sin restricciones) */}
-                                        <div className="text-[10px] text-white/40 leading-relaxed mt-0.5">
-                                            <span className="italic block break-words whitespace-normal">
-                                                {client.preferred_zones?.join(', ') || 'Zonas no definidas'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </TableCell>
-
-                                {/* COLUMNA: CONTACTO (Solo si NO es anónimo/network) */}
-                                {!isNetwork && (
-                                    <TableCell className="py-4">
-                                        {!isActuallyAnonymous ? (
-                                            <div className="flex items-center gap-2">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border border-white/5 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" asChild>
-                                                    <a href={`https://wa.me/${(client as ClientWithAgent).phone?.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                                                        <MessageSquare className="w-3.5 h-3.5" />
-                                                    </a>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border border-white/5 hover:bg-blue-500/10 hover:text-blue-400 transition-colors" asChild>
-                                                    <a href={`mailto:${(client as ClientWithAgent).email}`}>
-                                                        <Mail className="w-3.5 h-3.5" />
-                                                    </a>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full border border-white/5 hover:bg-violet-500/10 hover:text-violet-400 transition-colors" asChild>
-                                                    <a href={`tel:${(client as ClientWithAgent).phone}`}>
-                                                        <Phone className="w-3.5 h-3.5" />
-                                                    </a>
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-1.5 text-white/20">
-                                                <Eye className="w-3 h-3 opacity-30" />
-                                                <span className="text-[10px] italic">Datos Reservados</span>
-                                            </div>
                                         )}
-                                    </TableCell>
-                                )}
-
-                                {/* COLUMNA: AGENTE (En office y network) */}
-                                {(scope === 'office' || scope === 'network') && (
-                                    <TableCell className="py-4">
-                                        <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-1.5 text-white/60">
-                                                <User className="w-3 h-3 opacity-50" />
-                                                <span className="text-xs font-medium">{agentName}</span>
-                                            </div>
-                                            {isNetwork && (
-                                                <div className="flex items-center gap-1.5 text-white/30">
-                                                    <Building2 className="w-3 h-3 opacity-30" />
-                                                    <span className="text-[10px]">{(client as AnonymousClient).organization_name}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                )}
-
-                                {/* COLUMNA: ACCIONES */}
-                                <TableCell className="text-right py-4">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {/* Botón de Historial (Solo si NO es red anónima o si es Admin) */}
-                                        {!isNetwork && (
-                                            <TooltipProvider>
-                                                <Tooltip delayDuration={0}>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/5"
-                                                            onClick={() => handleOpenHistory(client.id)}
-                                                        >
-                                                            <History className="w-4 h-4" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="bg-slate-900 border-white/10 text-slate-200">
-                                                        Ver Historial y Notas
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
-
-                                        {/* Botón de Contacto SIEMPRE visible si hay teléfono del agente */}
-                                        {agentPhone && (
-                                            <TooltipProvider>
-                                                <Tooltip delayDuration={0}>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 border-emerald-500/30 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/20 gap-2 text-[11px]"
-                                                            asChild
-                                                        >
-                                                            <a
-                                                                href={`https://wa.me/${agentPhone.replace(/\D/g, '')}?text=Hola ${agentName}, vi tu búsqueda de ${client.type === 'buyer' ? 'Comprador' : 'Vendedor'} en la red profesional y me gustaría colaborar.`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                            >
-                                                                <MessageSquare className="w-3.5 h-3.5" />
-                                                                Contactar
-                                                            </a>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="bg-emerald-950 border-emerald-500/30 text-emerald-200">
-                                                        Hablar con el agente responsable
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
-
-                                        {!isActuallyAnonymous && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white">
-                                                        <MoreVertical className="w-4 h-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48 bg-[#09090b] border-white/10 text-slate-300">
-                                                    <DropdownMenuLabel className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Gestión</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator className="bg-white/5" />
-
-                                                    <DropdownMenuItem
-                                                        onClick={() => {
-                                                            const text = generateSearchClipboardText(client, propertyTypes || []);
-                                                            navigator.clipboard.writeText(text);
-                                                            toast.success('Búsqueda copiada al portapapeles');
-                                                        }}
-                                                        className="gap-2 cursor-pointer focus:bg-white/5"
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" /> Copiar Búsqueda
-                                                    </DropdownMenuItem>
-
-                                                    <DropdownMenuItem onClick={() => onEdit?.(client)} className="gap-2 cursor-pointer focus:bg-white/5">
-                                                        <Edit2 className="w-3.5 h-3.5" /> Editar Datos
-                                                    </DropdownMenuItem>
-
-                                                    <DropdownMenuSeparator className="bg-white/5" />
-                                                    <DropdownMenuLabel className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Cambiar Estado</DropdownMenuLabel>
-                                                    {['active', 'inactive', 'closed', 'archived'].map((status) => (
-                                                        <DropdownMenuItem
-                                                            key={status}
-                                                            onClick={() => onStatusChange?.(client.id, status)}
-                                                            className={`gap-2 cursor-pointer focus:bg-white/5 capitalize ${client.status === status ? 'text-violet-400 font-bold' : ''}`}
-                                                        >
-                                                            <div className={`w-1.5 h-1.5 rounded-full ${status === 'active' ? 'bg-emerald-400' :
-                                                                status === 'closed' ? 'bg-blue-400' : 'bg-white/30'
-                                                                }`} />
-                                                            {status}
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white">
+                                                    <MoreVertical className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-48 bg-[#09090b] border-white/10 text-slate-300">
+                                                <DropdownMenuItem
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const text = generateSearchClipboardText(client, propertyTypes || []);
+                                                        navigator.clipboard.writeText(text);
+                                                        toast.success('Búsqueda copiada');
+                                                    }}
+                                                    className="gap-2 cursor-pointer focus:bg-white/5"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" /> Copiar Link
+                                                </DropdownMenuItem>
+                                                {!isActuallyAnonymous && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(client); }} className="gap-2 cursor-pointer focus:bg-white/5">
+                                                            <Edit2 className="w-3.5 h-3.5" /> Editar
                                                         </DropdownMenuItem>
-                                                    ))}
 
-                                                    <DropdownMenuSeparator className="bg-white/5" />
-                                                    <DropdownMenuItem
-                                                        onClick={() => onDelete?.(client.id)}
-                                                        className="gap-2 cursor-pointer text-rose-400 focus:bg-rose-500/10 focus:text-rose-400"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
+                                                        <DropdownMenuSub>
+                                                            <DropdownMenuSubTrigger className="gap-2 cursor-pointer focus:bg-white/5">
+                                                                <RefreshCw className="w-3.5 h-3.5" /> Cambiar Estado
+                                                            </DropdownMenuSubTrigger>
+                                                            <DropdownMenuPortal>
+                                                                <DropdownMenuSubContent className="bg-[#09090b] border-white/10 text-slate-300 min-w-[150px]">
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'active'); }}
+                                                                        className="gap-2 cursor-pointer focus:bg-emerald-500/10 focus:text-emerald-400"
+                                                                    >
+                                                                        <Activity className="w-3.5 h-3.5" /> Activa
+                                                                        {client.status === 'active' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-emerald-400" />}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'inactive'); }}
+                                                                        className="gap-2 cursor-pointer focus:bg-white/5"
+                                                                    >
+                                                                        <Clock className="w-3.5 h-3.5" /> Inactiva
+                                                                        {client.status === 'inactive' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-slate-500" />}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'closed'); }}
+                                                                        className="gap-2 cursor-pointer focus:bg-blue-500/10 focus:text-blue-400"
+                                                                    >
+                                                                        <CheckCircle2 className="w-3.5 h-3.5" /> Cerrada
+                                                                        {client.status === 'closed' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-blue-400" />}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'archived'); }}
+                                                                        className="gap-2 cursor-pointer focus:bg-white/5"
+                                                                    >
+                                                                        <Archive className="w-3.5 h-3.5" /> Archivada
+                                                                        {client.status === 'archived' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-slate-700" />}
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuSubContent>
+                                                            </DropdownMenuPortal>
+                                                        </DropdownMenuSub>
+                                                    </>
+                                                )}
+                                                <DropdownMenuSeparator className="bg-white/5" />
+                                                <DropdownMenuItem
+                                                    onClick={(e) => { e.stopPropagation(); onDelete?.(client.id); }}
+                                                    className="gap-2 cursor-pointer text-rose-400 focus:bg-rose-500/10 focus:text-rose-400"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -430,6 +344,13 @@ export function ClientDataTable({
                     })}
                 </TableBody>
             </Table>
+
+            <SearchDetailSheet
+                client={selectedClient}
+                open={isDetailOpen}
+                onOpenChange={setIsDetailOpen}
+                onEdit={onEdit}
+            />
 
             {/* PANEL DE HISTORIAL/NOTAS */}
             <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
@@ -509,12 +430,11 @@ export function ClientDataTable({
                                 />
                                 <Button
                                     size="sm"
-                                    className="absolute bottom-2 right-2 bg-violet-600 hover:bg-violet-700 text-white"
+                                    className="absolute bottom-2 right-2 bg-violet-600 hover:bg-violet-700 text-white font-bold"
                                     onClick={handleAddNote}
                                     disabled={!newNote.trim() || addInteraction.isPending}
                                 >
-                                    <Send className="w-3.5 h-3.5 mr-2" />
-                                    {addInteraction.isPending ? 'Guardando...' : 'Guardar'}
+                                    {addInteraction.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 </Button>
                             </div>
                         </div>

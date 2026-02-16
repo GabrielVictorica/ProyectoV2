@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateClient, useUpdateClient } from '../hooks/useClients';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard } from 'lucide-react';
+import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard, Clock, Eye, Wallet, ShoppingCart, HardHat } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,16 +35,13 @@ import type { Client } from '../types';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
 import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
+import { PersonSelector } from './shared/PersonSelector';
 
 const clientSchema = z.object({
-    firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
-    email: z.string().optional().default('').refine(val => !val || z.string().email().safeParse(val).success, {
-        message: 'Email inválido',
-    }),
-    phone: z.string().optional().default('').refine(val => !val || isValidPhoneNumber(val), {
-        message: 'Teléfono inválido para el país seleccionado',
-    }),
+    firstName: z.string().optional().default(''),
+    lastName: z.string().optional().default(''),
+    email: z.string().optional().default(''),
+    phone: z.string().optional().default(''),
     type: z.enum(['buyer', 'seller']).default('buyer'),
     status: z.enum(['active', 'inactive', 'closed', 'archived']).default('active'),
     source: z.enum(['referral', 'portal', 'social', 'walk-in']).default('referral'),
@@ -64,25 +61,27 @@ const clientSchema = z.object({
     searchPaymentMethods: z.array(z.string()).default([]),
     organizationId: z.string().optional(),
     agentId: z.string().optional(),
+    personId: z.string().min(1, 'Debes vincular una persona del CRM').uuid('ID de persona inválido'),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
     onSuccess?: () => void;
+    onCreated?: (personId: string) => void;
     client?: Client;
 }
 
 const STEPS = [
     { id: 'identity', title: 'Identificación', icon: User },
-    { id: 'n', title: 'Necesidad (N)', icon: Target },
-    { id: 'u', title: 'Urgencia (U)', icon: Target },
-    { id: 'r', title: 'Realismo (R)', icon: Target },
-    { id: 'c', title: 'Capacidad (C)', icon: Target },
-    { id: 'extra', title: 'Detalles Finales', icon: MapPin },
+    { id: 'n', title: 'Necesidad', icon: Target },
+    { id: 'u', title: 'Urgencia', icon: Clock },
+    { id: 'r', title: 'Realismo', icon: Eye },
+    { id: 'c', title: 'Capacidad', icon: Wallet },
+    { id: 'extra', title: 'Detalles', icon: MapPin },
 ];
 
-export function ClientForm({ onSuccess, client }: ClientFormProps) {
+export function ClientForm({ onSuccess, onCreated, client }: ClientFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
     const createClient = useCreateClient();
     const updateClient = useUpdateClient();
@@ -149,13 +148,14 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
             searchPropertyTypes: client?.search_property_types || [],
             searchBedrooms: client?.search_bedrooms || [],
             searchPaymentMethods: client?.search_payment_methods || [],
+            personId: client?.person_id || undefined,
         },
     });
 
     const { data: propertyTypes } = usePropertyTypes();
 
     const onSubmit = async (values: ClientFormValues) => {
-        const loadingToast = toast.loading(isEditing ? 'Actualizando cliente...' : 'Registrando cliente...');
+        const loadingToast = toast.loading(isEditing ? 'Actualizando búsqueda...' : 'Registrando búsqueda...');
         try {
             const payload = {
                 ...values,
@@ -176,6 +176,7 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                 source: values.source,
                 organizationId: values.organizationId || undefined,
                 agentId: values.agentId || undefined,
+                personId: values.personId || undefined,
             };
 
             const result = isEditing
@@ -185,8 +186,14 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
             toast.dismiss(loadingToast);
 
             if (result.success) {
-                toast.success(isEditing ? 'Cliente actualizado correctamente' : 'Cliente registrado correctamente');
-                if (!isEditing) form.reset();
+                toast.success(isEditing ? 'Búsqueda actualizada correctamente' : 'Búsqueda registrada correctamente');
+                if (!isEditing) {
+                    form.reset();
+                    // Notify parent about the created client's personId
+                    if (onCreated && values.personId) {
+                        onCreated(values.personId);
+                    }
+                }
                 onSuccess?.();
             } else {
                 toast.error(result.error || 'Error desconocido');
@@ -194,7 +201,7 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
         } catch (error) {
             toast.dismiss(loadingToast);
             console.error('Form submission error:', error);
-            toast.error(isEditing ? 'Error al actualizar el cliente' : 'Error al intentar registrar el cliente');
+            toast.error(isEditing ? 'Error al actualizar la búsqueda' : 'Error al registrar la búsqueda');
         }
     };
 
@@ -210,12 +217,12 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
 
     const getFieldsForStep = (step: number) => {
         switch (step) {
-            case 0: return ['firstName', 'lastName', 'type', 'phone', 'email'];
+            case 0: return ['personId'];
             case 1: return ['necessity'];
             case 2: return ['urgency'];
             case 3: return ['realism'];
             case 4: return ['capacity', 'searchPaymentMethods'];
-            case 5: return ['budgetMin', 'budgetMax', 'preferredZones', 'tags'];
+            case 5: return ['budgetMin', 'budgetMax', 'preferredZones'];
             default: return [];
         }
     };
@@ -229,15 +236,22 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                     const isActive = idx === currentStep;
                     const isCompleted = idx < currentStep;
                     return (
-                        <div key={step.id} className="flex flex-col items-center gap-2 flex-1">
+                        <div key={step.id} className="flex flex-col items-center gap-2 flex-1 relative">
+                            {/* Connecting Line */}
+                            {idx > 0 && (
+                                <div className={`
+                                    absolute right-1/2 top-4 w-full h-[2px] -translate-y-1/2 -z-10
+                                    ${isCompleted ? 'bg-emerald-500/50' : 'bg-slate-800'}
+                                `} />
+                            )}
                             <div className={`
-                                w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300
-                                ${isActive ? 'bg-purple-600 text-white ring-4 ring-purple-600/20' :
-                                    isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}
+                                w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300
+                                ${isActive ? 'bg-purple-600 text-white ring-4 ring-purple-600/30' :
+                                    isCompleted ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-800 text-slate-500 border border-slate-700'}
                             `}>
                                 {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-4 h-4" />}
                             </div>
-                            <span className={`text-[10px] font-medium uppercase tracking-tighter ${isActive ? 'text-purple-400' : 'text-slate-600'}`}>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-purple-400' : isCompleted ? 'text-emerald-500/80' : 'text-slate-600'}`}>
                                 {step.title}
                             </span>
                         </div>
@@ -275,55 +289,41 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                             >
                                 {currentStep === 0 && (
                                     <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
+                                        {/* Selector de Persona (CRM) — Obligatorio */}
+                                        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <User className="w-5 h-5 text-purple-400" />
+                                                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Vincular con Persona (CRM)</h3>
+                                            </div>
                                             <FormField
                                                 control={form.control}
-                                                name="firstName"
+                                                name="personId"
                                                 render={({ field }) => (
                                                     <FormItem>
-                                                        <FormLabel className="text-slate-300">Nombre</FormLabel>
                                                         <FormControl>
-                                                            <Input autoFocus placeholder="Ej. Juan" className="bg-slate-800/50 border-slate-700 h-12" {...field} />
+                                                            <PersonSelector
+                                                                value={field.value ?? null}
+                                                                onChange={(id: string | null, person?: any) => {
+                                                                    field.onChange(id);
+                                                                    if (person) {
+                                                                        form.setValue('firstName', person.first_name);
+                                                                        form.setValue('lastName', person.last_name);
+                                                                        form.setValue('email', person.email || '');
+                                                                        form.setValue('phone', person.phone || '');
+                                                                    }
+                                                                }}
+                                                                placeholder="Buscar o crear persona..."
+                                                            />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
-                                            <FormField
-                                                control={form.control}
-                                                name="lastName"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel className="text-slate-300">Apellido</FormLabel>
-                                                        <FormControl>
-                                                            <Input placeholder="Ej. Perez" className="bg-slate-800/50 border-slate-700 h-12" {...field} />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
+                                            <p className="text-[10px] text-slate-500 italic">
+                                                Seleccioná la persona que está buscando propiedad. Si no existe, podés crearla desde aquí.
+                                            </p>
                                         </div>
-                                        <FormField
-                                            control={form.control}
-                                            name="type"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-slate-300">Tipo de Perfil</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger className="bg-slate-800/50 border-slate-700 h-12">
-                                                                <SelectValue placeholder="Seleccionar" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
-                                                            <SelectItem value="buyer">Comprador</SelectItem>
-                                                            <SelectItem value="seller">Vendedor</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+
 
                                         {/* Selectores de Org/Agente para God/Parent */}
                                         {isGodOrParent && (
@@ -388,43 +388,6 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                             </div>
                                         )}
 
-                                        <div className="grid grid-cols-2 gap-4 pt-2">
-                                            <FormField
-                                                control={form.control}
-                                                name="phone"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel className="text-slate-400 text-xs flex items-center gap-1">
-                                                            <Phone className="w-3 h-3" /> Teléfono
-                                                        </FormLabel>
-                                                        <FormControl>
-                                                            <PhoneInput
-                                                                value={field.value}
-                                                                onChange={field.onChange}
-                                                                className="bg-slate-800/50"
-                                                            />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                            <FormField
-                                                control={form.control}
-                                                name="email"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel className="text-slate-400 text-xs flex items-center gap-1">
-                                                            <Mail className="w-3 h-3" /> Email
-                                                        </FormLabel>
-                                                        <FormControl>
-                                                            <Input placeholder="juan@mail.com" className="bg-slate-800/50 border-slate-700" {...field} />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </div>
-
                                         {form.watch('type') === 'buyer' && (
                                             <div className="space-y-4 pt-2 border-t border-slate-800/50 mt-4 animate-in fade-in slide-in-from-top-4">
                                                 <FormField
@@ -450,14 +413,19 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                                                                 field.onChange(newValue);
                                                                             }}
                                                                             className={`
-                                                                            flex flex-col items-center justify-center p-3 rounded-xl border transition-all
+                                                                            flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300
                                                                             ${isSelected
-                                                                                    ? 'bg-purple-600/20 border-purple-500 text-purple-200 ring-1 ring-purple-500'
-                                                                                    : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}
+                                                                                    ? 'bg-purple-600/20 border-purple-500 text-purple-200 ring-2 ring-purple-500/20 shadow-lg shadow-purple-500/10'
+                                                                                    : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700 hover:bg-slate-800/50'}
                                                                         `}
                                                                         >
-                                                                            <Icon className={`w-5 h-5 mb-2 ${isSelected ? 'text-purple-400' : 'text-slate-500'}`} />
-                                                                            <span className="text-[10px] font-semibold text-center leading-tight">{pt.name}</span>
+                                                                            <div className={`
+                                                                                p-2 rounded-xl mb-2 transition-colors
+                                                                                ${isSelected ? 'bg-purple-600/30' : 'bg-slate-800/50'}
+                                                                            `}>
+                                                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-purple-400' : 'text-slate-600'}`} />
+                                                                            </div>
+                                                                            <span className="text-[10px] font-bold text-center leading-tight uppercase tracking-wider">{pt.name}</span>
                                                                         </button>
                                                                     );
                                                                 })}
@@ -510,81 +478,119 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                 )}
 
                                 {currentStep === 1 && (
-                                    <FormField
-                                        control={form.control}
-                                        name="necessity"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-xl font-bold text-white mb-2">Necesidad (N)</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        autoFocus
-                                                        placeholder="¿Qué es lo que verdaderamente necesita el cliente y por qué? Detalla su motivación de fondo."
-                                                        className="bg-slate-800/50 border-slate-700 min-h-[150px] text-lg p-4"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="space-y-4">
+                                        <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Target className="w-4 h-4 text-emerald-400" />
+                                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Necesidad (N)</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                💡 Preguntate: ¿Qué es lo que verdaderamente necesita? ¿Reemplaza vivienda? ¿Inversión? ¿Mudanza familiar? ¿Primera compra?
+                                            </p>
+                                        </div>
+                                        <FormField
+                                            control={form.control}
+                                            name="necessity"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            autoFocus
+                                                            placeholder="Detallá la motivación de fondo del cliente..."
+                                                            className="bg-slate-900/50 border-emerald-500/20 focus:border-emerald-500/40 min-h-[160px] text-lg p-4 rounded-xl backdrop-blur-sm transition-all focus:ring-2 focus:ring-emerald-500/10"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                 )}
 
                                 {currentStep === 2 && (
-                                    <FormField
-                                        control={form.control}
-                                        name="urgency"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-xl font-bold text-white mb-2">Urgencia (U)</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        autoFocus
-                                                        placeholder="¿Para cuándo necesita concretar la operación? ¿Qué sucede si no lo logra en ese plazo?"
-                                                        className="bg-slate-800/50 border-slate-700 min-h-[150px] text-lg p-4"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="space-y-4">
+                                        <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Clock className="w-4 h-4 text-amber-400" />
+                                                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Urgencia (U)</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                ⏰ ¿Para cuándo necesita concretar? ¿Tiene un plazo definido? ¿Qué consecuencias hay si no lo logra a tiempo?
+                                            </p>
+                                        </div>
+                                        <FormField
+                                            control={form.control}
+                                            name="urgency"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            autoFocus
+                                                            placeholder="Describí los plazos y la urgencia del cliente..."
+                                                            className="bg-slate-900/50 border-amber-500/20 focus:border-amber-500/40 min-h-[160px] text-lg p-4 rounded-xl backdrop-blur-sm transition-all focus:ring-2 focus:ring-amber-500/10"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                 )}
 
                                 {currentStep === 3 && (
-                                    <FormField
-                                        control={form.control}
-                                        name="realism"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-xl font-bold text-white mb-2">Realismo (R)</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        autoFocus
-                                                        placeholder="¿Sus expectativas de precio y producto son acordes a la realidad actual del mercado?"
-                                                        className="bg-slate-800/50 border-slate-700 min-h-[150px] text-lg p-4"
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="space-y-4">
+                                        <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Eye className="w-4 h-4 text-blue-400" />
+                                                <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Realismo (R)</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                🔍 ¿Sus expectativas de precio y producto son acordes al mercado actual? ¿Ya vio propiedades? ¿Está informado?
+                                            </p>
+                                        </div>
+                                        <FormField
+                                            control={form.control}
+                                            name="realism"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            autoFocus
+                                                            placeholder="Describí qué tan alineadas están sus expectativas con el mercado..."
+                                                            className="bg-slate-900/50 border-blue-500/20 focus:border-blue-500/40 min-h-[160px] text-lg p-4 rounded-xl backdrop-blur-sm transition-all focus:ring-2 focus:ring-blue-500/10"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                 )}
 
                                 {currentStep === 4 && (
                                     <div className="space-y-6">
+                                        <div className="p-3 rounded-lg bg-violet-500/5 border border-violet-500/10">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Wallet className="w-4 h-4 text-violet-400" />
+                                                <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Capacidad (C)</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                                💰 ¿Cuenta con los fondos? ¿Necesita vender para comprar? ¿Requiere financiación, permuta, o tiene efectivo disponible?
+                                            </p>
+                                        </div>
                                         <FormField
                                             control={form.control}
                                             name="capacity"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-xl font-bold text-white mb-2">Capacidad (C)</FormLabel>
                                                     <FormControl>
                                                         <Textarea
                                                             autoFocus
-                                                            placeholder="¿Cuenta con los fondos disponibles? ¿Necesita vender para comprar o requiere financiación?"
-                                                            className="bg-slate-800/50 border-slate-700 min-h-[150px] text-lg p-4"
+                                                            placeholder="Describí la situación económica y capacidad de pago..."
+                                                            className="bg-slate-900/50 border-violet-500/20 focus:border-violet-500/40 min-h-[160px] text-lg p-4 rounded-xl backdrop-blur-sm transition-all focus:ring-2 focus:ring-violet-500/10"
                                                             {...field}
                                                         />
                                                     </FormControl>
@@ -622,13 +628,13 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                                                             field.onChange(newValue);
                                                                         }}
                                                                         className={`
-                                                                        flex items-center gap-2 py-2 px-4 rounded-full border text-sm font-medium transition-all
+                                                                        flex items-center gap-2 py-2.5 px-5 rounded-xl border text-sm font-bold transition-all duration-300
                                                                         ${isSelected
-                                                                                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200'
-                                                                                : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}
+                                                                                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-lg shadow-emerald-500/10'
+                                                                                : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'}
                                                                     `}
                                                                     >
-                                                                        <Icon className="w-4 h-4" />
+                                                                        <Icon className={`w-4 h-4 ${isSelected ? 'text-emerald-400' : 'text-slate-600'}`} />
                                                                         {opt.label}
                                                                     </button>
                                                                 );
@@ -685,19 +691,7 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                                                 </FormItem>
                                             )}
                                         />
-                                        <FormField
-                                            control={form.control}
-                                            name="tags"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-slate-300">Etiquetas / Tags</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Ej. Urgente, Contado, Reubicación" className="bg-slate-800/50 border-slate-700 h-12" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+
                                     </div>
                                 )}
                             </motion.div>
@@ -729,7 +723,7 @@ export function ClientForm({ onSuccess, client }: ClientFormProps) {
                             <Button
                                 type="button"
                                 onClick={() => form.handleSubmit(onSubmit)()}
-                                className="flex-[2] bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold h-12 shadow-lg shadow-purple-500/20"
+                                className="flex-[2] bg-gradient-to-r from-purple-600 via-purple-500 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-black uppercase tracking-widest h-14 shadow-xl shadow-purple-600/20 rounded-2xl border-t border-white/10"
                                 disabled={isEditing ? updateClient.isPending : createClient.isPending}
                             >
                                 {isEditing ? (
@@ -768,5 +762,6 @@ function getIconForPropertyType(name: string) {
     if (lowercaseName.includes('depósito') || lowercaseName.includes('galpón')) return Warehouse;
     if (lowercaseName.includes('campo')) return Tractor;
     if (lowercaseName.includes('hotel')) return Hotel;
+    if (lowercaseName.includes('en pozo') || lowercaseName.includes('pozo')) return HardHat;
     return Building;
 }
