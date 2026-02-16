@@ -137,6 +137,9 @@ export function ClosingWizard({ open, onOpenChange, onComplete }: ClosingWizardP
                                     <Calculator className="h-5 w-5 text-indigo-400" />
                                     Confirmar Ejecución
                                 </DialogTitle>
+                                <DialogDescription className="sr-only">
+                                    Confirmación final para ejecutar el cierre mensual de operaciones.
+                                </DialogDescription>
                             </DialogHeader>
 
                             <div className="space-y-6 py-4 text-center">
@@ -189,6 +192,10 @@ export function ClosingWizard({ open, onOpenChange, onComplete }: ClosingWizardP
 
                     {step === 3 && (
                         <div className="space-y-8 py-4 animate-in fade-in zoom-in-95 duration-700">
+                            <DialogHeader className="sr-only">
+                                <DialogTitle>Proceso Completado</DialogTitle>
+                                <DialogDescription>El cierre mensual se ha ejecutado exitosamente.</DialogDescription>
+                            </DialogHeader>
                             <div className="flex flex-col items-center text-center space-y-4">
                                 <div className="h-20 w-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
                                     <CheckCircle2 className="h-12 w-12" />
