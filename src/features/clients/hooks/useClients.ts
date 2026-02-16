@@ -95,7 +95,14 @@ export function useClients(filters?: ClientFilters) {
                 const actionResult = await getNetworkClientsAction({
                     organizationId: filters.organizationId,
                     page: filters.page,
-                    limit: filters.limit
+                    limit: filters.limit,
+                    propertyTypes: filters.propertyTypes,
+                    paymentMethods: filters.paymentMethods,
+                    budgetMin: filters.budgetMin,
+                    budgetMax: filters.budgetMax,
+                    bedrooms: filters.bedrooms,
+                    statusFilter: filters.statusFilter,
+                    tags: filters.tags,
                 });
                 if (!actionResult.success) throw new Error(actionResult.error);
                 return actionResult.data!;

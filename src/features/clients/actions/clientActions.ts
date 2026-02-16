@@ -5,6 +5,46 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ActionResult } from '@/features/admin/actions/adminActions';
 import type { Client, AnonymousClient, ClientWithAgent } from '../types';
+import { applyPrivacyPolicy, type UserProfile } from '../utils/privacy';
+
+/**
+ * Helper interno para aplicar filtros complejos de búsqueda a una query de Supabase.
+ * Centraliza la lógica para que funcione igual en "Mis Clientes" y "Red".
+ */
+function applyFiltersToQuery(query: any, filters: any) {
+    if (filters?.statusFilter && filters.statusFilter.length > 0) {
+        query = query.in('status', filters.statusFilter);
+    }
+
+    if (filters?.propertyTypes && filters.propertyTypes.length > 0) {
+        query = query.overlaps('search_property_types', filters.propertyTypes);
+    }
+
+    if (filters?.paymentMethods && filters.paymentMethods.length > 0) {
+        query = query.overlaps('search_payment_methods', filters.paymentMethods);
+    }
+
+    if (filters?.budgetMin) {
+        // La búsqueda del cliente dice "puedo pagar hasta X". 
+        // Si el filtro de Presupuesto Mínimo es 500k, queremos búsquedas cuya capacidad MÁXIMA sea al menos 500k.
+        query = query.gte('budget_max', filters.budgetMin);
+    }
+
+    if (filters?.budgetMax) {
+        // Si el filtro de Presupuesto Máximo es 100k, queremos búsquedas cuya capacidad MÍNIMA sea inferior a 100k.
+        query = query.lte('budget_min', filters.budgetMax);
+    }
+
+    if (filters?.bedrooms && filters.bedrooms.length > 0) {
+        query = query.overlaps('search_bedrooms', filters.bedrooms);
+    }
+
+    if (filters?.tags && filters.tags.length > 0) {
+        query = query.overlaps('tags', filters.tags);
+    }
+
+    return query;
+}
 
 const clientSchema = z.object({
     firstName: z.string().optional().default(''),
@@ -52,8 +92,8 @@ export async function createClientAction(
 
         if (!profile) return { success: false, error: 'Perfil no encontrado' };
 
-        const isGodOrParent = (profile as any).role === 'god' || (profile as any).role === 'parent';
-        const isGod = (profile as any).role === 'god';
+        const isGodOrParent = (profile as any)?.role === 'god' || (profile as any)?.role === 'parent';
+        const isGod = (profile as any)?.role === 'god';
 
         // Determinar org y agent a usar basado en permisos
         let targetOrgId = (profile as any).organization_id;
@@ -71,7 +111,7 @@ export async function createClientAction(
             const { data: targetAgent } = await supabase
                 .from('profiles')
                 .select('organization_id')
-                .eq('id', targetAgentId)
+                .eq('id', targetAgentId as any)
                 .single();
 
             if (!targetAgent || (targetAgent as any).organization_id !== targetOrgId) {
@@ -93,8 +133,8 @@ export async function createClientAction(
                 .single();
 
             if (person) {
-                firstName = firstName || person.first_name;
-                lastName = lastName || person.last_name;
+                firstName = firstName || (person as any).first_name;
+                lastName = lastName || (person as any).last_name;
             }
         }
 
@@ -244,11 +284,7 @@ export async function deleteClientAction(id: string): Promise<ActionResult<void>
     }
 }
 
-import { applyPrivacyPolicy, type UserProfile } from '../utils/privacy';
-
-/**
- * Helper interno para obtener el perfil del usuario actual de forma robusta.
- */
+// Helper interno para obtener el perfil del usuario actual de forma robusta.
 async function getCurrentUserProfile(supabase: any, userId: string): Promise<UserProfile | null> {
     const { data: profile, error } = await supabase
         .from('profiles')
@@ -324,34 +360,8 @@ export async function getClientsAction(
             query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
         }
 
-        // Filtros avanzados de búsqueda
-        if (filters?.statusFilter && filters.statusFilter.length > 0) {
-            query = query.in('status', filters.statusFilter);
-        }
-
-        if (filters?.propertyTypes && filters.propertyTypes.length > 0) {
-            query = query.overlaps('search_property_types', filters.propertyTypes);
-        }
-
-        if (filters?.paymentMethods && filters.paymentMethods.length > 0) {
-            query = query.overlaps('search_payment_methods', filters.paymentMethods);
-        }
-
-        if (filters?.budgetMin) {
-            query = query.gte('budget_max', filters.budgetMin);
-        }
-
-        if (filters?.budgetMax) {
-            query = query.lte('budget_min', filters.budgetMax);
-        }
-
-        if (filters?.bedrooms && filters.bedrooms.length > 0) {
-            query = query.overlaps('search_bedrooms', filters.bedrooms);
-        }
-
-        if (filters?.tags && filters.tags.length > 0) {
-            query = query.overlaps('tags', filters.tags);
-        }
+        // Aplicar filtros avanzados compartidos
+        query = applyFiltersToQuery(query, filters);
 
         const { data, error, count } = await query
             .order('created_at', { ascending: false })
@@ -361,7 +371,7 @@ export async function getClientsAction(
 
         // Aplicar política de privacidad robusta
         const processedClients = (data || []).map(client =>
-            applyPrivacyPolicy(client, profile, user.id)
+            applyPrivacyPolicy(client as any, profile as any, user.id)
         );
 
         return {
@@ -385,7 +395,15 @@ export async function getNetworkClientsAction(
     filters?: {
         organizationId?: string,
         page?: number,
-        limit?: number
+        limit?: number,
+        // Advanced filters
+        propertyTypes?: string[];
+        paymentMethods?: string[];
+        budgetMin?: number | null;
+        budgetMax?: number | null;
+        bedrooms?: string[];
+        statusFilter?: string[];
+        tags?: string[];
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {
     try {
@@ -436,6 +454,9 @@ export async function getNetworkClientsAction(
             query = (query as any).eq('organization_id', filters.organizationId);
         }
 
+        // Aplicar filtros avanzados compartidos a la red
+        query = applyFiltersToQuery(query as any, filters);
+
         const { data, error, count } = await (query as any)
             .order('created_at', { ascending: false })
             .range(from, to);
@@ -453,7 +474,7 @@ export async function getNetworkClientsAction(
                 agent_name: c.agent ? `${c.agent.first_name || ''} ${c.agent.last_name || ''}`.trim() : (c.agent_name || 'Agente'),
                 agent_phone: c.agent?.phone || c.agent_phone || null
             };
-            return applyPrivacyPolicy(clientData, profile, user.id);
+            return applyPrivacyPolicy(clientData, profile as any, user.id);
         });
 
         return {
