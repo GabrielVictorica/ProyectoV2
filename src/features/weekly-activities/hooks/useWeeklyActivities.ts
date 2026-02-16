@@ -20,9 +20,16 @@ export type WeeklyActivity = {
     status: string;
     notes: string | null;
     client_id: string | null;
+    person_id: string | null;
     property_id: string | null;
     agent_id: string;
     organization_id: string;
+    person?: {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
+    } | null;
 };
 
 export type WeeklyDataMap = Record<string, {

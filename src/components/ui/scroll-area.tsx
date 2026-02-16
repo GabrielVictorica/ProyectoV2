@@ -9,7 +9,7 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
     <div
         ref={ref}
-        className={cn("relative overflow-auto h-full w-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent", className)}
+        className={cn("relative overflow-auto h-full w-full elegant-scrollbar", className)}
         {...props}
     >
         {children}

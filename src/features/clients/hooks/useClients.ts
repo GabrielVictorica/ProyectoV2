@@ -10,8 +10,9 @@ import {
     getClientsAction,
     getNetworkClientsAction,
     addClientInteractionAction,
-    getClientInteractionsAction
+    getClientInteractionsAction,
 } from '../actions/clientActions';
+import { getExistingSearchTagsAction } from '@/features/crm/actions/personActions';
 import { usePermissions } from '@/features/auth/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -70,6 +71,14 @@ export interface ClientFilters {
     page?: number;
     limit?: number;
     enabled?: boolean;
+    // Advanced filters
+    propertyTypes?: string[];
+    paymentMethods?: string[];
+    budgetMin?: number | null;
+    budgetMax?: number | null;
+    bedrooms?: string[];
+    statusFilter?: string[];
+    tags?: string[];
 }
 
 /**
@@ -122,7 +131,7 @@ export function useClient(id: string) {
         queryFn: async (): Promise<ClientWithAgent | null> => {
             const { data, error } = await supabase
                 .from('clients')
-                .select('*, agent:profiles(id, first_name, last_name, phone)')
+                .select('*, agent:profiles(id, first_name, last_name, phone), person:persons(id, first_name, last_name, tags, relationship_status)')
                 .eq('id', id)
                 .single();
 
@@ -143,7 +152,7 @@ export function useCreateClient() {
         mutationFn: createClientAction,
         onSuccess: (result) => {
             if (result.success) {
-                toast.success('Cliente registrado correctamente');
+                toast.success('Búsqueda registrada correctamente');
                 queryClient.invalidateQueries({ queryKey: clientKeys.all });
             } else {
                 toast.error(result.error);
@@ -166,14 +175,14 @@ export function useUpdateClient() {
         mutationFn: updateClientAction,
         onSuccess: (result) => {
             if (result.success) {
-                toast.success('Cliente actualizado correctamente');
+                toast.success('Búsqueda actualizada correctamente');
                 queryClient.invalidateQueries({ queryKey: clientKeys.all });
             } else {
                 toast.error(result.error);
             }
         },
         onError: (error) => {
-            toast.error('Error al actualizar el cliente');
+            toast.error('Error al actualizar la búsqueda');
             console.error(error);
         }
     });
@@ -189,15 +198,30 @@ export function useDeleteClient() {
         mutationFn: deleteClientAction,
         onSuccess: (result) => {
             if (result.success) {
-                toast.success('Cliente eliminado');
+                toast.success('Búsqueda eliminada');
                 queryClient.invalidateQueries({ queryKey: clientKeys.all });
             } else {
                 toast.error(result.error);
             }
         },
         onError: (error) => {
-            toast.error('Error al eliminar el cliente');
+            toast.error('Error al eliminar la búsqueda');
             console.error(error);
         }
+    });
+}
+
+/**
+ * Hook para obtener etiquetas exclusivas de búsquedas.
+ */
+export function useSearchTags() {
+    return useQuery({
+        queryKey: [...clientKeys.all, 'search-tags'],
+        queryFn: async () => {
+            const result = await getExistingSearchTagsAction();
+            if (!result.success) return [];
+            return result.data;
+        },
+        staleTime: 5 * 60 * 1000,
     });
 }

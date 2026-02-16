@@ -23,6 +23,8 @@ export interface Transaction {
     seller_name: string | null;
     buyer_id: string | null;
     seller_id: string | null;
+    buyer_person_id: string | null;
+    seller_person_id: string | null;
     custom_property_title: string | null;
     office_commission_amount: number;
     master_commission_amount: number;
@@ -47,6 +49,18 @@ export interface TransactionWithRelations extends Transaction {
     organization?: {
         id: string;
         name: string;
+    } | null;
+    buyer_person?: {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
+    } | null;
+    seller_person?: {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
     } | null;
 }
 
@@ -87,6 +101,8 @@ export interface CreateTransactionInput {
     seller_name?: string | null;
     buyer_id?: string | null;
     seller_id?: string | null;
+    buyer_person_id?: string | null;
+    seller_person_id?: string | null;
     custom_property_title?: string | null;
     notes?: string | null;
 }
@@ -102,6 +118,10 @@ export interface UpdateTransactionInput {
     net_commission?: number;
     buyer_name?: string | null;
     seller_name?: string | null;
+    buyer_id?: string | null;
+    seller_id?: string | null;
+    buyer_person_id?: string | null;
+    seller_person_id?: string | null;
     property_id?: string | null;
     agent_id?: string | null;
     organization_id?: string | null;

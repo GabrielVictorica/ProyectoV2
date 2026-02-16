@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
                 *,
                 property:properties(id, title, address),
                 agent:profiles(id, first_name, last_name, default_split_percentage),
-                organization:organizations(id, name)
+                buyer_person:persons!transactions_buyer_person_id_fkey(id, first_name, last_name, phone),
+                seller_person:persons!transactions_seller_person_id_fkey(id, first_name, last_name, phone)
             `)
             .order('transaction_date', { ascending: false });
 
@@ -118,6 +119,8 @@ export async function POST(request: NextRequest) {
             seller_name,
             buyer_id,
             seller_id,
+            buyer_person_id,
+            seller_person_id,
             notes,
             organization_id, // Solo para GOD
             custom_property_title
@@ -178,6 +181,28 @@ export async function POST(request: NextRequest) {
         // Monto para Oficina (Resto)
         const office_commission_amount = gross_commission - master_commission_amount - net_commission;
 
+        // 4. Resolve names from CRM if missing but IDs provided
+        let finalBuyerName = buyer_name;
+        let finalSellerName = seller_name;
+
+        if (!finalBuyerName && buyer_person_id) {
+            const { data: p } = await (adminClient as any)
+                .from('persons')
+                .select('first_name, last_name')
+                .eq('id', buyer_person_id)
+                .single();
+            if (p) finalBuyerName = `${p.first_name} ${p.last_name}`.trim();
+        }
+
+        if (!finalSellerName && seller_person_id) {
+            const { data: p } = await (adminClient as any)
+                .from('persons')
+                .select('first_name, last_name')
+                .eq('id', seller_person_id)
+                .single();
+            if (p) finalSellerName = `${p.first_name} ${p.last_name}`.trim();
+        }
+
         const { data, error } = await (adminClient as any)
             .from('transactions')
             .insert({
@@ -194,21 +219,47 @@ export async function POST(request: NextRequest) {
                 master_commission_amount,
                 office_commission_amount,
                 royalty_percentage_at_closure: royaltyPercent,
-                buyer_name: buyer_name || null,
-                seller_name: seller_name || null,
+                buyer_name: finalBuyerName || null,
+                seller_name: finalSellerName || null,
                 buyer_id: buyer_id || null,
                 seller_id: seller_id || null,
+                buyer_person_id: buyer_person_id || null,
+                seller_person_id: seller_person_id || null,
                 notes: notes || null,
                 custom_property_title: custom_property_title || null,
             })
             .select(`
                 *,
                 property:properties(id, title, address),
-                agent:profiles(id, first_name, last_name, default_split_percentage)
+                agent:profiles(id, first_name, last_name, default_split_percentage),
+                buyer_person:persons!transactions_buyer_person_id_fkey(id, first_name, last_name, phone),
+                seller_person:persons!transactions_seller_person_id_fkey(id, first_name, last_name, phone)
             `)
             .single();
 
         if (error) throw error;
+
+        // Auto-update last_interaction_at for linked persons and their clients
+        const txDate = transaction_date || new Date().toISOString().split('T')[0];
+        const personIdsToUpdate = [buyer_person_id, seller_person_id].filter(Boolean);
+
+        for (const personId of personIdsToUpdate) {
+            // Update person's last_interaction_at
+            await (adminClient as any)
+                .from('persons')
+                .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
+                .eq('id', personId);
+
+            // Update all clients linked to this person (Targeting base table person_searches)
+            await (adminClient as any)
+                .from('person_searches')
+                .update({
+                    last_interaction_at: txDate,
+                    updated_at: new Date().toISOString(),
+                    status: 'closed' // Auto-archive searches when operation closes
+                })
+                .eq('person_id', personId);
+        }
 
         return NextResponse.json({ success: true, data });
     } catch (err) {
@@ -234,10 +285,10 @@ export async function PUT(request: NextRequest) {
 
         const adminClient = createAdminClient();
 
-        // Obtener transacción actual para verificar permisos
+        // Obtener transacción actual para verificar permisos (Incluimos campos críticos para recálculo)
         const { data: currentTx } = await (adminClient as any)
             .from('transactions')
-            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage')
+            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage, buyer_person_id, seller_person_id, transaction_date, sides, property_id')
             .eq('id', id)
             .single();
 
@@ -264,8 +315,9 @@ export async function PUT(request: NextRequest) {
         const allowedFields = [
             'transaction_date', 'actual_price', 'sides',
             'commission_percentage', 'agent_split_percentage',
-            'buyer_name', 'seller_name', 'buyer_id', 'seller_id', 'notes',
-            'custom_property_title', 'agent_id', 'organization_id'
+            'buyer_name', 'seller_name', 'buyer_id', 'seller_id',
+            'buyer_person_id', 'seller_person_id',
+            'notes', 'custom_property_title', 'agent_id', 'organization_id'
         ];
 
         for (const field of allowedFields) {
@@ -280,12 +332,13 @@ export async function PUT(request: NextRequest) {
         const splitPercent = parseFloat(updates.agent_split_percentage ?? currentTx.agent_split_percentage);
         const sides = parseInt(updates.sides ?? currentTx.sides);
 
-        if (updates.actual_price !== undefined || updates.commission_percentage !== undefined || updates.agent_split_percentage !== undefined || updates.sides !== undefined) {
-            // 1. Obtener royalty de la organización
+        if (updates.actual_price !== undefined || updates.commission_percentage !== undefined || updates.agent_split_percentage !== undefined || updates.sides !== undefined || updates.organization_id !== undefined) {
+            // 1. Obtener royalty de la organización (buscamos la nueva si se cambió)
+            const orgIdToLookup = updates.organization_id || txData.organization_id;
             const { data: orgData } = await (adminClient as any)
                 .from('organizations')
                 .select('royalty_percentage')
-                .eq('id', txData.organization_id)
+                .eq('id', orgIdToLookup)
                 .single();
 
             const royaltyPercent = orgData?.royalty_percentage ?? 0;
@@ -302,6 +355,25 @@ export async function PUT(request: NextRequest) {
             updateData.royalty_percentage_at_closure = royaltyPercent;
         }
 
+        // 4. Resolve names from CRM if missing but IDs provide (only if they were actually part of the update or missing in record)
+        if (updateData.buyer_person_id && !updateData.buyer_name) {
+            const { data: p } = await (adminClient as any)
+                .from('persons')
+                .select('first_name, last_name')
+                .eq('id', updateData.buyer_person_id)
+                .single();
+            if (p) updateData.buyer_name = `${p.first_name} ${p.last_name}`.trim();
+        }
+
+        if (updateData.seller_person_id && !updateData.seller_name) {
+            const { data: p } = await (adminClient as any)
+                .from('persons')
+                .select('first_name, last_name')
+                .eq('id', updateData.seller_person_id)
+                .single();
+            if (p) updateData.seller_name = `${p.first_name} ${p.last_name}`.trim();
+        }
+
         const { data, error } = await (adminClient as any)
             .from('transactions')
             .update(updateData)
@@ -309,11 +381,37 @@ export async function PUT(request: NextRequest) {
             .select(`
                 *,
                 property:properties(id, title, address),
-                agent:profiles(id, first_name, last_name, default_split_percentage)
+                agent:profiles(id, first_name, last_name, default_split_percentage),
+                buyer_person:persons!transactions_buyer_person_id_fkey(id, first_name, last_name, phone),
+                seller_person:persons!transactions_seller_person_id_fkey(id, first_name, last_name, phone)
             `)
             .single();
 
         if (error) throw error;
+
+        // Auto-update last_interaction_at for linked persons and their clients
+        const txDate = updates.transaction_date || currentTx.transaction_date;
+        const personIdsToUpdate = [
+            updates.buyer_person_id || currentTx.buyer_person_id,
+            updates.seller_person_id || currentTx.seller_person_id
+        ].filter(Boolean);
+
+        for (const personId of personIdsToUpdate) {
+            await (adminClient as any)
+                .from('persons')
+                .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
+                .eq('id', personId);
+
+            // Update all clients linked to this person (Targeting base table person_searches)
+            await (adminClient as any)
+                .from('person_searches')
+                .update({
+                    last_interaction_at: txDate,
+                    updated_at: new Date().toISOString(),
+                    status: 'closed' // Auto-archive searches
+                })
+                .eq('person_id', personId);
+        }
 
         return NextResponse.json({ success: true, data });
     } catch (err) {

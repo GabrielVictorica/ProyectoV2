@@ -64,3 +64,10 @@ export function generateSearchClipboardText(client: any, propertyTypes: any[]): 
 
     return lines.filter(line => line !== null).join('\n');
 }
+
+export function toTitleCase(str: string): string {
+    return str.replace(
+        /\w\S*/g,
+        (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+    );
+}

@@ -7,6 +7,7 @@ export interface ClientDisplay extends Client {
     agent_phone?: string;
     organization_name?: string;
     motivation: string | null;
+    person?: any;
 }
 
 export interface UserProfile {
@@ -52,7 +53,8 @@ export function applyPrivacyPolicy(
             organization_name: organizationName,
             agent_name: agentName,
             agent_phone: agentPhone,
-            motivation: client.motivation || null
+            motivation: client.motivation || null,
+            person: client.person || null
         };
     }
 
@@ -70,6 +72,7 @@ export function applyPrivacyPolicy(
         organization_name: organizationName,
         agent_name: agentName,
         agent_phone: agentPhone,
-        motivation: client.motivation || null
+        motivation: client.motivation || null,
+        person: client.person || null
     };
 }

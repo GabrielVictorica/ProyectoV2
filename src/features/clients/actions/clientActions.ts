@@ -7,10 +7,10 @@ import type { ActionResult } from '@/features/admin/actions/adminActions';
 import type { Client, AnonymousClient, ClientWithAgent } from '../types';
 
 const clientSchema = z.object({
-    firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
-    email: z.string().email('Email inválido').optional().or(z.literal('')),
-    phone: z.string().min(6, 'Teléfono inválido').optional().or(z.literal('')),
+    firstName: z.string().optional().default(''),
+    lastName: z.string().optional().default(''),
+    email: z.string().optional().default(''),
+    phone: z.string().optional().default(''),
     type: z.enum(['buyer', 'seller']),
     status: z.enum(['active', 'inactive', 'closed', 'archived']).default('active'),
     source: z.enum(['referral', 'portal', 'social', 'walk-in']).default('referral'),
@@ -25,6 +25,7 @@ const clientSchema = z.object({
     searchPaymentMethods: z.array(z.string()).default([]),
     organizationId: z.string().uuid().optional(),
     agentId: z.string().uuid().optional(),
+    personId: z.string().uuid('Debes vincular una persona del CRM'),
 });
 
 const updateClientSchema = clientSchema.partial().extend({ id: z.string().uuid() });
@@ -80,28 +81,43 @@ export async function createClientAction(
 
         const organization_id = targetOrgId;
 
-        // 2. Insertar el nuevo cliente (La DB manejará duplicados con unique constraint)
+        // 1.1 Si tenemos personId pero no firstName/lastName, los buscamos de la tabla persons
+        let firstName = validatedData.firstName;
+        let lastName = validatedData.lastName;
+
+        if (validatedData.personId && (!firstName || !lastName)) {
+            const { data: person } = await supabase
+                .from('persons')
+                .select('first_name, last_name')
+                .eq('id', validatedData.personId)
+                .single();
+
+            if (person) {
+                firstName = firstName || person.first_name;
+                lastName = lastName || person.last_name;
+            }
+        }
+
+        // 2. Insertar los criterios de búsqueda en person_searches
         const { data, error } = await supabase
-            .from('clients' as any)
+            .from('person_searches' as any)
             .insert({
                 organization_id: organization_id,
                 agent_id: targetAgentId,
-                first_name: validatedData.firstName,
-                last_name: validatedData.lastName,
-                email: validatedData.email || null,
-                phone: validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null,
-                type: validatedData.type,
+                person_id: validatedData.personId,
+                first_name: firstName || '', // Requerido por DB
+                last_name: lastName || '',   // Requerido por DB
+                search_type: validatedData.type,
                 status: validatedData.status,
                 source: validatedData.source,
                 motivation: validatedData.motivation || null,
                 budget_min: validatedData.budgetMin,
                 budget_max: validatedData.budgetMax,
                 preferred_zones: validatedData.preferredZones,
-                tags: validatedData.tags,
-                search_property_types: validatedData.searchPropertyTypes,
-                search_bedrooms: validatedData.searchBedrooms,
-                search_payment_methods: validatedData.searchPaymentMethods,
-                preferences: validatedData.preferences || {},
+                property_types: validatedData.searchPropertyTypes,
+                bedrooms: validatedData.searchBedrooms,
+                payment_methods: validatedData.searchPaymentMethods,
+                notes: (validatedData as any).notes || null,
             } as any)
             .select()
             .single();
@@ -111,10 +127,24 @@ export async function createClientAction(
             if (error.code === '23505') { // Unique violation
                 return {
                     success: false,
-                    error: 'Este cliente ya existe en la organización (Email o Teléfono duplicado).'
+                    error: 'Esta búsqueda ya existe en la organización.'
                 };
             }
             throw error;
+        }
+
+        // Side-effect: Actualizar último contacto de la persona vinculada
+        if (validatedData.personId) {
+            const personUpdateData: any = { last_interaction_at: new Date().toISOString() };
+            const { error: syncError } = await supabase
+                .from('persons')
+                // @ts-ignore — Supabase generated types resolve Update to 'never' for this table
+                .update(personUpdateData)
+                .eq('id', validatedData.personId);
+
+            if (syncError) {
+                console.error('Error syncing person last_interaction_at:', syncError);
+            }
         }
 
         revalidatePath('/dashboard/clients');
@@ -124,7 +154,7 @@ export async function createClientAction(
         if (err instanceof z.ZodError) {
             return { success: false, error: err.issues[0].message };
         }
-        return { success: false, error: 'Error al crear el cliente' };
+        return { success: false, error: 'Error al crear la búsqueda' };
     }
 }
 
@@ -159,18 +189,17 @@ export async function updateClientAction(
         if (validatedData.phone !== undefined) {
             updatePayload.phone = validatedData.phone ? validatedData.phone.replace(/[^\d+]/g, '') : null;
         }
-        if (validatedData.type !== undefined) updatePayload.type = validatedData.type;
+        if (validatedData.type !== undefined) updatePayload.search_type = validatedData.type;
         if (validatedData.status !== undefined) updatePayload.status = validatedData.status;
         if (validatedData.source !== undefined) updatePayload.source = validatedData.source;
         if (validatedData.motivation !== undefined) updatePayload.motivation = validatedData.motivation;
         if (validatedData.budgetMin !== undefined) updatePayload.budget_min = validatedData.budgetMin;
         if (validatedData.budgetMax !== undefined) updatePayload.budget_max = validatedData.budgetMax;
         if (validatedData.preferredZones !== undefined) updatePayload.preferred_zones = validatedData.preferredZones;
-        if (validatedData.tags !== undefined) updatePayload.tags = validatedData.tags;
-        if (validatedData.searchPropertyTypes !== undefined) updatePayload.search_property_types = validatedData.searchPropertyTypes;
-        if (validatedData.searchBedrooms !== undefined) updatePayload.search_bedrooms = validatedData.searchBedrooms;
-        if (validatedData.searchPaymentMethods !== undefined) updatePayload.search_payment_methods = validatedData.searchPaymentMethods;
-        if (validatedData.preferences !== undefined) updatePayload.preferences = validatedData.preferences;
+        if (validatedData.searchPropertyTypes !== undefined) updatePayload.property_types = validatedData.searchPropertyTypes;
+        if (validatedData.searchBedrooms !== undefined) updatePayload.bedrooms = validatedData.searchBedrooms;
+        if (validatedData.searchPaymentMethods !== undefined) updatePayload.payment_methods = validatedData.searchPaymentMethods;
+        if (validatedData.personId !== undefined) updatePayload.person_id = validatedData.personId;
 
         // Solo God/Parent puede reasignar agente
         if (isGodOrParent && validatedData.agentId) {
@@ -178,7 +207,7 @@ export async function updateClientAction(
         }
 
         const { data, error } = await (supabase
-            .from('clients' as any) as any)
+            .from('person_searches' as any) as any)
             .update(updatePayload)
             .eq('id', validatedData.id)
             .select()
@@ -201,7 +230,7 @@ export async function deleteClientAction(id: string): Promise<ActionResult<void>
     try {
         const supabase = await createClient();
         const { error } = await supabase
-            .from('clients')
+            .from('person_searches')
             .delete()
             .eq('id', id);
 
@@ -243,6 +272,13 @@ export async function getClientsAction(
         limit?: number;
         agentId?: string;
         organizationId?: string;
+        propertyTypes?: string[];
+        paymentMethods?: string[];
+        budgetMin?: number | null;
+        budgetMax?: number | null;
+        bedrooms?: string[];
+        statusFilter?: string[];
+        tags?: string[];
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {
     try {
@@ -260,7 +296,11 @@ export async function getClientsAction(
 
         let query = supabase
             .from('clients')
-            .select('*, agent:profiles(id, first_name, last_name, phone, reports_to_organization_id)', { count: 'exact' });
+            .select(`
+                *,
+                agent:profiles(id, first_name, last_name, phone, reports_to_organization_id),
+                person:persons(id, first_name, last_name, tags, relationship_status)
+            `, { count: 'exact' });
 
         const isGod = (profile as any).role === 'god';
         const isParent = (profile as any).role === 'parent';
@@ -282,6 +322,35 @@ export async function getClientsAction(
 
         if (filters?.search) {
             query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%`);
+        }
+
+        // Filtros avanzados de búsqueda
+        if (filters?.statusFilter && filters.statusFilter.length > 0) {
+            query = query.in('status', filters.statusFilter);
+        }
+
+        if (filters?.propertyTypes && filters.propertyTypes.length > 0) {
+            query = query.overlaps('search_property_types', filters.propertyTypes);
+        }
+
+        if (filters?.paymentMethods && filters.paymentMethods.length > 0) {
+            query = query.overlaps('search_payment_methods', filters.paymentMethods);
+        }
+
+        if (filters?.budgetMin) {
+            query = query.gte('budget_max', filters.budgetMin);
+        }
+
+        if (filters?.budgetMax) {
+            query = query.lte('budget_min', filters.budgetMax);
+        }
+
+        if (filters?.bedrooms && filters.bedrooms.length > 0) {
+            query = query.overlaps('search_bedrooms', filters.bedrooms);
+        }
+
+        if (filters?.tags && filters.tags.length > 0) {
+            query = query.overlaps('tags', filters.tags);
         }
 
         const { data, error, count } = await query
@@ -452,5 +521,40 @@ export async function getClientInteractionsAction(clientId: string): Promise<Act
     } catch (err) {
         console.error('Error in getClientInteractionsAction:', err);
         return { success: false, error: 'Error al obtener el historial' };
+    }
+}
+
+/**
+ * Verifica si una persona tiene búsquedas activas o cerradas (no archivadas).
+ */
+export async function checkPersonHasSearchAction(
+    personId: string,
+    type?: 'buyer' | 'seller'
+): Promise<ActionResult<{ hasSearch: boolean; searches: Client[] }>> {
+    try {
+        const supabase = await createClient();
+        let query = supabase
+            .from('person_searches')
+            .select('*')
+            .eq('person_id', personId)
+            .neq('status', 'archived');
+
+        if (type) {
+            query = query.eq('search_type', type);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        return {
+            success: true,
+            data: {
+                hasSearch: (data || []).length > 0,
+                searches: (data as Client[]) || []
+            }
+        };
+    } catch (err) {
+        console.error('Error checking person search:', err);
+        return { success: false, error: 'Error al verificar búsquedas' };
     }
 }
