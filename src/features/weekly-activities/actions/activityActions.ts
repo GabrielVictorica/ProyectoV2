@@ -9,6 +9,7 @@ export type ActivityInsert = {
     organization_id: string;
     agent_id: string;
     client_id?: string | null;
+    person_id?: string | null;
     property_id?: string | null;
     type: string;
     date: string;
@@ -16,6 +17,44 @@ export type ActivityInsert = {
     status?: string;
     notes?: string | null;
 };
+
+/**
+ * Sincroniza el estado de una persona en el CRM basado en una actividad reciente.
+ */
+async function syncPersonFromActivity(personId: string, activityType: string, activityDate: string) {
+    const supabase = await createClient();
+
+    // Mapeo selectivo de tipos de actividad a estados de relación
+    // Solo actualizamos el estado si es uno de los hitos importantes
+    const statusMap: Record<string, string> = {
+        'reunion_verde': 'reunion_verde',
+        'pre_listing': 'pre_listing',
+        'pre_buying': 'pre_buying',
+        'acm': 'acm',
+        'captacion': 'captacion',
+        'visita': 'visita',
+        'reserva': 'reserva',
+        'referido': 'referido',
+    };
+
+    const newStatus = statusMap[activityType];
+    const updateData: any = {
+        last_interaction_at: new Date(activityDate + 'T12:00:00Z').toISOString(),
+    };
+
+    if (newStatus) {
+        updateData.relationship_status = newStatus;
+    }
+
+    const { error } = await supabase
+        .from('persons')
+        .update(updateData)
+        .eq('id', personId);
+
+    if (error) {
+        console.error('Error syncing person from activity:', error);
+    }
+}
 
 export async function createActivityAction(data: ActivityInsert) {
     const supabase = await createClient();
@@ -30,7 +69,13 @@ export async function createActivityAction(data: ActivityInsert) {
         return { success: false, error: error.message };
     }
 
+    // Side-effect: Sincronizar con CRM si hay una persona vinculada
+    if (data.person_id) {
+        await syncPersonFromActivity(data.person_id, data.type, data.date);
+    }
+
     revalidatePath('/dashboard/my-week');
+    revalidatePath('/dashboard/crm');
     return { success: true, data: activity };
 }
 
@@ -48,7 +93,13 @@ export async function updateActivityAction(id: string, data: Partial<ActivityIns
         return { success: false, error: error.message };
     }
 
+    // Side-effect: Sincronizar con CRM si hay una persona vinculada
+    if (data.person_id && data.type && data.date) {
+        await syncPersonFromActivity(data.person_id, data.type, data.date);
+    }
+
     revalidatePath('/dashboard/my-week');
+    revalidatePath('/dashboard/crm');
     return { success: true, data: activity };
 }
 
@@ -113,13 +164,13 @@ export async function getWeeklyDataAction(
         const [activitiesResult, transactionsResult] = await Promise.all([
             adminClient
                 .from('activities' as any)
-                .select('*')
+                .select('*, person:persons(id, first_name, last_name, phone)')
                 .eq('agent_id', agentId)
                 .gte('date', startDate)
                 .lte('date', endDate),
             adminClient
                 .from('transactions' as any)
-                .select('id, transaction_date, buyer_name, seller_name, actual_price, notes, property_id, custom_property_title, property:properties(title)')
+                .select('id, transaction_date, buyer_name, seller_name, buyer_person_id, seller_person_id, actual_price, notes, property_id, custom_property_title, property:properties(title)')
                 .eq('agent_id', agentId)
                 .gte('transaction_date', startDate)
                 .lte('transaction_date', endDate)

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WeeklyGrid } from './WeeklyGrid';
+import { WeeklyNoteEditor } from './WeeklyNoteEditor';
 import { format, startOfWeek, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useObjectives } from '@/features/objectives/hooks/useObjectives';
@@ -275,6 +276,12 @@ export function WeeklyDashboard() {
                     );
                 })}
             </div>
+
+            {/* Weekly Note Section */}
+            <WeeklyNoteEditor
+                agentId={selectedAgentId}
+                weekStartDate={currentWeekStart}
+            />
 
             {/* Main Content Grid */}
             <div className="glass rounded-3xl border border-white/[0.08] overflow-hidden">

@@ -22,9 +22,11 @@ import {
 import { useClients } from '@/features/clients/hooks/useClients';
 import { useWeeklyActivities, WeeklyActivity } from '../hooks/useWeeklyActivities';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { Trash2, Plus, ArrowLeft, Edit2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Edit2, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
+import { Person } from '@/features/clients/types';
 
 interface ActivityDialogProps {
     open: boolean;
@@ -53,32 +55,34 @@ export function ActivityDialog({
     console.log('ActivityDialog clients:', clients.length, 'Loading:', isLoadingClients); // Debug log
     const dateObj = new Date(date + 'T12:00:00');
     const isValidDate = !isNaN(dateObj.getTime());
-    const { createActivity, updateActivity, deleteActivity } = useWeeklyActivities(
+    const { createActivity, updateActivity, deleteActivity, weeklyData } = useWeeklyActivities(
         isValidDate ? dateObj : new Date(),
         agentId
     );
+
+    // Obtener actividades frescas del mapa de datos si están disponibles
+    const dateStr = date;
+    const freshActivities = weeklyData?.[dateStr]?.activities.filter(a => a.type === type) || existingActivities;
 
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingActivity, setEditingActivity] = useState<WeeklyActivity | null>(null);
 
     // Form state
-    const [clientId, setClientId] = useState<string>('none');
-    const [search, setSearch] = useState('');
-    const [showResults, setShowResults] = useState(false);
+    const [personId, setPersonId] = useState<string | null>(null);
     const [notes, setNotes] = useState('');
 
     // Reset view when opening
     useEffect(() => {
         if (open) {
             if (initialEditId) {
-                const act = existingActivities.find(a => a.id === initialEditId);
+                const act = freshActivities.find(a => a.id === initialEditId);
                 if (act) {
                     handleEdit(act);
                     return;
                 }
             }
 
-            if (existingActivities.length === 0) {
+            if (freshActivities.length === 0) {
                 setView('form');
                 setEditingActivity(null);
                 resetForm();
@@ -86,27 +90,19 @@ export function ActivityDialog({
                 setView('list');
             }
         }
-    }, [open, existingActivities, initialEditId]);
+    }, [open, initialEditId]); // Removed freshActivities to avoid kicking user out on background updates
 
     const resetForm = () => {
-        setClientId('none');
-        setSearch('');
+        setPersonId(null);
         setNotes('');
     };
 
     const handleEdit = (act: WeeklyActivity) => {
         setEditingActivity(act);
-        setClientId(act.client_id || 'none');
+        setPersonId(act.person_id || null);
 
         const rawNotes = act.notes || '';
-        if (!act.client_id && rawNotes.includes(' || ')) {
-            const [name, ...rest] = rawNotes.split(' || ');
-            setSearch(name);
-            setNotes(rest.join(' || '));
-        } else {
-            setSearch('');
-            setNotes(rawNotes);
-        }
+        setNotes(rawNotes);
 
         setView('form');
     };
@@ -120,17 +116,14 @@ export function ActivityDialog({
     const handleSave = async () => {
         if (!auth?.profile?.organization_id || !auth?.profile?.id) return;
 
-        const finalNotes = clientId === 'none' && search.trim()
-            ? `${search.trim()} || ${notes || ''}`
-            : notes || null;
-
         const data = {
             organization_id: auth.profile.organization_id,
             agent_id: agentId || auth.profile.id,
             type,
             date,
-            notes: finalNotes,
-            client_id: clientId === 'none' ? null : clientId,
+            notes: notes || null,
+            person_id: personId,
+            client_id: personId ? null : (editingActivity?.client_id || null), // Clear legacy client if we scale to person
             status: 'completed'
         };
 
@@ -140,7 +133,7 @@ export function ActivityDialog({
             await createActivity.mutateAsync(data as any);
         }
 
-        if (existingActivities.length + (editingActivity ? 0 : 1) > 0) {
+        if (freshActivities.length + (editingActivity ? 0 : 1) > 0) {
             setView('list');
         } else {
             onOpenChange(false);
@@ -149,17 +142,17 @@ export function ActivityDialog({
 
     const handleDelete = async (id: string) => {
         await deleteActivity.mutateAsync(id);
-        if (existingActivities.length <= 1) {
+        if (freshActivities.length <= 1) {
             onOpenChange(false);
         }
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#09090b] border-white/[0.08] text-white sm:max-w-md z-[9999]">
+            <DialogContent className="bg-[#09090b] border-white/10 shadow-[0_0_50px_-12px_rgba(139,92,246,0.25)] text-white sm:max-w-md z-[9999]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        {view === 'form' && existingActivities.length > 0 && (
+                        {view === 'form' && freshActivities.length > 0 && (
                             <Button variant="ghost" size="icon" onClick={() => setView('list')} className="h-6 w-6 -ml-2 rounded-full">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -174,17 +167,21 @@ export function ActivityDialog({
                 {view === 'list' ? (
                     <div className="space-y-4 py-2">
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                            {existingActivities.map((act) => {
+                            {freshActivities.map((act) => {
+                                // Robust name resolution
+                                const personData = Array.isArray(act.person) ? act.person[0] : act.person;
                                 const client = clients?.find(c => c.id === act.client_id);
 
-                                // Robust splitting logic
                                 const notes = act.notes || '';
                                 const hasSeparator = notes.includes(' || ');
 
                                 let contactName = '';
                                 let activityNotes = '';
 
-                                if (client) {
+                                if (personData) {
+                                    contactName = `${personData.first_name} ${personData.last_name}`;
+                                    activityNotes = notes;
+                                } else if (client) {
                                     contactName = `${(client as any).first_name} ${(client as any).last_name}`;
                                     activityNotes = notes;
                                 } else if (hasSeparator) {
@@ -192,17 +189,16 @@ export function ActivityDialog({
                                     contactName = parts[0]?.trim() || '';
                                     activityNotes = parts.slice(1).join(' || ').trim();
                                 } else {
-                                    contactName = '';
                                     activityNotes = notes;
                                 }
 
                                 return (
                                     <div key={act.id} className="p-4 glass bg-white/[0.02] border border-white/[0.04] rounded-xl flex items-start justify-between group gap-4">
                                         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleEdit(act)}>
-                                            {(client || contactName) && (
+                                            {(client || personData || contactName) && (
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
-                                                        {client ? 'Cliente' : 'Contacto'}
+                                                        {client ? 'Búsqueda' : personData ? 'Relación' : 'Contacto'}
                                                     </span>
                                                     {contactName && (
                                                         <p className="font-bold text-white text-sm">
@@ -246,80 +242,15 @@ export function ActivityDialog({
                     </div>
                 ) : (
                     <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Cliente</Label>
-                            {clientId !== 'none' && clientId !== null ? (
-                                <div className="flex items-center justify-between p-3 glass bg-violet-500/10 border border-violet-500/20 rounded-xl animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-xs">
-                                            {(clients.find(c => c.id === clientId) as any)?.first_name?.[0]}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-white">
-                                                {(clients.find(c => c.id === clientId) as any)?.first_name} {(clients.find(c => c.id === clientId) as any)?.last_name}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setClientId('none')}
-                                        className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/10 rounded-lg"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 relative">
-                                    <Input
-                                        placeholder="Buscar cliente por nombre..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        onFocus={() => setShowResults(true)}
-                                        onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                                        className="bg-white/[0.02] border-white/[0.08] rounded-xl"
-                                    />
-                                    {search.length > 0 && showResults && (
-                                        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-white/[0.08] bg-[#1a1a1e] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                                            <div className="max-h-[200px] overflow-y-auto custom-scrollbar p-1">
-                                                {isLoadingClients ? (
-                                                    <div className="p-3 text-sm text-white/40 text-center">Cargando...</div>
-                                                ) : clients.filter(c => {
-                                                    const firstName = (c as any).first_name || '';
-                                                    const lastName = (c as any).last_name || '';
-                                                    return firstName.toLowerCase().includes(search.toLowerCase()) ||
-                                                        lastName.toLowerCase().includes(search.toLowerCase());
-                                                }).length === 0 ? (
-                                                    <div className="p-3 text-sm text-white/40 text-center">No se encontraron clientes</div>
-                                                ) : (
-                                                    clients.filter(c => {
-                                                        const firstName = (c as any).first_name || '';
-                                                        const lastName = (c as any).last_name || '';
-                                                        return firstName.toLowerCase().includes(search.toLowerCase()) ||
-                                                            lastName.toLowerCase().includes(search.toLowerCase());
-                                                    }).map(client => (
-                                                        <button
-                                                            key={client.id}
-                                                            onClick={() => {
-                                                                setClientId(client.id);
-                                                                setSearch('');
-                                                            }}
-                                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/[0.08] transition-colors flex items-center gap-2"
-                                                        >
-                                                            <div className="h-6 w-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-white/60">
-                                                                {(client as any).first_name[0]}
-                                                            </div>
-                                                            <span className="text-sm text-white/80">
-                                                                {(client as any).first_name} {(client as any).last_name}
-                                                            </span>
-                                                        </button>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold">Cliente</Label>
+                                <PersonSelector
+                                    value={personId}
+                                    onChange={(id) => setPersonId(id)}
+                                    placeholder="Buscar o crear cliente..."
+                                />
+                            </div>
                         </div>
 
 

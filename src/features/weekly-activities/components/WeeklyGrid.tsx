@@ -12,7 +12,6 @@ import {
     TooltipTrigger
 } from "@/components/ui/tooltip";
 import { ActivityDialog } from './ActivityDialog';
-import { useClients } from '@/features/clients/hooks/useClients';
 
 interface WeeklyGridProps {
     weekStart: Date;
@@ -34,8 +33,6 @@ const ROWS = [
 ];
 
 export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridProps) {
-    const { data: clientsData } = useClients();
-    const clients = clientsData?.clients || [];
     const [dialogConfig, setDialogConfig] = useState<{
         open: boolean;
         date: string;
@@ -161,26 +158,10 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                             ) : (
                                                                 <div className="space-y-2">
                                                                     {activities.map((act, aIdx) => {
-                                                                        const client = clients?.find(c => c.id === act.client_id);
-
-                                                                        // Robust splitting logic
-                                                                        const notes = act.notes || '';
-                                                                        const hasSeparator = notes.includes(' || ');
-
-                                                                        let contactName = '';
-                                                                        let activityNotes = '';
-
-                                                                        if (client) {
-                                                                            contactName = `${(client as any).first_name} ${(client as any).last_name}`;
-                                                                            activityNotes = notes;
-                                                                        } else if (hasSeparator) {
-                                                                            const parts = notes.split(' || ');
-                                                                            contactName = parts[0]?.trim() || '';
-                                                                            activityNotes = parts.slice(1).join(' || ').trim();
-                                                                        } else {
-                                                                            contactName = '';
-                                                                            activityNotes = notes;
-                                                                        }
+                                                                        const personName = act.person
+                                                                            ? `${act.person.first_name} ${act.person.last_name}`
+                                                                            : null;
+                                                                        const activityNotes = act.notes || '';
 
                                                                         return (
                                                                             <div
@@ -188,15 +169,18 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                                                 className="text-xs space-y-0.5 border-l-2 border-white/20 pl-2 hover:border-violet-500/50 hover:bg-white/[0.02] cursor-pointer p-1 rounded-r-lg transition-all group/item"
                                                                                 onClick={() => handleCellClick(dateStr, row, activities, act.id)}
                                                                             >
-                                                                                {contactName && (
+                                                                                {personName && (
                                                                                     <p className="font-bold text-white leading-tight">
-                                                                                        {contactName}
+                                                                                        {personName}
                                                                                     </p>
                                                                                 )}
                                                                                 {activityNotes && (
-                                                                                    <p className="text-white/60 italic leading-tight">
+                                                                                    <p className="text-white/60 italic leading-tight line-clamp-2">
                                                                                         {activityNotes}
                                                                                     </p>
+                                                                                )}
+                                                                                {!personName && !activityNotes && (
+                                                                                    <p className="text-white/40 italic">Sin detalle</p>
                                                                                 )}
                                                                             </div>
                                                                         );
