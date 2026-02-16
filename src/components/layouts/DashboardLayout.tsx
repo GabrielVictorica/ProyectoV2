@@ -36,7 +36,8 @@ import { PageTransitionWrapper } from '@/components/ui/PageTransitionWrapper';
 const MAIN_ITEMS = [
     { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/dashboard/properties', label: 'Propiedades', icon: Building },
-    { href: '/dashboard/clients', label: 'Clientes', icon: Users },
+    { href: '/dashboard/clients', label: 'Búsquedas', icon: Users },
+    { href: '/dashboard/crm', label: 'Relaciones (CRM)', icon: Handshake },
 ];
 
 const TRACKING_ITEMS = [
