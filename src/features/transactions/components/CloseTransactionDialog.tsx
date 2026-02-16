@@ -9,6 +9,10 @@ import { useAddTransaction, useUpdateTransaction, TransactionWithRelations } fro
 import { useProperties } from '@/features/properties/hooks/useProperties';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
 import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
+import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
+import { checkPersonHasSearchAction } from '@/features/clients/actions/clientActions';
+import { ClientForm } from '@/features/clients/components/ClientForm';
+
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,19 +45,23 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Handshake, DollarSign, Percent, Users, TrendingUp, Building2, Pencil } from 'lucide-react';
+import { Loader2, Handshake, DollarSign, Percent, Users, TrendingUp, Building2, Pencil, Plus, ShoppingCart, Home, UserPlus } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const formSchema = z.object({
     property_id: z.string().min(1, 'Debes seleccionar una propiedad'),
     custom_property_title: z.string().optional(),
     actual_price: z.coerce.number().min(1, 'El precio debe ser mayor a 0'),
     sides: z.coerce.number().min(1).max(2),
+    my_side: z.enum(['buyer', 'seller']).default('buyer'),
     commission_percentage: z.coerce.number().min(0).max(100),
     agent_split_percentage: z.number().min(0).max(100),
     transaction_date: z.string().min(1, 'La fecha es requerida'),
     buyer_name: z.string().optional(),
     seller_name: z.string().optional(),
+    buyer_person_id: z.string().nullable().optional(),
+    seller_person_id: z.string().nullable().optional(),
     notes: z.string().optional(),
     organization_id: z.string().optional(),
     agent_id: z.string().optional(),
@@ -65,6 +73,40 @@ const formSchema = z.object({
 }, {
     message: "Debes ingresar el nombre/dirección de la propiedad",
     path: ["custom_property_title"]
+}).refine((data) => {
+    // 2 puntas: ambos person_id obligatorios
+    if (data.sides === 2) {
+        if (!data.buyer_person_id) return false;
+    }
+    return true;
+}, {
+    message: "Debes vincular al comprador desde el CRM",
+    path: ["buyer_person_id"]
+}).refine((data) => {
+    if (data.sides === 2) {
+        if (!data.seller_person_id) return false;
+    }
+    return true;
+}, {
+    message: "Debes vincular al vendedor desde el CRM",
+    path: ["seller_person_id"]
+}).refine((data) => {
+    // 1 punta: solo el lado propio requiere person_id
+    if (data.sides === 1 && data.my_side === 'buyer') {
+        if (!data.buyer_person_id) return false;
+    }
+    return true;
+}, {
+    message: "Debes vincular al comprador desde el CRM",
+    path: ["buyer_person_id"]
+}).refine((data) => {
+    if (data.sides === 1 && data.my_side === 'seller') {
+        if (!data.seller_person_id) return false;
+    }
+    return true;
+}, {
+    message: "Debes vincular al vendedor desde el CRM",
+    path: ["seller_person_id"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -78,6 +120,13 @@ interface Props {
 
 export function CloseTransactionDialog({ propertyId, transaction, onSuccess, trigger }: Props) {
     const [open, setOpen] = useState(false);
+    const [buyerHasSearch, setBuyerHasSearch] = useState<boolean | null>(null);
+    const [sellerHasSearch, setSellerHasSearch] = useState<boolean | null>(null);
+    const [isCheckingBuyer, setIsCheckingBuyer] = useState(false);
+    const [isCheckingSeller, setIsCheckingSeller] = useState(false);
+    const [showBuyerSearchForm, setShowBuyerSearchForm] = useState(false);
+    const [showSellerSearchForm, setShowSellerSearchForm] = useState(false);
+
     const { mutateAsync: addTransaction, isPending: isAdding } = useAddTransaction();
     const { mutateAsync: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
     const { data: properties = [], isLoading: isLoadingProps } = useProperties();
@@ -110,11 +159,14 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             property_id: transaction ? (transaction.property_id ?? 'manual') : (propertyId || ''),
             actual_price: transaction?.actual_price || 0,
             sides: transaction?.sides || 1,
+            my_side: 'buyer' as const,
             commission_percentage: transaction?.commission_percentage || 3,
             agent_split_percentage: transaction?.agent_split_percentage || profile?.default_split_percentage || 45,
             transaction_date: transaction?.transaction_date || new Date().toISOString().split('T')[0],
             buyer_name: transaction?.buyer_name || '',
             seller_name: transaction?.seller_name || '',
+            buyer_person_id: transaction?.buyer_person_id || null,
+            seller_person_id: transaction?.seller_person_id || null,
             custom_property_title: transaction?.custom_property_title || '',
             notes: transaction?.notes || '',
             organization_id: transaction?.organization_id || profile?.organization_id || '',
@@ -154,8 +206,62 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     // Watch values para cálculos en vivo
     const watchPrice = form.watch('actual_price');
     const watchSides = form.watch('sides');
+    const watchMySide = form.watch('my_side');
     const watchCommissionPercent = form.watch('commission_percentage');
     const watchSplitPercent = form.watch('agent_split_percentage');
+
+    // Clear person IDs and names when sides or my_side changes
+    useEffect(() => {
+        if (watchSides === 1) {
+            // When switching to 1 punta, clear the opposite side
+            if (watchMySide === 'buyer') {
+                form.setValue('seller_person_id', null);
+                setSellerHasSearch(null);
+            } else {
+                form.setValue('buyer_person_id', null);
+                setBuyerHasSearch(null);
+            }
+        }
+    }, [watchSides, watchMySide, form]);
+
+    const watchBuyerPersonId = form.watch('buyer_person_id');
+    const watchSellerPersonId = form.watch('seller_person_id');
+
+    // Check search existence for buyer
+    useEffect(() => {
+        async function checkBuyer() {
+            if (!watchBuyerPersonId) {
+                setBuyerHasSearch(null);
+                return;
+            }
+            setIsCheckingBuyer(true);
+            const result = await checkPersonHasSearchAction(watchBuyerPersonId, 'buyer');
+            if (result.success) {
+                setBuyerHasSearch(result.data?.hasSearch ?? false);
+            }
+            setIsCheckingBuyer(false);
+        }
+        checkBuyer();
+    }, [watchBuyerPersonId]);
+
+    // Check search existence for seller
+    useEffect(() => {
+        async function checkSeller() {
+            if (!watchSellerPersonId) {
+                setSellerHasSearch(null);
+                return;
+            }
+            setIsCheckingSeller(true);
+            // Sellers might have 'seller' type searches or just be a person in CRM
+            // But requirement says "must have a search"
+            const result = await checkPersonHasSearchAction(watchSellerPersonId, 'seller');
+            if (result.success) {
+                setSellerHasSearch(result.data?.hasSearch ?? false);
+            }
+            setIsCheckingSeller(false);
+        }
+        checkSeller();
+    }, [watchSellerPersonId]);
 
     // Cálculos en tiempo real
     const calculations = useMemo(() => {
@@ -197,6 +303,8 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 agent_split_percentage: data.agent_split_percentage,
                 buyer_name: data.buyer_name || null,
                 seller_name: data.seller_name || null,
+                buyer_person_id: data.buyer_person_id || null,
+                seller_person_id: data.seller_person_id || null,
                 custom_property_title: data.property_id === 'manual' ? data.custom_property_title : null,
                 notes: data.notes || null,
             };
@@ -216,10 +324,13 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 property_id: '',
                 actual_price: 0,
                 sides: 1,
+                my_side: 'buyer',
                 commission_percentage: 3,
                 transaction_date: new Date().toISOString().split('T')[0],
                 buyer_name: '',
                 seller_name: '',
+                buyer_person_id: null,
+                seller_person_id: null,
                 custom_property_title: '',
                 notes: '',
             });
@@ -556,44 +667,240 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                             />
                         </div>
 
-                        {/* Comprador y Vendedor */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="buyer_name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200">Comprador</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Nombre del comprador"
-                                                className="bg-slate-700/50 border-slate-600 text-white"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                        {/* ===== SECCIÓN DINÁMICA: COMPRADOR / VENDEDOR ===== */}
 
-                            <FormField
-                                control={form.control}
-                                name="seller_name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200">Vendedor</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Nombre del vendedor"
-                                                className="bg-slate-700/50 border-slate-600 text-white"
+                        {/* Toggle "¿Qué lado representás?" — solo visible en 1 punta */}
+                        {watchSides === 1 && (
+                            <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                <p className="text-slate-300 text-xs font-bold uppercase tracking-wider">¿Qué lado representás?</p>
+                                <FormField
+                                    control={form.control}
+                                    name="my_side"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => field.onChange('buyer')}
+                                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'buyer'
+                                                        ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10'
+                                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                                                        }`}
+                                                >
+                                                    <ShoppingCart className="w-4 h-4" />
+                                                    Comprador
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => field.onChange('seller')}
+                                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'seller'
+                                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                                                        }`}
+                                                >
+                                                    <Home className="w-4 h-4" />
+                                                    Vendedor
+                                                </button>
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* ===== COMPRADOR ===== */}
+                            {(() => {
+                                const isBuyerMySide = watchSides === 2 || watchMySide === 'buyer';
+                                const isBuyerRequired = isBuyerMySide;
+                                return (
+                                    <div className="space-y-2">
+                                        <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                                            <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
+                                            Comprador {isBuyerRequired ? '(CRM) *' : '(Externo)'}
+                                        </p>
+
+                                        {isBuyerMySide ? (
+                                            /* Nuestro lado: PersonSelector obligatorio */
+                                            <>
+                                                <FormField
+                                                    control={form.control}
+                                                    name="buyer_person_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormControl>
+                                                                <PersonSelector
+                                                                    value={field.value ?? null}
+                                                                    onChange={(id) => field.onChange(id)}
+                                                                    placeholder="Buscar comprador en CRM..."
+                                                                />
+                                                            </FormControl>
+                                                            {isCheckingBuyer && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
+                                                            {!isCheckingBuyer && buyerHasSearch === false && watchBuyerPersonId && (
+                                                                <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
+                                                                    <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
+                                                                        <span>Este cliente no tiene una búsqueda activa.</span>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="link"
+                                                                            className="h-auto p-0 text-red-400 font-bold"
+                                                                            onClick={() => setShowBuyerSearchForm(true)}
+                                                                        >
+                                                                            Crear Búsqueda
+                                                                        </Button>
+                                                                    </AlertDescription>
+                                                                </Alert>
+                                                            )}
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <Dialog open={showBuyerSearchForm} onOpenChange={setShowBuyerSearchForm}>
+                                                    <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
+                                                        <DialogHeader>
+                                                            <DialogTitle className="text-white">Crear Búsqueda de Comprador</DialogTitle>
+                                                            <DialogDescription>
+                                                                Completa los datos de la búsqueda para poder cerrar la operación.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <ClientForm
+                                                            onSuccess={() => {
+                                                                setShowBuyerSearchForm(false);
+                                                                // Trigger re-check
+                                                                const currentId = watchBuyerPersonId;
+                                                                form.setValue('buyer_person_id', null);
+                                                                setTimeout(() => form.setValue('buyer_person_id', currentId), 10);
+                                                            }}
+                                                            client={watchBuyerPersonId ? { person_id: watchBuyerPersonId, type: 'buyer' } as any : undefined}
+                                                        />
+                                                    </DialogContent>
+                                                </Dialog>
+
+                                            </>
+                                        ) : (
+                                            /* Lado contrario (1 punta): input manual */
+                                            <FormField
+                                                control={form.control}
+                                                name="buyer_name"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormControl>
+                                                            <Input
+                                                                {...field}
+                                                                placeholder="Nombre del colega / inmobiliaria"
+                                                                className="bg-slate-700/50 border-slate-600 text-white"
+                                                            />
+                                                        </FormControl>
+                                                        <FormDescription className="text-slate-500 text-[10px]">
+                                                            Ingresá el nombre del colega o inmobiliaria contraparte.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
                                             />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ===== VENDEDOR ===== */}
+                            {(() => {
+                                const isSellerMySide = watchSides === 2 || watchMySide === 'seller';
+                                const isSellerRequired = isSellerMySide;
+                                return (
+                                    <div className="space-y-2">
+                                        <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                                            <Home className="w-3.5 h-3.5 text-emerald-400" />
+                                            Vendedor {isSellerRequired ? '(CRM) *' : '(Externo)'}
+                                        </p>
+
+                                        {isSellerMySide ? (
+                                            /* Nuestro lado: PersonSelector obligatorio */
+                                            <>
+                                                <FormField
+                                                    control={form.control}
+                                                    name="seller_person_id"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormControl>
+                                                                <PersonSelector
+                                                                    value={field.value ?? null}
+                                                                    onChange={(id) => field.onChange(id)}
+                                                                    placeholder="Buscar vendedor en CRM..."
+                                                                />
+                                                            </FormControl>
+                                                            {isCheckingSeller && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
+                                                            {!isCheckingSeller && sellerHasSearch === false && watchSellerPersonId && (
+                                                                <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
+                                                                    <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
+                                                                        <span>Este vendedor no tiene una búsqueda/cliente activo.</span>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="link"
+                                                                            className="h-auto p-0 text-red-400 font-bold"
+                                                                            onClick={() => setShowSellerSearchForm(true)}
+                                                                        >
+                                                                            Crear Cliente
+                                                                        </Button>
+                                                                    </AlertDescription>
+                                                                </Alert>
+                                                            )}
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <Dialog open={showSellerSearchForm} onOpenChange={setShowSellerSearchForm}>
+                                                    <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
+                                                        <DialogHeader>
+                                                            <DialogTitle className="text-white">Crear Cliente (Vendedor)</DialogTitle>
+                                                            <DialogDescription>
+                                                                Completa los datos del cliente para poder cerrar la operación.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <ClientForm
+                                                            onSuccess={() => {
+                                                                setShowSellerSearchForm(false);
+                                                                // Trigger re-check
+                                                                const currentId = watchSellerPersonId;
+                                                                form.setValue('seller_person_id', null);
+                                                                setTimeout(() => form.setValue('seller_person_id', currentId), 10);
+                                                            }}
+                                                            client={watchSellerPersonId ? { person_id: watchSellerPersonId, type: 'seller' } as any : undefined}
+                                                        />
+                                                    </DialogContent>
+                                                </Dialog>
+
+                                            </>
+                                        ) : (
+                                            /* Lado contrario (1 punta): input manual */
+                                            <FormField
+                                                control={form.control}
+                                                name="seller_name"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormControl>
+                                                            <Input
+                                                                {...field}
+                                                                placeholder="Nombre del colega / inmobiliaria"
+                                                                className="bg-slate-700/50 border-slate-600 text-white"
+                                                            />
+                                                        </FormControl>
+                                                        <FormDescription className="text-slate-500 text-[10px]">
+                                                            Ingresá el nombre del colega o inmobiliaria contraparte.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
+
 
                         {/* Fecha */}
                         <FormField
@@ -699,7 +1006,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={isAdding || isUpdating}
+                                disabled={isAdding || isUpdating || isCheckingBuyer || isCheckingSeller || (buyerHasSearch === false && (watchSides === 2 || watchMySide === 'buyer')) || (sellerHasSearch === false && (watchSides === 2 || watchMySide === 'seller'))}
                                 className="bg-gradient-to-r from-green-500 to-emerald-600"
                             >
                                 {isAdding || isUpdating ? (

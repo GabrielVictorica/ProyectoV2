@@ -45,7 +45,9 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
             *,
             property:properties(id, title, address),
             agent:profiles(id, first_name, last_name, default_split_percentage),
-            organization:organizations(id, name)
+            organization:organizations(id, name),
+            buyer_person:persons!transactions_buyer_person_id_fkey(id, first_name, last_name, phone),
+            seller_person:persons!transactions_seller_person_id_fkey(id, first_name, last_name, phone)
         `)
         .order('transaction_date', { ascending: false });
 
