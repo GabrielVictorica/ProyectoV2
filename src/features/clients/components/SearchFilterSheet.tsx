@@ -38,7 +38,7 @@ const PAYMENT_OPTIONS = [
 ];
 
 const BEDROOM_OPTIONS = [
-    { label: 'Monoamb', value: '0' },
+    { label: 'Monoamb', value: 'Mono' },
     { label: '1', value: '1' },
     { label: '2', value: '2' },
     { label: '3', value: '3' },
@@ -190,12 +190,12 @@ export function SearchFilterSheet({
                                     <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Tipo de Propiedad</Label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {propertyTypes.map((pt) => {
-                                            const isSelected = filters.propertyTypes.includes(pt.name);
+                                            const isSelected = filters.propertyTypes.includes(pt.id);
                                             const Icon = getIconForPropertyType(pt.name);
                                             return (
                                                 <div
                                                     key={pt.id}
-                                                    onClick={() => toggleFilter('propertyTypes', pt.name)}
+                                                    onClick={() => toggleFilter('propertyTypes', pt.id)}
                                                     className={cn(
                                                         "cursor-pointer rounded-lg border p-3 flex flex-col items-center justify-center gap-1.5 transition-all hover:bg-white/5",
                                                         isSelected
