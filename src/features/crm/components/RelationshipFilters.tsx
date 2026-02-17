@@ -16,6 +16,7 @@ interface RelationshipFiltersProps {
         influenceLevel: number[];
         contactType: string[];
         source: string[];
+        referredById: string[];
         organizationId: string;
     };
     setFilters: (filters: any) => void;
@@ -214,12 +215,13 @@ export function RelationshipFilters({
                     )}
                     {filters.agentId.length > 0 && !filters.agentId.includes('all') && !filters.agentId.includes('me') && (
                         <Badge variant="secondary" className="bg-white/5 text-white/70 border border-white/10 whitespace-nowrap gap-1 pr-1">
-                            Agente: {agents.find(a => a.id === filters.agentId[0])?.first_name || '...'}
+                            Agente: {agents.find(a => a.id === filters.agentId[0]) ? `${agents.find(a => a.id === filters.agentId[0])?.first_name} ${agents.find(a => a.id === filters.agentId[0])?.last_name}` : '...'}
                             <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('agentId', 'all')} />
                         </Badge>
-                    )}
-                </div>
+                    )
+                    }
+                </div >
             )}
-        </div>
+        </div >
     );
 }

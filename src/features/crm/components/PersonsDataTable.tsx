@@ -166,11 +166,11 @@ export function PersonsDataTable({ persons, isLoading, onEdit, onAddNote, onView
                             <TableCell>
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-1.5">
-                                        <div className="h-4 w-4 rounded-full bg-violet-500/20 flex items-center justify-center text-[8px] text-violet-300 font-bold">
-                                            {person.agent?.first_name[0] || '?'}
+                                        <div className="h-4 w-4 rounded-full bg-violet-500/20 flex items-center justify-center text-[8px] text-violet-300 font-bold shrink-0">
+                                            {person.agent?.first_name?.[0] || '?'}{person.agent?.last_name?.[0] || ''}
                                         </div>
-                                        <span className="text-xs text-white/70 font-medium">
-                                            {person.agent ? `${person.agent.first_name}` : 'N/A'}
+                                        <span className="text-xs text-white/70 font-medium truncate">
+                                            {person.agent ? `${person.agent.first_name} ${person.agent.last_name}` : 'N/A'}
                                         </span>
                                     </div>
                                     {person.preferred_channel && (
