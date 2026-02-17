@@ -49,6 +49,7 @@ const TAG_GROUPS: MultiSelectOptionGroup[] = [
 ];
 
 const RELATIONSHIP_STATUSES = [
+    { value: 'contacto_telefonico', label: 'Contacto Telefónico', description: 'Primer contacto vía telefónica' },
     { value: 'reunion_verde', label: 'Reunión Verde', description: 'Primer contacto o reunión inicial' },
     { value: 'pre_listing', label: 'Pre-Listing', description: 'Proceso de preparación antes de captar' },
     { value: 'pre_buying', label: 'Pre-Buying', description: 'Análisis preliminar antes de búsqueda' },

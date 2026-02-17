@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-    X, Filter, RotateCcw, Star, Users, Briefcase, MapPin, Tag,
+    X, Filter, RotateCcw, Star, Users, Briefcase, MapPin, Tag, Phone,
     Handshake, Search, FileSearch, BarChart3, Home, CheckCircle2, PenTool, UserCheck
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ import { PersonSelector } from '@/features/clients/components/shared/PersonSelec
 
 // Reusing options from previous file or defining them here
 const STATUS_OPTIONS = [
+    { label: 'Contacto Telefónico', value: 'contacto_telefonico', icon: Phone },
     { label: 'Reunión Verde', value: 'reunion_verde', icon: Handshake },
     { label: 'Pre-Listing', value: 'pre_listing', icon: FileSearch },
     { label: 'Pre-Buying', value: 'pre_buying', icon: Search },
