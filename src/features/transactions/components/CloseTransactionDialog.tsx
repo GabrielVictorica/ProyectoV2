@@ -378,7 +378,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                     </Button>
                 ))}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
+            <DialogContent className="sm:max-w-[600px] max-h-[95vh] flex flex-col bg-slate-800 border-slate-700">
                 <DialogHeader>
                     <DialogTitle className="text-white flex items-center gap-2">
                         <Handshake className="h-5 w-5 text-green-400" />
@@ -390,621 +390,625 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
-                        {/* Selector de Organización (Solo GOD) */}
-                        {isGod && !transaction && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="organization_id"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-slate-200 flex items-center gap-2">
-                                                <Users className="h-4 w-4 text-purple-400" />
-                                                Oficina / Organización *
-                                            </FormLabel>
-                                            <Select
-                                                onValueChange={(val) => {
-                                                    field.onChange(val);
-                                                    // Limpiar agente al cambiar de org
-                                                    form.setValue('agent_id', '');
-                                                }}
-                                                defaultValue={field.value}
-                                            >
-                                                <FormControl>
-                                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                        <SelectValue placeholder="Seleccionar oficina" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                                                    {organizations.map((org: any) => (
-                                                        <SelectItem key={org.id} value={org.id}>
-                                                            {org.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={form.control}
-                                    name="agent_id"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-slate-200 flex items-center gap-2">
-                                                <Users className="h-4 w-4 text-blue-400" />
-                                                Agente Responsable *
-                                            </FormLabel>
-                                            <Select
-                                                onValueChange={field.onChange}
-                                                defaultValue={field.value}
-                                                disabled={!watchOrgId}
-                                            >
-                                                <FormControl>
-                                                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                        <SelectValue placeholder={watchOrgId ? "Seleccionar agente" : "Primero elige oficina"} />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                                                    {filteredAgents.map((u: any) => (
-                                                        <SelectItem key={u.id} value={u.id}>
-                                                            {u.first_name} {u.last_name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                        )}
-
-                        {/* Selector de Agente (Solo Parent de su propia org) */}
-                        {isParent && !isGod && !transaction && (
-                            <FormField
-                                control={form.control}
-                                name="agent_id"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-blue-400" />
-                                            Agente Responsable *
-                                        </FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            defaultValue={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                    <SelectValue placeholder="Seleccionar agente" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                                                {filteredAgents
-                                                    .map((u: any) => (
-                                                        <SelectItem key={u.id} value={u.id}>
-                                                            {u.first_name} {u.last_name}
-                                                        </SelectItem>
-                                                    ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-
-                        {/* Selector de Propiedad (solo si no se pasó una por props fija) */}
-                        {!propertyId && (
-                            <FormField
-                                control={form.control}
-                                name="property_id"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <Building2 className="h-4 w-4" />
-                                            Propiedad *
-                                        </FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            defaultValue={field.value}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                    <SelectValue placeholder={isLoadingProps ? "Cargando propiedades..." : "Seleccionar propiedad"} />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-slate-800 border-slate-700">
-                                                <SelectItem value="manual" className="text-blue-400 font-medium hover:bg-slate-700">
-                                                    + Propiedad no registrada (Manual)
-                                                </SelectItem>
-                                                <SelectSeparator className="bg-slate-700/50" />
-                                                {availableProperties.map((p) => (
-                                                    <SelectItem
-                                                        key={p.id}
-                                                        value={p.id}
-                                                        className="text-white hover:bg-slate-700"
+                    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4 flex flex-col h-full">
+                        <ScrollArea className="flex-1 pr-4 -mr-4 max-h-[65vh]">
+                            <div className="space-y-4 py-1">
+                                {/* Selector de Organización (Solo GOD) */}
+                                {isGod && !transaction && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField
+                                            control={form.control}
+                                            name="organization_id"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                        <Users className="h-4 w-4 text-purple-400" />
+                                                        Oficina / Organización *
+                                                    </FormLabel>
+                                                    <Select
+                                                        onValueChange={(val) => {
+                                                            field.onChange(val);
+                                                            // Limpiar agente al cambiar de org
+                                                            form.setValue('agent_id', '');
+                                                        }}
+                                                        defaultValue={field.value}
                                                     >
-                                                        {p.title} ({p.city})
-                                                    </SelectItem>
-                                                ))}
-                                                {availableProperties.length === 0 && !isLoadingProps && (
-                                                    <div className="p-2 text-slate-500 text-sm text-center">
-                                                        No tienes propiedades activas
+                                                        <FormControl>
+                                                            <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                                                                <SelectValue placeholder="Seleccionar oficina" />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                                                            {organizations.map((org: any) => (
+                                                                <SelectItem key={org.id} value={org.id}>
+                                                                    {org.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name="agent_id"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                        <Users className="h-4 w-4 text-blue-400" />
+                                                        Agente Responsable *
+                                                    </FormLabel>
+                                                    <Select
+                                                        onValueChange={field.onChange}
+                                                        defaultValue={field.value}
+                                                        disabled={!watchOrgId}
+                                                    >
+                                                        <FormControl>
+                                                            <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                                                                <SelectValue placeholder={watchOrgId ? "Seleccionar agente" : "Primero elige oficina"} />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                                                            {filteredAgents.map((u: any) => (
+                                                                <SelectItem key={u.id} value={u.id}>
+                                                                    {u.first_name} {u.last_name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Selector de Agente (Solo Parent de su propia org) */}
+                                {isParent && !isGod && !transaction && (
+                                    <FormField
+                                        control={form.control}
+                                        name="agent_id"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-blue-400" />
+                                                    Agente Responsable *
+                                                </FormLabel>
+                                                <Select
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                                                            <SelectValue placeholder="Seleccionar agente" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                                                        {filteredAgents
+                                                            .map((u: any) => (
+                                                                <SelectItem key={u.id} value={u.id}>
+                                                                    {u.first_name} {u.last_name}
+                                                                </SelectItem>
+                                                            ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                )}
+
+                                {/* Selector de Propiedad (solo si no se pasó una por props fija) */}
+                                {!propertyId && (
+                                    <FormField
+                                        control={form.control}
+                                        name="property_id"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <Building2 className="h-4 w-4" />
+                                                    Propiedad *
+                                                </FormLabel>
+                                                <Select
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                    value={field.value}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                                                            <SelectValue placeholder={isLoadingProps ? "Cargando propiedades..." : "Seleccionar propiedad"} />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                                        <SelectItem value="manual" className="text-blue-400 font-medium hover:bg-slate-700">
+                                                            + Propiedad no registrada (Manual)
+                                                        </SelectItem>
+                                                        <SelectSeparator className="bg-slate-700/50" />
+                                                        {availableProperties.map((p) => (
+                                                            <SelectItem
+                                                                key={p.id}
+                                                                value={p.id}
+                                                                className="text-white hover:bg-slate-700"
+                                                            >
+                                                                {p.title} ({p.city})
+                                                            </SelectItem>
+                                                        ))}
+                                                        {availableProperties.length === 0 && !isLoadingProps && (
+                                                            <div className="p-2 text-slate-500 text-sm text-center">
+                                                                No tienes propiedades activas
+                                                            </div>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                )}
+
+                                {/* Campo Manual (solo si eligió manual) */}
+                                {watchPropertyId === 'manual' && (
+                                    <FormField
+                                        control={form.control}
+                                        name="custom_property_title"
+                                        render={({ field }) => (
+                                            <FormItem className="animate-in slide-in-from-top-2 duration-300">
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <Building2 className="h-4 w-4 text-blue-400" />
+                                                    Nombre/Dirección de la Propiedad *
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="Ej: Departamento en Recoleta 3 amb"
+                                                        className="bg-slate-700/50 border-blue-500/50 text-white focus:border-blue-400"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-slate-500 text-[10px]">
+                                                    Escribe un título descriptivo para identificar esta operación.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                )}
+
+                                {/* Precio y Puntas */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="actual_price"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <DollarSign className="h-4 w-4" />
+                                                    Precio de Venta (USD) *
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        type="number"
+                                                        step="1"
+                                                        placeholder="150000"
+                                                        className="bg-slate-700/50 border-slate-600 text-white"
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="sides"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <Users className="h-4 w-4" />
+                                                    Puntas *
+                                                </FormLabel>
+                                                <Select
+                                                    onValueChange={(value) => field.onChange(parseInt(value))}
+                                                    defaultValue={String(field.value)}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-slate-800 border-slate-700">
+                                                        <SelectItem value="1" className="text-white hover:bg-slate-700">
+                                                            1 Punta - Solo comprador o vendedor
+                                                        </SelectItem>
+                                                        <SelectItem value="2" className="text-white hover:bg-slate-700">
+                                                            2 Puntas - Ambos lados
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                {/* Comisión y Split */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="commission_percentage"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <Percent className="h-4 w-4" />
+                                                    Comisión (%) *
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        type="number"
+                                                        step="0.1"
+                                                        min="0"
+                                                        max="100"
+                                                        readOnly
+                                                        className="bg-slate-700/50 border-slate-600 text-slate-400 cursor-not-allowed"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-slate-500 text-[10px]">
+                                                    Fijo al 3% según política.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="agent_split_percentage"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel className="text-slate-200 flex items-center gap-2">
+                                                    <TrendingUp className="h-4 w-4" />
+                                                    Tu Split (%) *
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        type="number"
+                                                        step="0.1"
+                                                        min="0"
+                                                        max="100"
+                                                        readOnly
+                                                        className="bg-slate-700/50 border-slate-600 text-slate-400 cursor-not-allowed"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription className="text-slate-500 text-[10px]">
+                                                    Definido en tu perfil de usuario.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                {/* ===== SECCIÓN DINÁMICA: COMPRADOR / VENDEDOR ===== */}
+
+                                {/* Toggle "¿Qué lado representás?" — solo visible en 1 punta */}
+                                {watchSides === 1 && (
+                                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                        <p className="text-slate-300 text-xs font-bold uppercase tracking-wider">¿Qué lado representás?</p>
+                                        <FormField
+                                            control={form.control}
+                                            name="my_side"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => field.onChange('buyer')}
+                                                            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'buyer'
+                                                                ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10'
+                                                                : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                                                                }`}
+                                                        >
+                                                            <ShoppingCart className="w-4 h-4" />
+                                                            Comprador
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => field.onChange('seller')}
+                                                            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'seller'
+                                                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                                                                : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                                                                }`}
+                                                        >
+                                                            <Home className="w-4 h-4" />
+                                                            Vendedor
+                                                        </button>
                                                     </div>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* ===== COMPRADOR ===== */}
+                                    {(() => {
+                                        const isBuyerMySide = watchSides === 2 || watchMySide === 'buyer';
+                                        const isBuyerRequired = isBuyerMySide;
+                                        return (
+                                            <div className="space-y-2">
+                                                <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                                                    <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
+                                                    Comprador {isBuyerRequired ? '(CRM) *' : '(Externo)'}
+                                                </p>
+
+                                                {isBuyerMySide ? (
+                                                    /* Nuestro lado: PersonSelector obligatorio */
+                                                    <>
+                                                        <FormField
+                                                            control={form.control}
+                                                            name="buyer_person_id"
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormControl>
+                                                                        <PersonSelector
+                                                                            value={field.value ?? null}
+                                                                            onChange={(id) => field.onChange(id)}
+                                                                            placeholder="Buscar comprador en CRM..."
+                                                                        />
+                                                                    </FormControl>
+                                                                    {isCheckingBuyer && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
+                                                                    {!isCheckingBuyer && buyerHasSearch === false && watchBuyerPersonId && (
+                                                                        <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
+                                                                            <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
+                                                                                <span>Este cliente no tiene una búsqueda activa.</span>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="link"
+                                                                                    className="h-auto p-0 text-red-400 font-bold"
+                                                                                    onClick={() => setShowBuyerSearchForm(true)}
+                                                                                >
+                                                                                    Crear Búsqueda
+                                                                                </Button>
+                                                                            </AlertDescription>
+                                                                        </Alert>
+                                                                    )}
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
+
+                                                        <Dialog open={showBuyerSearchForm} onOpenChange={setShowBuyerSearchForm}>
+                                                            <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
+                                                                <DialogHeader>
+                                                                    <DialogTitle className="text-white">Crear Búsqueda de Comprador</DialogTitle>
+                                                                    <DialogDescription>
+                                                                        Completa los datos de la búsqueda para poder cerrar la operación.
+                                                                    </DialogDescription>
+                                                                </DialogHeader>
+                                                                <ClientForm
+                                                                    onSuccess={() => {
+                                                                        setShowBuyerSearchForm(false);
+                                                                        // Trigger re-check
+                                                                        const currentId = watchBuyerPersonId;
+                                                                        form.setValue('buyer_person_id', null);
+                                                                        setTimeout(() => form.setValue('buyer_person_id', currentId), 10);
+                                                                    }}
+                                                                    client={watchBuyerPersonId ? { person_id: watchBuyerPersonId, type: 'buyer' } as any : undefined}
+                                                                />
+                                                            </DialogContent>
+                                                        </Dialog>
+
+                                                    </>
+                                                ) : (
+                                                    /* Lado contrario (1 punta): input manual */
+                                                    <FormField
+                                                        control={form.control}
+                                                        name="buyer_name"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        {...field}
+                                                                        placeholder="Nombre del colega / inmobiliaria"
+                                                                        className="bg-slate-700/50 border-slate-600 text-white"
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription className="text-slate-500 text-[10px]">
+                                                                    Ingresá el nombre del colega o inmobiliaria contraparte.
+                                                                </FormDescription>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
                                                 )}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                                            </div>
+                                        );
+                                    })()}
 
-                        {/* Campo Manual (solo si eligió manual) */}
-                        {watchPropertyId === 'manual' && (
-                            <FormField
-                                control={form.control}
-                                name="custom_property_title"
-                                render={({ field }) => (
-                                    <FormItem className="animate-in slide-in-from-top-2 duration-300">
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <Building2 className="h-4 w-4 text-blue-400" />
-                                            Nombre/Dirección de la Propiedad *
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                placeholder="Ej: Departamento en Recoleta 3 amb"
-                                                className="bg-slate-700/50 border-blue-500/50 text-white focus:border-blue-400"
-                                            />
-                                        </FormControl>
-                                        <FormDescription className="text-slate-500 text-[10px]">
-                                            Escribe un título descriptivo para identificar esta operación.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                                    {/* ===== VENDEDOR ===== */}
+                                    {(() => {
+                                        const isSellerMySide = watchSides === 2 || watchMySide === 'seller';
+                                        const isSellerRequired = isSellerMySide;
+                                        return (
+                                            <div className="space-y-2">
+                                                <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                                                    <Home className="w-3.5 h-3.5 text-emerald-400" />
+                                                    Vendedor {isSellerRequired ? '(CRM) *' : '(Externo)'}
+                                                </p>
 
-                        {/* Precio y Puntas */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="actual_price"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <DollarSign className="h-4 w-4" />
-                                            Precio de Venta (USD) *
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                type="number"
-                                                step="1"
-                                                placeholder="150000"
-                                                className="bg-slate-700/50 border-slate-600 text-white"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                                {isSellerMySide ? (
+                                                    /* Nuestro lado: PersonSelector obligatorio */
+                                                    <>
+                                                        <FormField
+                                                            control={form.control}
+                                                            name="seller_person_id"
+                                                            render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormControl>
+                                                                        <PersonSelector
+                                                                            value={field.value ?? null}
+                                                                            onChange={(id) => field.onChange(id)}
+                                                                            placeholder="Buscar vendedor en CRM..."
+                                                                        />
+                                                                    </FormControl>
+                                                                    {isCheckingSeller && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
+                                                                    {/* We removed the block for sellers missing a search/property implementation yet */}
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
 
-                            <FormField
-                                control={form.control}
-                                name="sides"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <Users className="h-4 w-4" />
-                                            Puntas *
-                                        </FormLabel>
-                                        <Select
-                                            onValueChange={(value) => field.onChange(parseInt(value))}
-                                            defaultValue={String(field.value)}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-slate-800 border-slate-700">
-                                                <SelectItem value="1" className="text-white hover:bg-slate-700">
-                                                    1 Punta - Solo comprador o vendedor
-                                                </SelectItem>
-                                                <SelectItem value="2" className="text-white hover:bg-slate-700">
-                                                    2 Puntas - Ambos lados
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
+                                                        <Dialog open={showSellerSearchForm} onOpenChange={setShowSellerSearchForm}>
+                                                            <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
+                                                                <DialogHeader>
+                                                                    <DialogTitle className="text-white">Crear Cliente (Vendedor)</DialogTitle>
+                                                                    <DialogDescription>
+                                                                        Completa los datos del cliente para poder cerrar la operación.
+                                                                    </DialogDescription>
+                                                                </DialogHeader>
+                                                                <ClientForm
+                                                                    onSuccess={() => {
+                                                                        setShowSellerSearchForm(false);
+                                                                        // Trigger re-check
+                                                                        const currentId = watchSellerPersonId;
+                                                                        form.setValue('seller_person_id', null);
+                                                                        setTimeout(() => form.setValue('seller_person_id', currentId), 10);
+                                                                    }}
+                                                                    client={watchSellerPersonId ? { person_id: watchSellerPersonId, type: 'seller' } as any : undefined}
+                                                                />
+                                                            </DialogContent>
+                                                        </Dialog>
 
-                        {/* Comisión y Split */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="commission_percentage"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <Percent className="h-4 w-4" />
-                                            Comisión (%) *
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                type="number"
-                                                step="0.1"
-                                                min="0"
-                                                max="100"
-                                                readOnly
-                                                className="bg-slate-700/50 border-slate-600 text-slate-400 cursor-not-allowed"
-                                            />
-                                        </FormControl>
-                                        <FormDescription className="text-slate-500 text-[10px]">
-                                            Fijo al 3% según política.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                                    </>
+                                                ) : (
+                                                    /* Lado contrario (1 punta): input manual */
+                                                    <FormField
+                                                        control={form.control}
+                                                        name="seller_name"
+                                                        render={({ field }) => (
+                                                            <FormItem>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        {...field}
+                                                                        placeholder="Nombre del colega / inmobiliaria"
+                                                                        className="bg-slate-700/50 border-slate-600 text-white"
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription className="text-slate-500 text-[10px]">
+                                                                    Ingresá el nombre del colega o inmobiliaria contraparte.
+                                                                </FormDescription>
+                                                                <FormMessage />
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
 
-                            <FormField
-                                control={form.control}
-                                name="agent_split_percentage"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-slate-200 flex items-center gap-2">
-                                            <TrendingUp className="h-4 w-4" />
-                                            Tu Split (%) *
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                {...field}
-                                                type="number"
-                                                step="0.1"
-                                                min="0"
-                                                max="100"
-                                                readOnly
-                                                className="bg-slate-700/50 border-slate-600 text-slate-400 cursor-not-allowed"
-                                            />
-                                        </FormControl>
-                                        <FormDescription className="text-slate-500 text-[10px]">
-                                            Definido en tu perfil de usuario.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
 
-                        {/* ===== SECCIÓN DINÁMICA: COMPRADOR / VENDEDOR ===== */}
-
-                        {/* Toggle "¿Qué lado representás?" — solo visible en 1 punta */}
-                        {watchSides === 1 && (
-                            <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                                <p className="text-slate-300 text-xs font-bold uppercase tracking-wider">¿Qué lado representás?</p>
+                                {/* Fecha */}
                                 <FormField
                                     control={form.control}
-                                    name="my_side"
+                                    name="transaction_date"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => field.onChange('buyer')}
-                                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'buyer'
-                                                        ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/10'
-                                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                                                        }`}
-                                                >
-                                                    <ShoppingCart className="w-4 h-4" />
-                                                    Comprador
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => field.onChange('seller')}
-                                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${field.value === 'seller'
-                                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                                                        }`}
-                                                >
-                                                    <Home className="w-4 h-4" />
-                                                    Vendedor
-                                                </button>
-                                            </div>
+                                            <FormLabel className="text-slate-200">Fecha de Operación *</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    {...field}
+                                                    type="date"
+                                                    className="bg-slate-700/50 border-slate-600 text-white"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
-                            </div>
-                        )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* ===== COMPRADOR ===== */}
-                            {(() => {
-                                const isBuyerMySide = watchSides === 2 || watchMySide === 'buyer';
-                                const isBuyerRequired = isBuyerMySide;
-                                return (
-                                    <div className="space-y-2">
-                                        <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                                            <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
-                                            Comprador {isBuyerRequired ? '(CRM) *' : '(Externo)'}
-                                        </p>
-
-                                        {isBuyerMySide ? (
-                                            /* Nuestro lado: PersonSelector obligatorio */
-                                            <>
-                                                <FormField
-                                                    control={form.control}
-                                                    name="buyer_person_id"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormControl>
-                                                                <PersonSelector
-                                                                    value={field.value ?? null}
-                                                                    onChange={(id) => field.onChange(id)}
-                                                                    placeholder="Buscar comprador en CRM..."
-                                                                />
-                                                            </FormControl>
-                                                            {isCheckingBuyer && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
-                                                            {!isCheckingBuyer && buyerHasSearch === false && watchBuyerPersonId && (
-                                                                <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
-                                                                    <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
-                                                                        <span>Este cliente no tiene una búsqueda activa.</span>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="link"
-                                                                            className="h-auto p-0 text-red-400 font-bold"
-                                                                            onClick={() => setShowBuyerSearchForm(true)}
-                                                                        >
-                                                                            Crear Búsqueda
-                                                                        </Button>
-                                                                    </AlertDescription>
-                                                                </Alert>
-                                                            )}
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
+                                {/* Notas */}
+                                <FormField
+                                    control={form.control}
+                                    name="notes"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-slate-200">Notas (opcional)</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    {...field}
+                                                    placeholder="Detalles adicionales..."
+                                                    className="bg-slate-700/50 border-slate-600 text-white resize-none"
+                                                    rows={2}
                                                 />
-
-                                                <Dialog open={showBuyerSearchForm} onOpenChange={setShowBuyerSearchForm}>
-                                                    <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
-                                                        <DialogHeader>
-                                                            <DialogTitle className="text-white">Crear Búsqueda de Comprador</DialogTitle>
-                                                            <DialogDescription>
-                                                                Completa los datos de la búsqueda para poder cerrar la operación.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <ClientForm
-                                                            onSuccess={() => {
-                                                                setShowBuyerSearchForm(false);
-                                                                // Trigger re-check
-                                                                const currentId = watchBuyerPersonId;
-                                                                form.setValue('buyer_person_id', null);
-                                                                setTimeout(() => form.setValue('buyer_person_id', currentId), 10);
-                                                            }}
-                                                            client={watchBuyerPersonId ? { person_id: watchBuyerPersonId, type: 'buyer' } as any : undefined}
-                                                        />
-                                                    </DialogContent>
-                                                </Dialog>
-
-                                            </>
-                                        ) : (
-                                            /* Lado contrario (1 punta): input manual */
-                                            <FormField
-                                                control={form.control}
-                                                name="buyer_name"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input
-                                                                {...field}
-                                                                placeholder="Nombre del colega / inmobiliaria"
-                                                                className="bg-slate-700/50 border-slate-600 text-white"
-                                                            />
-                                                        </FormControl>
-                                                        <FormDescription className="text-slate-500 text-[10px]">
-                                                            Ingresá el nombre del colega o inmobiliaria contraparte.
-                                                        </FormDescription>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        )}
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ===== VENDEDOR ===== */}
-                            {(() => {
-                                const isSellerMySide = watchSides === 2 || watchMySide === 'seller';
-                                const isSellerRequired = isSellerMySide;
-                                return (
-                                    <div className="space-y-2">
-                                        <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                                            <Home className="w-3.5 h-3.5 text-emerald-400" />
-                                            Vendedor {isSellerRequired ? '(CRM) *' : '(Externo)'}
-                                        </p>
-
-                                        {isSellerMySide ? (
-                                            /* Nuestro lado: PersonSelector obligatorio */
-                                            <>
-                                                <FormField
-                                                    control={form.control}
-                                                    name="seller_person_id"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormControl>
-                                                                <PersonSelector
-                                                                    value={field.value ?? null}
-                                                                    onChange={(id) => field.onChange(id)}
-                                                                    placeholder="Buscar vendedor en CRM..."
-                                                                />
-                                                            </FormControl>
-                                                            {isCheckingSeller && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
-                                                            {/* We removed the block for sellers missing a search/property implementation yet */}
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-
-                                                <Dialog open={showSellerSearchForm} onOpenChange={setShowSellerSearchForm}>
-                                                    <DialogContent className="sm:max-w-[700px] bg-slate-800 border-slate-700">
-                                                        <DialogHeader>
-                                                            <DialogTitle className="text-white">Crear Cliente (Vendedor)</DialogTitle>
-                                                            <DialogDescription>
-                                                                Completa los datos del cliente para poder cerrar la operación.
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-                                                        <ClientForm
-                                                            onSuccess={() => {
-                                                                setShowSellerSearchForm(false);
-                                                                // Trigger re-check
-                                                                const currentId = watchSellerPersonId;
-                                                                form.setValue('seller_person_id', null);
-                                                                setTimeout(() => form.setValue('seller_person_id', currentId), 10);
-                                                            }}
-                                                            client={watchSellerPersonId ? { person_id: watchSellerPersonId, type: 'seller' } as any : undefined}
-                                                        />
-                                                    </DialogContent>
-                                                </Dialog>
-
-                                            </>
-                                        ) : (
-                                            /* Lado contrario (1 punta): input manual */
-                                            <FormField
-                                                control={form.control}
-                                                name="seller_name"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input
-                                                                {...field}
-                                                                placeholder="Nombre del colega / inmobiliaria"
-                                                                className="bg-slate-700/50 border-slate-600 text-white"
-                                                            />
-                                                        </FormControl>
-                                                        <FormDescription className="text-slate-500 text-[10px]">
-                                                            Ingresá el nombre del colega o inmobiliaria contraparte.
-                                                        </FormDescription>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        )}
-                                    </div>
-                                );
-                            })()}
-                        </div>
-
-
-                        {/* Fecha */}
-                        <FormField
-                            control={form.control}
-                            name="transaction_date"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-slate-200">Fecha de Operación *</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            type="date"
-                                            className="bg-slate-700/50 border-slate-600 text-white"
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Notas */}
-                        <FormField
-                            control={form.control}
-                            name="notes"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-slate-200">Notas (opcional)</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            {...field}
-                                            placeholder="Detalles adicionales..."
-                                            className="bg-slate-700/50 border-slate-600 text-white resize-none"
-                                            rows={2}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Preview Card */}
-                        {watchPrice > 0 && (
-                            <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-green-400 text-sm font-medium flex items-center gap-2">
-                                        <TrendingUp className="h-4 w-4" />
-                                        Reparto de Comisiones (Cascada)
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="flex justify-between items-center text-sm border-b border-green-500/20 pb-2">
-                                        <span className="text-slate-400">Comisión Bruta ({watchCommissionPercent}% x {watchSides})</span>
-                                        <span className="text-white font-semibold">
-                                            {formatCurrency(calculations.grossCommission)}
-                                        </span>
-                                    </div>
-
-                                    {/* Mostrar Royalty (Dios) solo si no es agente o si queremos transparencia total */}
-                                    {profile?.role !== 'child' && (
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-red-400/80">Fee de Red (Dios) ({calculations.royaltyPercent}%)</span>
-                                            <span className="text-red-400/80">
-                                                - {formatCurrency(calculations.masterAmount)}
-                                            </span>
-                                        </div>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
+                                />
 
-                                    <div className="flex justify-between items-center text-sm pt-2 border-t border-green-500/20">
-                                        <span className="text-green-400 font-medium">Tu Comisión ({watchSplitPercent}%)</span>
-                                        <span className="text-green-400 font-bold">
-                                            {formatCurrency(calculations.agentAmount)}
-                                        </span>
-                                    </div>
+                                {/* Preview Card */}
+                                {watchPrice > 0 && (
+                                    <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-green-400 text-sm font-medium flex items-center gap-2">
+                                                <TrendingUp className="h-4 w-4" />
+                                                Reparto de Comisiones (Cascada)
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            <div className="flex justify-between items-center text-sm border-b border-green-500/20 pb-2">
+                                                <span className="text-slate-400">Comisión Bruta ({watchCommissionPercent}% x {watchSides})</span>
+                                                <span className="text-white font-semibold">
+                                                    {formatCurrency(calculations.grossCommission)}
+                                                </span>
+                                            </div>
 
-                                    {/* Mostrar Neto Oficina solo si no es agente */}
-                                    {profile?.role !== 'child' && (
-                                        <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-700/50">
-                                            <span className="text-blue-400 font-medium">Neto Oficina</span>
-                                            <span className="text-blue-400 font-semibold">
-                                                {formatCurrency(calculations.officeAmount)}
-                                            </span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                                {watchSides === 2 && (
-                                    <div className="px-6 pb-4">
-                                        <span className="text-purple-400 text-xs font-medium bg-purple-500/20 px-2 py-1 rounded">
-                                            ⭐ Operación de 2 puntas
-                                        </span>
-                                    </div>
+                                            {/* Mostrar Royalty (Dios) solo si no es agente o si queremos transparencia total */}
+                                            {profile?.role !== 'child' && (
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-red-400/80">Fee de Red (Dios) ({calculations.royaltyPercent}%)</span>
+                                                    <span className="text-red-400/80">
+                                                        - {formatCurrency(calculations.masterAmount)}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-between items-center text-sm pt-2 border-t border-green-500/20">
+                                                <span className="text-green-400 font-medium">Tu Comisión ({watchSplitPercent}%)</span>
+                                                <span className="text-green-400 font-bold">
+                                                    {formatCurrency(calculations.agentAmount)}
+                                                </span>
+                                            </div>
+
+                                            {/* Mostrar Neto Oficina solo si no es agente */}
+                                            {profile?.role !== 'child' && (
+                                                <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-700/50">
+                                                    <span className="text-blue-400 font-medium">Neto Oficina</span>
+                                                    <span className="text-blue-400 font-semibold">
+                                                        {formatCurrency(calculations.officeAmount)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                        {watchSides === 2 && (
+                                            <div className="px-6 pb-4">
+                                                <span className="text-purple-400 text-xs font-medium bg-purple-500/20 px-2 py-1 rounded">
+                                                    ⭐ Operación de 2 puntas
+                                                </span>
+                                            </div>
+                                        )}
+                                    </Card>
                                 )}
-                            </Card>
-                        )}
+                            </div>
+                        </ScrollArea>
 
-                        <div className="flex justify-end gap-3 pt-4">
+                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50 mt-auto">
                             <Button
                                 type="button"
                                 variant="ghost"
