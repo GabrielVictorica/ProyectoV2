@@ -29,18 +29,8 @@ import { cn } from "@/lib/utils";
 import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
 
 // Reusing options from previous file or defining them here
-const STATUS_OPTIONS = [
-    { label: 'Contacto Telefónico', value: 'contacto_telefonico', icon: Phone },
-    { label: 'Reunión Verde', value: 'reunion_verde', icon: Handshake },
-    { label: 'Pre-Listing', value: 'pre_listing', icon: FileSearch },
-    { label: 'Pre-Buying', value: 'pre_buying', icon: Search },
-    { label: 'ACM', value: 'acm', icon: BarChart3 },
-    { label: 'Captación', value: 'captacion', icon: Home },
-    { label: 'Visita', value: 'visita', icon: MapPin },
-    { label: 'Reserva', value: 'reserva', icon: CheckCircle2 },
-    { label: 'Cierre', value: 'cierre', icon: PenTool },
-    { label: 'Referido', value: 'referido', icon: Users },
-];
+import { RELATIONSHIP_STATUSES } from '../../constants/relationshipStatuses';
+import { LIFECYCLE_STATUSES } from '../../constants/lifecycleStatuses';
 
 const CONTACT_TYPE_OPTIONS = [
     { label: 'Comprador', value: 'comprador' },
@@ -75,6 +65,7 @@ interface AdvancedFilterSheetProps {
         contactType: string[];
         source: string[];
         referredById: string[];
+        lifecycleStatus: string[];
         organizationId?: string;
     };
     setFilters: (filters: any) => void;
@@ -113,6 +104,7 @@ export function AdvancedFilterSheet({
             contactType: [],
             source: [],
             referredById: [],
+            lifecycleStatus: [],
             organizationId: filters.organizationId
         });
     };
@@ -125,7 +117,8 @@ export function AdvancedFilterSheet({
         filters.influenceLevel.length +
         filters.contactType.length +
         filters.source.length +
-        filters.referredById.length;
+        filters.referredById.length +
+        filters.lifecycleStatus.length;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -161,11 +154,38 @@ export function AdvancedFilterSheet({
                 <ScrollArea className="flex-1 px-6 py-6">
                     <div className="space-y-8 pb-12">
 
+                        {/* Lifecycle Status */}
+                        <div className="space-y-3">
+                            <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Estado del Lead</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {LIFECYCLE_STATUSES.map((option) => {
+                                    const isSelected = filters.lifecycleStatus?.includes(option.value);
+                                    return (
+                                        <div
+                                            key={option.value}
+                                            onClick={() => toggleFilter('lifecycleStatus', option.value)}
+                                            className={cn(
+                                                "cursor-pointer rounded-lg border p-3 flex flex-col items-center justify-center gap-2 transition-all hover:bg-white/5",
+                                                isSelected
+                                                    ? `${option.bgColor} ${option.borderColor} ${option.color}`
+                                                    : "bg-transparent border-white/10 text-white/50"
+                                            )}
+                                        >
+                                            <option.icon className={cn("w-4 h-4", isSelected ? option.color : "text-white/30")} />
+                                            <span className="text-[10px] font-medium text-center">{option.label}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        <Separator className="bg-white/10" />
+
                         {/* Status */}
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Estado de Relación</Label>
                             <div className="grid grid-cols-2 gap-2">
-                                {STATUS_OPTIONS.map((option) => {
+                                {RELATIONSHIP_STATUSES.map((option) => {
                                     const isSelected = filters.relationshipStatus.includes(option.value);
                                     return (
                                         <div

@@ -19,41 +19,31 @@ export type ActivityInsert = {
 };
 
 /**
- * Sincroniza el estado de una persona en el CRM basado en una actividad reciente.
+ * Actualiza explícitamente el estado de una persona en el CRM.
+ * Se llama desde el cliente tras confirmación del usuario.
  */
-async function syncPersonFromActivity(personId: string, activityType: string, activityDate: string) {
+export async function updatePersonStatusAction(
+    personId: string,
+    newStatus: string,
+    activityDate: string
+): Promise<{ success: boolean; error?: string }> {
     const supabase = await createClient();
 
-    // Mapeo selectivo de tipos de actividad a estados de relación
-    // Solo actualizamos el estado si es uno de los hitos importantes
-    const statusMap: Record<string, string> = {
-        'reunion_verde': 'reunion_verde',
-        'pre_listing': 'pre_listing',
-        'pre_buying': 'pre_buying',
-        'acm': 'acm',
-        'captacion': 'captacion',
-        'visita': 'visita',
-        'reserva': 'reserva',
-        'referido': 'referido',
-    };
-
-    const newStatus = statusMap[activityType];
-    const updateData: any = {
-        last_interaction_at: new Date(activityDate + 'T12:00:00Z').toISOString(),
-    };
-
-    if (newStatus) {
-        updateData.relationship_status = newStatus;
-    }
-
     const { error } = await supabase
-        .from('persons')
-        .update(updateData)
+        .from('persons' as any)
+        .update({
+            relationship_status: newStatus,
+            last_interaction_at: new Date(activityDate + 'T12:00:00Z').toISOString(),
+        } as any)
         .eq('id', personId);
 
     if (error) {
-        console.error('Error syncing person from activity:', error);
+        console.error('Error updating person status:', error);
+        return { success: false, error: error.message };
     }
+
+    revalidatePath('/dashboard/crm');
+    return { success: true };
 }
 
 export async function createActivityAction(data: ActivityInsert) {
@@ -69,9 +59,12 @@ export async function createActivityAction(data: ActivityInsert) {
         return { success: false, error: error.message };
     }
 
-    // Side-effect: Sincronizar con CRM si hay una persona vinculada
+    // Actualizar last_interaction_at si hay persona vinculada (no toca relationship_status)
     if (data.person_id) {
-        await syncPersonFromActivity(data.person_id, data.type, data.date);
+        await supabase
+            .from('persons' as any)
+            .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
+            .eq('id', data.person_id);
     }
 
     revalidatePath('/dashboard/my-week');
@@ -93,9 +86,12 @@ export async function updateActivityAction(id: string, data: Partial<ActivityIns
         return { success: false, error: error.message };
     }
 
-    // Side-effect: Sincronizar con CRM si hay una persona vinculada
-    if (data.person_id && data.type && data.date) {
-        await syncPersonFromActivity(data.person_id, data.type, data.date);
+    // Actualizar last_interaction_at si hay persona vinculada (no toca relationship_status)
+    if (data.person_id && data.date) {
+        await supabase
+            .from('persons' as any)
+            .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
+            .eq('id', data.person_id);
     }
 
     revalidatePath('/dashboard/my-week');
@@ -106,6 +102,13 @@ export async function updateActivityAction(id: string, data: Partial<ActivityIns
 export async function deleteActivityAction(id: string) {
     const supabase = await createClient();
 
+    // Primero obtener la actividad para saber si tiene persona vinculada
+    const { data: activityToDelete } = await supabase
+        .from('activities' as any)
+        .select('person_id, type')
+        .eq('id', id)
+        .single();
+
     const { error } = await supabase
         .from('activities' as any)
         .delete()
@@ -115,7 +118,33 @@ export async function deleteActivityAction(id: string) {
         return { success: false, error: error.message };
     }
 
+    // Revertir estado: buscar la actividad más reciente restante de esta persona
+    const deletedActivity = activityToDelete as any;
+    if (deletedActivity?.person_id) {
+        const { data: latestActivity } = await supabase
+            .from('activities' as any)
+            .select('type, date')
+            .eq('person_id', deletedActivity.person_id)
+            .order('date', { ascending: false })
+            .limit(1)
+            .single();
+
+        const latest = latestActivity as any;
+        if (latest) {
+            // Hay otra actividad → actualizar al estado de esa actividad
+            await supabase
+                .from('persons' as any)
+                .update({
+                    relationship_status: latest.type,
+                    last_interaction_at: new Date(latest.date + 'T12:00:00Z').toISOString(),
+                } as any)
+                .eq('id', deletedActivity.person_id);
+        }
+        // Si no hay más actividades, dejamos el estado tal cual (no regresionamos)
+    }
+
     revalidatePath('/dashboard/my-week');
+    revalidatePath('/dashboard/crm');
     return { success: true };
 }
 

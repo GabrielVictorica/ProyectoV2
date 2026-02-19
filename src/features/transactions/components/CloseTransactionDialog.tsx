@@ -12,6 +12,8 @@ import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
 import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
 import { checkPersonHasSearchAction } from '@/features/clients/actions/clientActions';
 import { ClientForm } from '@/features/clients/components/ClientForm';
+import { updatePersonStatusAction } from '@/features/weekly-activities/actions/activityActions';
+import { getStatusLabel } from '@/features/crm/constants/relationshipStatuses';
 
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -252,10 +254,9 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 return;
             }
             setIsCheckingSeller(true);
-            // Sellers might have 'seller' type searches or just be a person in CRM
-            // But requirement says "must have a search"
             const result = await checkPersonHasSearchAction(watchSellerPersonId, 'seller');
             if (result.success) {
+                // Optimization: We still track if it has a search, but we don't block the form anymore based on your requirement
                 setSellerHasSearch(result.data?.hasSearch ?? false);
             }
             setIsCheckingSeller(false);
@@ -318,6 +319,28 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             } else {
                 await addTransaction(input as any);
                 toast.success('Operación cerrada con éxito');
+
+                // Preguntar si desea actualizar el estado de los clientes a "Cierre"
+                const linkedPersons = [
+                    { id: data.buyer_person_id, name: data.buyer_name || 'Comprador' },
+                    { id: data.seller_person_id, name: data.seller_name || 'Vendedor' }
+                ].filter(p => p.id);
+
+                linkedPersons.forEach(person => {
+                    toast(`¿Actualizar estado de ${person.name} a "Cierre"?`, {
+                        action: {
+                            label: "Sí",
+                            onClick: () => {
+                                updatePersonStatusAction(person.id!, 'cierre', data.transaction_date)
+                                    .then(res => {
+                                        if (res.success) toast.success(`CRM: ${person.name} ahora está en "Cierre"`);
+                                        else toast.error(`Error al actualizar estado de ${person.name}`);
+                                    });
+                            }
+                        },
+                        duration: 8000,
+                    });
+                });
             }
 
             form.reset({
@@ -832,21 +855,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                                                 />
                                                             </FormControl>
                                                             {isCheckingSeller && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
-                                                            {!isCheckingSeller && sellerHasSearch === false && watchSellerPersonId && (
-                                                                <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
-                                                                    <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
-                                                                        <span>Este vendedor no tiene una búsqueda/cliente activo.</span>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="link"
-                                                                            className="h-auto p-0 text-red-400 font-bold"
-                                                                            onClick={() => setShowSellerSearchForm(true)}
-                                                                        >
-                                                                            Crear Cliente
-                                                                        </Button>
-                                                                    </AlertDescription>
-                                                                </Alert>
-                                                            )}
+                                                            {/* We removed the block for sellers missing a search/property implementation yet */}
                                                             <FormMessage />
                                                         </FormItem>
                                                     )}
@@ -1006,7 +1015,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={isAdding || isUpdating || isCheckingBuyer || isCheckingSeller || (buyerHasSearch === false && (watchSides === 2 || watchMySide === 'buyer')) || (sellerHasSearch === false && (watchSides === 2 || watchMySide === 'seller'))}
+                                disabled={isAdding || isUpdating || isCheckingBuyer || isCheckingSeller || (buyerHasSearch === false && (watchSides === 2 || watchMySide === 'buyer'))}
                                 className="bg-gradient-to-r from-green-500 to-emerald-600"
                             >
                                 {isAdding || isUpdating ? (

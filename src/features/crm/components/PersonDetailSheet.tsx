@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import {
     Sheet,
     SheetContent,
@@ -10,10 +12,12 @@ import {
 } from "@/components/ui/sheet";
 
 import { Badge } from "@/components/ui/badge";
+import { PersonTimeline } from './PersonTimeline';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+    Activity,
     Phone,
     Mail,
     MapPin,
@@ -35,24 +39,37 @@ import { Person } from "@/features/clients/types";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { HealthScoreBadge } from "./HealthScoreBadge";
-import { useCRM } from "../hooks/useCRM";
+import { getStatusLabel } from "../constants/relationshipStatuses";
+import { useCRM, usePerson, crmKeys } from '../hooks/useCRM';
 import { toast } from "sonner";
+import { LIFECYCLE_STATUSES, LOST_REASONS } from "../constants/lifecycleStatuses";
+import { updatePersonLifecycleStatusAction } from "../actions/personActions";
+import { cn } from "@/lib/utils";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface PersonDetailSheetProps {
     person: Person | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onEdit: (person: Person) => void;
+    onEdit?: (person: Person) => void;
 }
 
-export function PersonDetailSheet({
-    person,
-    open,
-    onOpenChange,
-    onEdit,
-}: PersonDetailSheetProps) {
-    const { updatePerson } = useCRM();
+export function PersonDetailSheet({ open, onOpenChange, person: initialPerson, onEdit }: PersonDetailSheetProps) {
+    const queryClient = useQueryClient();
+    const { updatePerson, touchPerson } = useCRM();
+    const { data: livePerson, isLoading: isLoadingPerson } = usePerson(open ? initialPerson?.id || null : null);
+
+    // Use live data if available, otherwise fall back to initial person
+    const person = livePerson || initialPerson;
+
     const [deletingNoteIndex, setDeletingNoteIndex] = React.useState<number | null>(null);
+    const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
 
     if (!person) return null;
 
@@ -92,6 +109,24 @@ export function PersonDetailSheet({
         }
     };
 
+    const handleLifecycleUpdate = async (status: any, reason?: string) => {
+        if (!person) return;
+        try {
+            setIsUpdatingStatus(true);
+            const result = await updatePersonLifecycleStatusAction(person.id, status, reason);
+            if (result.success) {
+                toast.success(`Estado actualizado a ${status === 'lost' ? 'Perdido' : status === 'following_up' ? 'Seguimiento' : 'Activo'}`);
+                queryClient.invalidateQueries({ queryKey: crmKeys.all });
+            } else {
+                toast.error(result.error);
+            }
+        } catch (error) {
+            toast.error("Error al actualizar el estado");
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full sm:max-w-xl bg-[#09090b] border-l border-white/10 text-white p-0">
@@ -123,7 +158,7 @@ export function PersonDetailSheet({
                                     ))}
                                     {person.relationship_status && (
                                         <Badge variant="outline" className="border-white/20 text-white/60">
-                                            {person.relationship_status}
+                                            {getStatusLabel(person.relationship_status)}
                                         </Badge>
                                     )}
                                 </div>
@@ -135,7 +170,10 @@ export function PersonDetailSheet({
                                     <Button
                                         variant="outline"
                                         className="bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20"
-                                        onClick={() => window.open(`https://wa.me/${person.phone?.replace(/\D/g, '')}`, '_blank')}
+                                        onClick={() => {
+                                            touchPerson.mutate(person.id);
+                                            window.open(`https://wa.me/${person.phone?.replace(/\D/g, '')}`, '_blank');
+                                        }}
                                     >
                                         <MessageCircle className="w-4 h-4 mr-2" />
                                         WhatsApp
@@ -145,13 +183,87 @@ export function PersonDetailSheet({
                                     className="bg-white/10 hover:bg-white/20 text-white border-white/10" variant="outline"
                                     onClick={() => {
                                         onOpenChange(false);
-                                        onEdit(person);
+                                        onEdit?.(person);
                                     }}
                                 >
                                     <Edit className="w-4 h-4 mr-2" />
-                                    Editar Perfil
+                                    Editar
                                 </Button>
                             </div>
+
+                            <Separator className="bg-white/5" />
+
+                            {/* Disposition / Lifecycle Status */}
+                            {person.relationship_status === 'acm' && (
+                                <div className="w-full space-y-3 px-2 pb-6 border-b border-white/[0.06]">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Estado del Lead</span>
+                                        {person.lifecycle_status === 'lost' && person.lost_reason && (
+                                            <Badge variant="outline" className="text-[10px] bg-rose-500/5 text-rose-400 border-rose-500/20">
+                                                Motivo: {person.lost_reason}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {LIFECYCLE_STATUSES.map((status) => {
+                                            const isSelected = person.lifecycle_status === status.value;
+                                            return (
+                                                <button
+                                                    key={status.value}
+                                                    disabled={isUpdatingStatus}
+                                                    onClick={() => handleLifecycleUpdate(status.value as any)}
+                                                    className={cn(
+                                                        "h-16 flex flex-col items-center justify-center gap-1.5 rounded-2xl border transition-all relative overflow-hidden group/btn",
+                                                        isSelected
+                                                            ? `${status.bgColor} ${status.borderColor} ${status.color} shadow-[0_0_20px_-10px_rgba(0,0,0,0.5)]`
+                                                            : "bg-white/[0.02] border-white/[0.05] text-white/40 hover:border-white/20 hover:bg-white/[0.04]",
+                                                        isUpdatingStatus && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <status.icon className={cn("w-4 h-4", isSelected ? status.color : "text-white/20 group-hover/btn:text-white/40")} />
+                                                    <span className="text-[10px] font-extrabold uppercase tracking-tight">{status.label}</span>
+                                                    {isSelected && (
+                                                        <motion.div layoutId="active-pill" className="absolute bottom-0 left-0 right-0 h-1 bg-current opacity-20" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <AnimatePresence>
+                                        {person.lifecycle_status === 'lost' && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <Select
+                                                    value={person.lost_reason || ""}
+                                                    onValueChange={(val) => handleLifecycleUpdate('lost', val)}
+                                                >
+                                                    <SelectTrigger className="h-9 bg-white/5 border-white/10 text-xs text-white/70">
+                                                        <SelectValue placeholder="Seleccionar motivo de pérdida..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-[#18181b] border-white/10 text-white">
+                                                        {LOST_REASONS.map(reason => (
+                                                            <SelectItem key={reason} value={reason} className="text-xs hover:bg-white/10 focus:bg-white/10">
+                                                                {reason}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {person.lifecycle_status !== 'lost' && isUpdatingStatus && (
+                                        <div className="flex justify-center">
+                                            <Loader2 className="w-4 h-4 animate-spin text-white/20" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <Separator className="bg-white/10" />
@@ -302,6 +414,19 @@ export function PersonDetailSheet({
 
                         <Separator className="bg-white/10" />
 
+                        {/* Actividad / Línea de Tiempo */}
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-emerald-400" />
+                                Historial de Actividad
+                            </h3>
+                            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                                <PersonTimeline personId={person.id} />
+                            </div>
+                        </div>
+
+                        <Separator className="bg-white/10" />
+
                         {/* Observations / Notes */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -313,7 +438,7 @@ export function PersonDetailSheet({
                                 <div className="space-y-3">
                                     {notes.map((note, index) => {
                                         // Try to extract date
-                                        const dateMatch = note.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*(.*)/s);
+                                        const dateMatch = note.match(/^\[(\d{2}\/\d{2}\/\d{4})\]\s*([\s\S]*)/);
                                         const date = dateMatch ? dateMatch[1] : null;
                                         const content = dateMatch ? dateMatch[2] : note;
 
@@ -375,6 +500,6 @@ export function PersonDetailSheet({
                     </div>
                 </ScrollArea>
             </SheetContent>
-        </Sheet>
+        </Sheet >
     );
 }

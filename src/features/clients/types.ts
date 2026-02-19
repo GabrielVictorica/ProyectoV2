@@ -91,6 +91,7 @@ export type RelationshipRole =
     | 'socio'
     | 'otro';
 export type RelationshipStatus =
+    | 'contacto_telefonico'
     | 'reunion_verde'
     | 'pre_listing'
     | 'pre_buying'
@@ -104,6 +105,7 @@ export type RelationshipStatus =
     | 'cliente activo' // Legacy
     | 'ex-cliente' // Legacy
     | 'socio'; // Legacy
+export type LifecycleStatus = 'active' | 'following_up' | 'lost';
 export type CommunicationChannel = 'WhatsApp' | 'Llamada' | 'Email' | 'LinkedIn';
 
 export interface Person {
@@ -139,6 +141,8 @@ export interface Person {
 
     // Gestión
     relationship_status: RelationshipStatus;
+    lifecycle_status: LifecycleStatus;
+    lost_reason: string | null;
     last_interaction_at: string | null;
     next_action_at: string | null;
     tags: string[];
@@ -191,4 +195,33 @@ export interface PersonInteraction {
     content: string;
 
     created_at: string;
+}
+
+// --- Historial y Auditoría (Línea de Tiempo) ---
+
+export type PersonHistoryEventType =
+    | 'creation'
+    | 'edit'
+    | 'status_change'
+    | 'lifecycle_change'
+    | 'note_added'
+    | 'contact'
+    | 'acm_result';
+
+export interface PersonHistoryEvent {
+    id: string;
+    person_id: string;
+    agent_id: string | null;
+    event_type: PersonHistoryEventType;
+    field_name: string | null;
+    old_value: string | null;
+    new_value: string | null;
+    metadata: Record<string, any>;
+    created_at: string;
+
+    // Virtual field for UI (joined)
+    agent?: {
+        first_name: string;
+        last_name: string;
+    } | null;
 }

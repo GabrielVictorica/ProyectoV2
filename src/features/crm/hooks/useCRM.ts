@@ -8,8 +8,11 @@ import {
     touchPersonAction,
     getCRMAgentsAction,
     getExistingTagsAction,
-    getExistingSourcesAction
+    getExistingSourcesAction,
+    getPersonByIdAction,
+    deletePersonAction
 } from '../actions/personActions';
+import { LifecycleStatus } from '@/features/clients/types';
 import { toast } from 'sonner';
 
 export const crmKeys = {
@@ -18,6 +21,7 @@ export const crmKeys = {
     agents: () => [...crmKeys.all, 'agents'] as const,
     tags: () => [...crmKeys.all, 'tags'] as const,
     sources: () => [...crmKeys.all, 'sources'] as const,
+    person: (id: string) => [...crmKeys.all, 'person', id] as const,
 };
 
 export function useCRM(filters: {
@@ -31,6 +35,7 @@ export function useCRM(filters: {
     contactType?: string[];
     source?: string[];
     referredById?: string[];
+    lifecycleStatus?: LifecycleStatus[];
 } = {}) {
     const queryClient = useQueryClient();
 
@@ -130,6 +135,23 @@ export function useCRM(filters: {
         }
     });
 
+    // Mutation for deleting a person
+    const deletePerson = useMutation({
+        mutationFn: deletePersonAction,
+        onSuccess: (result) => {
+            if (result.success) {
+                toast.success('Relación eliminada');
+                queryClient.invalidateQueries({ queryKey: crmKeys.all });
+            } else {
+                toast.error(result.error);
+            }
+        },
+        onError: (error) => {
+            toast.error('Error al eliminar relación');
+            console.error(error);
+        }
+    });
+
     return {
         persons: personsQuery.data || [],
         agents: agentsQuery.data || [],
@@ -140,6 +162,22 @@ export function useCRM(filters: {
         createPerson,
         updatePerson,
         touchPerson,
+        deletePerson,
         refetch: personsQuery.refetch
     };
+}
+
+export function usePerson(id: string | null) {
+    return useQuery({
+        queryKey: crmKeys.person(id || ''),
+        queryFn: async () => {
+            if (!id) return null;
+            const result = await getPersonByIdAction(id);
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            return result.data;
+        },
+        enabled: !!id,
+    });
 }
