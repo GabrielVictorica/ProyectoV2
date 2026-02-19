@@ -48,18 +48,7 @@ const TAG_GROUPS: MultiSelectOptionGroup[] = [
     }
 ];
 
-const RELATIONSHIP_STATUSES = [
-    { value: 'contacto_telefonico', label: 'Contacto Telefónico', description: 'Primer contacto vía telefónica' },
-    { value: 'reunion_verde', label: 'Reunión Verde', description: 'Primer contacto o reunión inicial' },
-    { value: 'pre_listing', label: 'Pre-Listing', description: 'Proceso de preparación antes de captar' },
-    { value: 'pre_buying', label: 'Pre-Buying', description: 'Análisis preliminar antes de búsqueda' },
-    { value: 'acm', label: 'ACM', description: 'Análisis Comparativo de Mercado' },
-    { value: 'captacion', label: 'Captación', description: 'Propiedad listada y activa' },
-    { value: 'visita', label: 'Visita', description: 'Visitando propiedades activamente' },
-    { value: 'reserva', label: 'Reserva', description: 'Oferta formal realizada o aceptada' },
-    { value: 'cierre', label: 'Cierre', description: 'Proceso de escritura y cierre' },
-    { value: 'referido', label: 'Referido', description: 'Generador de nuevos leads' },
-];
+import { RELATIONSHIP_STATUSES } from '../constants/relationshipStatuses';
 
 const INFLUENCE_CATEGORIES = [
     { value: 4, label: 'A', activeBg: 'bg-violet-500/20', activeBorder: 'border-violet-500/50', activeShadow: 'shadow-violet-500/20', activeText: 'text-violet-400', activeGlow: 'border-violet-500/30', description: 'Te refieren clientes sin que se lo pidas.' },
@@ -67,6 +56,8 @@ const INFLUENCE_CATEGORIES = [
     { value: 2, label: 'C', activeBg: 'bg-slate-500/20', activeBorder: 'border-slate-500/50', activeShadow: 'shadow-slate-500/20', activeText: 'text-slate-400', activeGlow: 'border-slate-500/30', description: 'Te caen bien, pero no refieren.' },
     { value: 1, label: 'D', activeBg: 'bg-rose-500/20', activeBorder: 'border-rose-500/50', activeShadow: 'shadow-rose-500/20', activeText: 'text-rose-400', activeGlow: 'border-rose-500/30', description: 'Te caen mal y no refieren.' },
 ];
+
+import { LIFECYCLE_STATUSES, LOST_REASONS } from '../constants/lifecycleStatuses';
 import {
     Form,
     FormControl,
@@ -118,6 +109,8 @@ const personFormSchema = z.object({
     preferredChannel: z.string().default(''),
     bestContactTime: z.string().default(''),
     relationshipStatus: z.string().min(1, 'Estado requerido'),
+    lifecycleStatus: z.enum(['active', 'following_up', 'lost']).default('active'),
+    lostReason: z.string().optional().or(z.literal('')).nullable(),
     lastInteractionAt: z.string().default(''),
     nextActionAt: z.string().default(''),
     tags: z.string().default(''),
@@ -199,6 +192,8 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
             preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',
             bestContactTime: person?.best_contact_time || initialData?.bestContactTime || '',
             relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'reunion_verde',
+            lifecycleStatus: (person?.lifecycle_status as any) || (initialData as any)?.lifecycleStatus || 'active',
+            lostReason: person?.lost_reason || (initialData as any)?.lostReason || '',
             lastInteractionAt: person?.last_interaction_at ? new Date(person.last_interaction_at).toISOString().split('T')[0] : (initialData?.lastInteractionAt || ''),
             nextActionAt: person?.next_action_at ? new Date(person.next_action_at).toISOString().split('T')[0] : (initialData?.nextActionAt || ''),
             tags: person?.tags?.join(', ') || initialData?.tags || '',
@@ -229,6 +224,8 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                 preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',
                 bestContactTime: person?.best_contact_time || initialData?.bestContactTime || '',
                 relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'reunion_verde',
+                lifecycleStatus: (person?.lifecycle_status as any) || (initialData as any)?.lifecycleStatus || 'active',
+                lostReason: person?.lost_reason || (initialData as any)?.lostReason || '',
                 lastInteractionAt: person?.last_interaction_at ? new Date(person.last_interaction_at).toISOString().split('T')[0] : (initialData?.lastInteractionAt || ''),
                 nextActionAt: person?.next_action_at ? new Date(person.next_action_at).toISOString().split('T')[0] : (initialData?.nextActionAt || ''),
                 tags: person?.tags?.join(', ') || initialData?.tags || '',
@@ -266,6 +263,8 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                 referred_by_id: values.referredById,
                 influence_level: values.influenceLevel,
                 relationship_status: values.relationshipStatus,
+                lifecycle_status: values.lifecycleStatus,
+                lost_reason: values.lostReason || null,
                 last_interaction_at: values.lastInteractionAt,
                 next_action_at: values.nextActionAt,
             };
@@ -653,6 +652,74 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                                             </Select>
                                                         </FormItem>
                                                     )} />
+
+                                                    {form.watch('relationshipStatus') === 'acm' && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="space-y-4"
+                                                        >
+                                                            <FormField control={form.control} name="lifecycleStatus" render={({ field }) => (
+                                                                <FormItem>
+                                                                    <FormLabel className={labelClass}>Estado del Lead <span className="text-rose-400">*</span></FormLabel>
+                                                                    <div className="grid grid-cols-3 gap-2 mt-1">
+                                                                        {LIFECYCLE_STATUSES.map((status) => {
+                                                                            const isSelected = field.value === status.value;
+                                                                            return (
+                                                                                <button
+                                                                                    key={status.value}
+                                                                                    type="button"
+                                                                                    onClick={() => field.onChange(status.value)}
+                                                                                    className={cn(
+                                                                                        "h-12 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all",
+                                                                                        isSelected
+                                                                                            ? `${status.bgColor} ${status.borderColor} ${status.color} shadow-lg shadow-black/20`
+                                                                                            : "bg-white/[0.02] border-white/[0.08] text-white/40 hover:border-white/20"
+                                                                                    )}
+                                                                                >
+                                                                                    <status.icon className={cn("w-3.5 h-3.5", isSelected ? status.color : "text-white/20")} />
+                                                                                    <span className="text-[10px] font-bold uppercase">{status.label}</span>
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )} />
+
+                                                            <AnimatePresence>
+                                                                {form.watch('lifecycleStatus') === 'lost' && (
+                                                                    <motion.div
+                                                                        initial={{ opacity: 0, height: 0 }}
+                                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                                        exit={{ opacity: 0, height: 0 }}
+                                                                        className="overflow-hidden"
+                                                                    >
+                                                                        <FormField control={form.control} name="lostReason" render={({ field }) => (
+                                                                            <FormItem className="pt-2">
+                                                                                <FormLabel className={labelClass}>Motivo de Pérdida</FormLabel>
+                                                                                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                                                                                    <FormControl>
+                                                                                        <SelectTrigger className={inputClass}>
+                                                                                            <SelectValue placeholder="Seleccionar motivo..." />
+                                                                                        </SelectTrigger>
+                                                                                    </FormControl>
+                                                                                    <SelectContent className="bg-[#1a1a1e] border-white/[0.08] text-white">
+                                                                                        {LOST_REASONS.map(reason => (
+                                                                                            <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                                                                                        ))}
+                                                                                    </SelectContent>
+                                                                                </Select>
+                                                                                <FormMessage />
+                                                                            </FormItem>
+                                                                        )} />
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+                                                        </motion.div>
+                                                    )}
+
                                                     <FormField control={form.control} name="tags" render={({ field }) => (
                                                         <FormItem>
                                                             <FormLabel className={labelClass}>Etiquetas / Tags</FormLabel>

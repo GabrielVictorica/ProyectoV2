@@ -3,6 +3,8 @@ import { Search, X, SlidersHorizontal, Filter, Building2, Users } from 'lucide-r
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdvancedFilterSheet } from "./filters/AdvancedFilterSheet";
+import { getStatusLabel } from "../constants/relationshipStatuses";
+import { getLifecycleLabel } from "../constants/lifecycleStatuses";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +19,7 @@ interface RelationshipFiltersProps {
         contactType: string[];
         source: string[];
         referredById: string[];
+        lifecycleStatus: string[];
         organizationId: string;
     };
     setFilters: (filters: any) => void;
@@ -57,6 +60,7 @@ export function RelationshipFilters({
         filters.influenceLevel.length > 0 ||
         filters.contactType.length > 0 ||
         filters.source.length > 0 ||
+        filters.lifecycleStatus.length > 0 ||
         filters.organizationId !== 'all';
 
     const activeFilterCount =
@@ -67,6 +71,7 @@ export function RelationshipFilters({
         filters.influenceLevel.length +
         filters.contactType.length +
         filters.source.length +
+        filters.lifecycleStatus.length +
         (filters.organizationId !== 'all' ? 1 : 0);
 
     const clearFilter = (key: string, value: any) => {
@@ -173,8 +178,14 @@ export function RelationshipFilters({
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {filters.relationshipStatus.map(status => (
                         <Badge key={status} variant="secondary" className="bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap gap-1 pr-1">
-                            {status}
+                            {getStatusLabel(status)}
                             <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('relationshipStatus', status)} />
+                        </Badge>
+                    ))}
+                    {filters.lifecycleStatus.map(status => (
+                        <Badge key={status} variant="secondary" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap gap-1 pr-1">
+                            Lead: {getLifecycleLabel(status)}
+                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('lifecycleStatus', status)} />
                         </Badge>
                     ))}
                     {filters.tags.map(tag => (

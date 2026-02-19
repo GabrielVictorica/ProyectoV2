@@ -33,8 +33,19 @@ import {
     CheckCircle2,
     PenTool,
     Star,
-    ArrowUpRight
+    ArrowUpRight,
+    Trash2
 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Person } from '@/features/clients/types';
 import { format, differenceInDays } from 'date-fns';
@@ -51,7 +62,16 @@ interface PersonsDataTableProps {
 }
 
 export function PersonsDataTable({ persons, isLoading, onEdit, onAddNote, onView }: PersonsDataTableProps) {
-    const { touchPerson } = useCRM();
+    const { touchPerson, deletePerson } = useCRM();
+    const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+    const handleDelete = async () => {
+        if (!personToDelete) return;
+        await deletePerson.mutateAsync(personToDelete.id);
+        setPersonToDelete(null);
+        setIsDeleteDialogOpen(false);
+    };
 
     if (isLoading) {
         return (
@@ -293,6 +313,16 @@ export function PersonsDataTable({ persons, isLoading, onEdit, onAddNote, onView
                                                 <StickyNote className="w-4 h-4 mr-2 text-amber-400" />
                                                 Agregar Nota
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    setPersonToDelete(person);
+                                                    setIsDeleteDialogOpen(true);
+                                                }}
+                                                className="hover:bg-rose-500/10 text-rose-400 cursor-pointer"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Eliminar Relación
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
@@ -301,6 +331,26 @@ export function PersonsDataTable({ persons, isLoading, onEdit, onAddNote, onView
                     ))}
                 </TableBody>
             </Table>
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent className="bg-[#1a1a1e] border-white/[0.08] text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás completamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/40">
+                            Esta acción eliminará permanentemente a <strong>{personToDelete?.first_name} {personToDelete?.last_name}</strong> de tu base de relaciones y todo su historial.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDelete}
+                            className="bg-rose-600 hover:bg-rose-500 text-white border-none"
+                        >
+                            {deletePerson.isPending ? "Eliminando..." : "Eliminar Relación"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

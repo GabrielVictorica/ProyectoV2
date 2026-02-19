@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ActionResult } from '@/features/admin/actions/adminActions';
-import type { Person, RelationshipRole, RelationshipStatus, CommunicationChannel } from '@/features/clients/types';
+import type { Person, RelationshipRole, RelationshipStatus, CommunicationChannel, LifecycleStatus, PersonHistoryEventType, PersonHistoryEvent } from '@/features/clients/types';
 import { toTitleCase } from '@/features/clients/utils/clientUtils';
 
 import { personSchema } from '../schemas/personSchema';
@@ -16,6 +16,40 @@ const normalizeTags = (tags: string[]): string[] => {
             .filter(Boolean)
     ));
 };
+
+/**
+ * Helper privado para registrar eventos en el historial de la persona.
+ */
+async function recordPersonEvent(params: {
+    personId: string;
+    eventType: PersonHistoryEventType;
+    agentId?: string | null;
+    fieldName?: string;
+    oldValue?: string | null;
+    newValue?: string | null;
+    metadata?: Record<string, any>;
+}): Promise<void> {
+    try {
+        const supabase = await createClient();
+        const { error } = await (supabase as any)
+            .from('person_history')
+            .insert({
+                person_id: params.personId,
+                event_type: params.eventType,
+                agent_id: params.agentId,
+                field_name: params.fieldName,
+                old_value: params.oldValue,
+                new_value: params.newValue,
+                metadata: params.metadata || {}
+            });
+
+        if (error) {
+            console.error('Error recording person event:', error);
+        }
+    } catch (err) {
+        console.error('Failed to record person event:', err);
+    }
+}
 
 /**
  * Busca personas por coincidencia parcial en nombre, teléfono o email.
@@ -97,6 +131,8 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
                 preferred_channel: validatedData.preferredChannel || null,
                 best_contact_time: validatedData.bestContactTime || null,
                 relationship_status: validatedData.relationshipStatus,
+                lifecycle_status: validatedData.lifecycleStatus,
+                lost_reason: validatedData.lostReason || null,
                 next_action_at: validatedData.nextActionAt || null,
                 tags: normalizeTags(validatedData.tags),
                 observations: validatedData.observations || null,
@@ -105,6 +141,17 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
             .single();
 
         if (error) throw error;
+
+        // Registrar evento de creación
+        await recordPersonEvent({
+            personId: (data as any).id,
+            eventType: 'creation',
+            agentId: user.id,
+            metadata: {
+                initial_status: validatedData.relationshipStatus,
+                initial_lifecycle: validatedData.lifecycleStatus
+            }
+        });
 
         revalidatePath('/dashboard/crm');
         return { success: true, data: data as Person };
@@ -150,6 +197,8 @@ export async function updatePersonAction(id: string, formData: Partial<z.infer<t
         if (formData.bestContactTime !== undefined) dbData.best_contact_time = formData.bestContactTime || null;
 
         if (formData.relationshipStatus) dbData.relationship_status = formData.relationshipStatus;
+        if (formData.lifecycleStatus) dbData.lifecycle_status = formData.lifecycleStatus;
+        if (formData.lostReason !== undefined) dbData.lost_reason = formData.lostReason || null;
         if (formData.nextActionAt !== undefined) dbData.next_action_at = formData.nextActionAt || null;
         if (formData.lastInteractionAt !== undefined) dbData.last_interaction_at = formData.lastInteractionAt || null;
         if (formData.tags) dbData.tags = normalizeTags(formData.tags);
@@ -164,6 +213,40 @@ export async function updatePersonAction(id: string, formData: Partial<z.infer<t
             .single();
 
         if (error) throw error;
+
+        // Registrar cambios significativos
+        if (formData.relationshipStatus) {
+            await recordPersonEvent({
+                personId: id,
+                eventType: 'status_change',
+                agentId: user.id,
+                fieldName: 'relationship_status',
+                newValue: formData.relationshipStatus,
+            });
+        }
+
+        if (formData.lifecycleStatus) {
+            await recordPersonEvent({
+                personId: id,
+                eventType: 'lifecycle_change',
+                agentId: user.id,
+                fieldName: 'lifecycle_status',
+                newValue: formData.lifecycleStatus,
+                metadata: { lost_reason: formData.lostReason }
+            });
+        }
+
+        // Registrar evento de edición general si hubo cambios y no son solo estados
+        const genericFields = ['firstName', 'lastName', 'email', 'phone', 'dniCuil', 'birthday', 'occupationCompany', 'familyComposition', 'tags', 'observations'];
+        const hasGenericChanges = genericFields.some(field => (formData as any)[field] !== undefined);
+
+        if (hasGenericChanges && !formData.relationshipStatus && !formData.lifecycleStatus) {
+            await recordPersonEvent({
+                personId: id,
+                eventType: 'edit',
+                agentId: user.id
+            });
+        }
 
         revalidatePath('/dashboard/crm');
         return { success: true, data: data as Person };
@@ -188,6 +271,14 @@ export async function touchPersonAction(id: string): Promise<ActionResult<void>>
             .eq('id', id);
 
         if (error) throw error;
+
+        // Registrar evento de contacto
+        await recordPersonEvent({
+            personId: id,
+            eventType: 'contact',
+            agentId: user.id,
+            metadata: { type: 'quick_touch' }
+        });
 
         revalidatePath('/dashboard/crm');
         return { success: true, data: undefined };
@@ -214,6 +305,7 @@ export async function getPersonsAction(filters: {
     contactType?: string[];
     source?: string[];
     referredById?: string[];
+    lifecycleStatus?: LifecycleStatus[];
 } = {}): Promise<ActionResult<Person[]>> {
     try {
         const supabase = await createClient();
@@ -239,9 +331,18 @@ export async function getPersonsAction(filters: {
 
         // --- Filtros Básicos ---
 
-        // Estado (Array de strings)
+        // Estado Proceso (Array de strings)
         if (filters.relationshipStatus && filters.relationshipStatus.length > 0) {
             query = query.in('relationship_status', filters.relationshipStatus);
+        }
+
+        // Estado Lead / Lifecycle (Array de strings)
+        // Por defecto: 'active' y 'following_up' si no se especifica nada
+        if (filters.lifecycleStatus && filters.lifecycleStatus.length > 0) {
+            query = query.in('lifecycle_status', filters.lifecycleStatus);
+        } else {
+            // Si no hay filtro explícito, ocultamos los 'lost' por defecto
+            query = query.in('lifecycle_status', ['active', 'following_up']);
         }
 
         // Search
@@ -470,5 +571,112 @@ export async function getPersonByIdAction(id: string): Promise<ActionResult<Pers
     } catch (err) {
         console.error('Error in getPersonByIdAction:', err);
         return { success: false, error: 'Error al obtener la persona' };
+    }
+}
+
+/**
+ * Actualiza el estado de disposición (lifecycle) de una persona de forma rápida.
+ */
+export async function updatePersonLifecycleStatusAction(
+    id: string,
+    status: LifecycleStatus,
+    lostReason?: string | null
+): Promise<ActionResult<void>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const dbData: any = {
+            lifecycle_status: status,
+            updated_at: new Date().toISOString()
+        };
+
+        if (status === 'lost') {
+            dbData.lost_reason = lostReason || null;
+        } else {
+            dbData.lost_reason = null;
+        }
+
+        const { error } = await (supabase as any)
+            .from('persons')
+            .update(dbData)
+            .eq('id', id);
+
+        if (error) throw error;
+
+        // Registro de historial específico para cambio de disposición
+        await recordPersonEvent({
+            personId: id,
+            eventType: 'lifecycle_change',
+            agentId: user.id,
+            fieldName: 'lifecycle_status',
+            newValue: status,
+            metadata: { lost_reason: lostReason }
+        });
+
+        revalidatePath('/dashboard/crm');
+        return { success: true, data: undefined };
+    } catch (err) {
+        console.error('Error in updatePersonLifecycleStatusAction:', err);
+        return { success: false, error: 'Error al actualizar el estado del lead' };
+    }
+}
+/**
+ * Obtiene el historial (línea de tiempo) de una persona.
+ */
+export async function getPersonHistoryAction(personId: string): Promise<ActionResult<PersonHistoryEvent[]>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const { data, error } = await (supabase as any)
+            .from('person_history')
+            .select(`
+                *,
+                agent:profiles!person_history_agent_id_fkey (
+                    first_name,
+                    last_name
+                )
+            `)
+            .eq('person_id', personId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return { success: true, data: data as PersonHistoryEvent[] };
+    } catch (err) {
+        console.error('Error in getPersonHistoryAction:', err);
+        return { success: false, error: 'Error al obtener el historial' };
+    }
+}
+
+/**
+ * Elimina una persona de la base de relaciones.
+ */
+export async function deletePersonAction(id: string): Promise<ActionResult<void>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        // El borrado en cascada debería encargarse del historial si está configurado en DB,
+        // de lo contrario habría que borrarlo manualmente aquí.
+        // Dado que es un CRM, a veces preferimos un "soft delete", pero por el pedido del usuario
+        // procederemos con un borrado físico.
+
+        const { error } = await supabase
+            .from('persons')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        revalidatePath('/dashboard/crm');
+        return { success: true, data: undefined };
+    } catch (err) {
+        console.error('Error in deletePersonAction:', err);
+        return { success: false, error: 'Error al eliminar la relación' };
     }
 }

@@ -23,6 +23,8 @@ export const personSchema = z.object({
     bestContactTime: z.string().optional().nullable(),
 
     relationshipStatus: z.string().default('reunion_verde'),
+    lifecycleStatus: z.enum(['active', 'following_up', 'lost']).default('active'),
+    lostReason: z.string().optional().nullable(),
     nextActionAt: z.string().optional().nullable(),
     lastInteractionAt: z.string().optional().nullable(),
     tags: z.union([

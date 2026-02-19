@@ -22,6 +22,9 @@ import {
 import { useClients } from '@/features/clients/hooks/useClients';
 import { useWeeklyActivities, WeeklyActivity } from '../hooks/useWeeklyActivities';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { updatePersonStatusAction } from '../actions/activityActions';
+import { toast } from 'sonner';
+import { getStatusLabel } from '@/features/crm/constants/relationshipStatuses';
 import { Trash2, Plus, ArrowLeft, Edit2, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -131,6 +134,24 @@ export function ActivityDialog({
             await updateActivity.mutateAsync({ id: editingActivity.id, data });
         } else {
             await createActivity.mutateAsync(data as any);
+        }
+
+        // Preguntar si desea actualizar el estado en el CRM
+        if (personId) {
+            const statusLabel = getStatusLabel(type);
+            toast(`¿Actualizar estado a "${statusLabel}"?`, {
+                action: {
+                    label: "Sí",
+                    onClick: () => {
+                        updatePersonStatusAction(personId, type, date)
+                            .then(res => {
+                                if (res.success) toast.success(`CRM: Estado de relación actualizado`);
+                                else toast.error("Error al actualizar estado en CRM");
+                            });
+                    }
+                },
+                duration: 6000,
+            });
         }
 
         if (freshActivities.length + (editingActivity ? 0 : 1) > 0) {

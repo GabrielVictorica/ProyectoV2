@@ -28,6 +28,7 @@ export default function RelationshipsPage() {
         contactType: [] as string[],
         source: [] as string[],
         referredById: [] as string[],
+        lifecycleStatus: [] as string[],
         organizationId: 'all'
     });
 
@@ -41,6 +42,7 @@ export default function RelationshipsPage() {
         contactType: filters.contactType,
         source: filters.source,
         referredById: filters.referredById,
+        lifecycleStatus: filters.lifecycleStatus as any,
         organizationId: filters.organizationId
     });
 
@@ -61,12 +63,15 @@ export default function RelationshipsPage() {
     };
 
     const [isDetailOpen, setIsDetailOpen] = useState(false);
-    const [personToView, setPersonToView] = useState<Person | null>(null);
+    const [personToViewId, setPersonToViewId] = useState<string | null>(null);
 
     const handleView = (person: Person) => {
-        setPersonToView(person);
+        setPersonToViewId(person.id);
         setIsDetailOpen(true);
     };
+
+    // Find the person in the current list if possible, as a fallback
+    const personToView = persons.find(p => p.id === personToViewId) || null;
 
     const handleCreate = () => {
         setSelectedPerson(null);
