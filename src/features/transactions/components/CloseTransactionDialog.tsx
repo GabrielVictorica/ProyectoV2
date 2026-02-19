@@ -109,6 +109,23 @@ const formSchema = z.object({
 }, {
     message: "Debes vincular al vendedor desde el CRM",
     path: ["seller_person_id"]
+}).refine((data) => {
+    // Validar nombre externo obligatorio si no es nuestro lado
+    if (data.sides === 1 && data.my_side === 'seller') {
+        if (!data.buyer_name || data.buyer_name.trim() === '') return false;
+    }
+    return true;
+}, {
+    message: "Debes ingresar el agente o inmobiliaria representante del comprador",
+    path: ["buyer_name"]
+}).refine((data) => {
+    if (data.sides === 1 && data.my_side === 'buyer') {
+        if (!data.seller_name || data.seller_name.trim() === '') return false;
+    }
+    return true;
+}, {
+    message: "Debes ingresar el agente o inmobiliaria representante del vendedor",
+    path: ["seller_name"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -292,6 +309,13 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     }, [watchPrice, watchCommissionPercent, watchSplitPercent, watchSides, profile, watchOrgId, organizations]);
 
     const onSubmit = async (data: FormData) => {
+        // Bloqueo preventivo: si representamos al comprador y no tiene búsqueda, no dejamos avanzar
+        const isBuyerRepresented = watchSides === 2 || watchMySide === 'buyer';
+        if (isBuyerRepresented && buyerHasSearch === false) {
+            toast.error('No se puede cerrar la operación: El comprador debe tener una búsqueda activa.');
+            return;
+        }
+
         try {
             const input = {
                 property_id: data.property_id === 'manual' ? null : data.property_id,
@@ -743,7 +767,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                             <div className="space-y-2">
                                                 <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                                                     <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
-                                                    Comprador {isBuyerRequired ? '(CRM) *' : '(Externo)'}
+                                                    Comprador {isBuyerRequired ? '(CRM) *' : '(Externo) *'}
                                                 </p>
 
                                                 {isBuyerMySide ? (
@@ -814,7 +838,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                                                 <FormControl>
                                                                     <Input
                                                                         {...field}
-                                                                        placeholder="Nombre del colega / inmobiliaria"
+                                                                        placeholder="Agente / Inmobiliaria representante *"
                                                                         className="bg-slate-700/50 border-slate-600 text-white"
                                                                     />
                                                                 </FormControl>
@@ -838,7 +862,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                             <div className="space-y-2">
                                                 <p className="text-slate-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                                                     <Home className="w-3.5 h-3.5 text-emerald-400" />
-                                                    Vendedor {isSellerRequired ? '(CRM) *' : '(Externo)'}
+                                                    Vendedor {isSellerRequired ? '(CRM) *' : '(Externo) *'}
                                                 </p>
 
                                                 {isSellerMySide ? (
@@ -895,7 +919,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                                                 <FormControl>
                                                                     <Input
                                                                         {...field}
-                                                                        placeholder="Nombre del colega / inmobiliaria"
+                                                                        placeholder="Agente / Inmobiliaria representante *"
                                                                         className="bg-slate-700/50 border-slate-600 text-white"
                                                                     />
                                                                 </FormControl>
