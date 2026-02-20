@@ -70,6 +70,7 @@ interface ClientFormProps {
     onSuccess?: () => void;
     onCreated?: (personId: string) => void;
     client?: Client;
+    mode?: 'create' | 'edit';
 }
 
 const STEPS = [
@@ -81,11 +82,16 @@ const STEPS = [
     { id: 'extra', title: 'Detalles', icon: MapPin },
 ];
 
-export function ClientForm({ onSuccess, onCreated, client }: ClientFormProps) {
+export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
     const createClient = useCreateClient();
     const updateClient = useUpdateClient();
-    const isEditing = !!client;
+
+    const isEditing = useMemo(() => {
+        if (mode === 'create') return false;
+        if (mode === 'edit') return true;
+        return !!client?.id;
+    }, [client?.id, mode]);
 
     // Auth y roles
     const { data: auth } = useAuth();
@@ -180,7 +186,7 @@ export function ClientForm({ onSuccess, onCreated, client }: ClientFormProps) {
             };
 
             const result = isEditing
-                ? await updateClient.mutateAsync({ ...payload, id: client.id } as any)
+                ? await updateClient.mutateAsync({ ...payload, id: client?.id } as any)
                 : await createClient.mutateAsync(payload as any);
 
             toast.dismiss(loadingToast);
