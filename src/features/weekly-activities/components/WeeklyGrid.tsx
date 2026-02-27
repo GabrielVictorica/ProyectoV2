@@ -50,9 +50,11 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
     });
 
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const handleCellClick = (dateStr: string, row: typeof ROWS[0], activities: any[], initialEditId: string | null = null) => {
         if (row.isVirtual) return;
+        if (dateStr > todayStr) return; // Block future dates
         setDialogConfig({
             open: true,
             date: dateStr,
@@ -80,18 +82,22 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                             <th className="p-6 text-left w-64 border-r border-white/[0.04]">
                                 <span className="text-xs font-bold uppercase tracking-widest text-white/30">Actividad</span>
                             </th>
-                            {days.map((day, i) => (
-                                <th key={i} className="p-6 text-center border-r last:border-r-0 border-white/[0.04]">
-                                    <div className="flex flex-col items-center gap-1">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-white/30">
-                                            {format(day, 'EEE', { locale: es })}
-                                        </span>
-                                        <span className="text-lg font-bold text-white">
-                                            {format(day, 'd')}
-                                        </span>
-                                    </div>
-                                </th>
-                            ))}
+                            {days.map((day, i) => {
+                                const dayStr = day.toISOString().split('T')[0];
+                                const isFuture = dayStr > todayStr;
+                                return (
+                                    <th key={i} className={`p-6 text-center border-r last:border-r-0 border-white/[0.04] ${isFuture ? 'opacity-30' : ''}`}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="text-xs font-bold uppercase tracking-widest text-white/30">
+                                                {format(day, 'EEE', { locale: es })}
+                                            </span>
+                                            <span className="text-lg font-bold text-white">
+                                                {format(day, 'd')}
+                                            </span>
+                                        </div>
+                                    </th>
+                                );
+                            })}
                         </tr>
                     </thead>
                     <tbody>
@@ -107,6 +113,7 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                 </td>
                                 {days.map((day, dIdx) => {
                                     const dateStr = day.toISOString().split('T')[0];
+                                    const isFuture = dateStr > todayStr;
                                     const cellData = data[dateStr];
                                     const activities = cellData?.activities.filter(a => a.type === row.id) || [];
                                     const count = row.isVirtual
@@ -114,7 +121,7 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                         : activities.length;
 
                                     return (
-                                        <td key={dIdx} className="p-4 text-center border-r last:border-r-0 border-white/[0.04] relative">
+                                        <td key={dIdx} className={`p-4 text-center border-r last:border-r-0 border-white/[0.04] relative ${isFuture ? 'opacity-20 pointer-events-none' : ''}`}>
                                             <div className="flex items-center justify-center min-h-[48px]">
                                                 {count > 0 ? (
                                                     <Tooltip>

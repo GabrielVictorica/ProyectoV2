@@ -24,6 +24,13 @@ export type WeeklyActivity = {
     property_id: string | null;
     agent_id: string;
     organization_id: string;
+    visit_metadata?: {
+        punta: 'compradora' | 'vendedora' | 'ambas';
+        buyer_person_id?: string | null;
+        seller_person_id?: string | null;
+        property_address?: string | null;
+        buyer_feedback?: string | null;
+    } | null;
     person?: {
         id: string;
         first_name: string;
