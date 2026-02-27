@@ -25,11 +25,13 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { updatePersonStatusAction } from '../actions/activityActions';
 import { toast } from 'sonner';
 import { getStatusLabel } from '@/features/crm/constants/relationshipStatuses';
-import { Trash2, Plus, ArrowLeft, Edit2, User } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Edit2, User, MapPin, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
 import { Person } from '@/features/clients/types';
+
+type PuntaType = 'compradora' | 'vendedora' | 'ambas';
 
 interface ActivityDialogProps {
     open: boolean;
@@ -55,7 +57,6 @@ export function ActivityDialog({
     const { data: auth } = useAuth();
     const { data: clientsData, isLoading: isLoadingClients } = useClients();
     const clients = clientsData?.clients || [];
-    console.log('ActivityDialog clients:', clients.length, 'Loading:', isLoadingClients); // Debug log
     const dateObj = new Date(date + 'T12:00:00');
     const isValidDate = !isNaN(dateObj.getTime());
     const { createActivity, updateActivity, deleteActivity, weeklyData } = useWeeklyActivities(
@@ -73,6 +74,14 @@ export function ActivityDialog({
     // Form state
     const [personId, setPersonId] = useState<string | null>(null);
     const [notes, setNotes] = useState('');
+
+    // Visit-specific state
+    const isVisita = type === 'visita';
+    const [punta, setPunta] = useState<PuntaType>('compradora');
+    const [buyerPersonId, setBuyerPersonId] = useState<string | null>(null);
+    const [sellerPersonId, setSellerPersonId] = useState<string | null>(null);
+    const [propertyAddress, setPropertyAddress] = useState('');
+    const [buyerFeedback, setBuyerFeedback] = useState('');
 
     // Reset view when opening
     useEffect(() => {
@@ -98,6 +107,11 @@ export function ActivityDialog({
     const resetForm = () => {
         setPersonId(null);
         setNotes('');
+        setPunta('compradora');
+        setBuyerPersonId(null);
+        setSellerPersonId(null);
+        setPropertyAddress('');
+        setBuyerFeedback('');
     };
 
     const handleEdit = (act: WeeklyActivity) => {
@@ -106,6 +120,21 @@ export function ActivityDialog({
 
         const rawNotes = act.notes || '';
         setNotes(rawNotes);
+
+        // Restore visit metadata if editing a visit
+        if (act.visit_metadata) {
+            setPunta(act.visit_metadata.punta || 'compradora');
+            setBuyerPersonId(act.visit_metadata.buyer_person_id || null);
+            setSellerPersonId(act.visit_metadata.seller_person_id || null);
+            setPropertyAddress(act.visit_metadata.property_address || '');
+            setBuyerFeedback(act.visit_metadata.buyer_feedback || '');
+        } else {
+            setPunta('compradora');
+            setBuyerPersonId(null);
+            setSellerPersonId(null);
+            setPropertyAddress('');
+            setBuyerFeedback('');
+        }
 
         setView('form');
     };
@@ -116,8 +145,28 @@ export function ActivityDialog({
         setView('form');
     };
 
+    // Determine the primary person_id for the activity based on punta
+    const getMainPersonId = () => {
+        if (!isVisita) return personId;
+        switch (punta) {
+            case 'compradora': return buyerPersonId;
+            case 'vendedora': return sellerPersonId;
+            case 'ambas': return buyerPersonId || sellerPersonId;
+        }
+    };
+
     const handleSave = async () => {
         if (!auth?.profile?.organization_id || !auth?.profile?.id) return;
+
+        const mainPersonId = getMainPersonId();
+
+        const visitMetadata = isVisita ? {
+            punta,
+            buyer_person_id: (punta === 'compradora' || punta === 'ambas') ? buyerPersonId : null,
+            seller_person_id: (punta === 'vendedora' || punta === 'ambas') ? sellerPersonId : null,
+            property_address: propertyAddress || null,
+            buyer_feedback: (punta === 'compradora' || punta === 'ambas') ? (buyerFeedback || null) : null,
+        } : null;
 
         const data = {
             organization_id: auth.profile.organization_id,
@@ -125,9 +174,10 @@ export function ActivityDialog({
             type,
             date,
             notes: notes || null,
-            person_id: personId,
-            client_id: personId ? null : (editingActivity?.client_id || null), // Clear legacy client if we scale to person
-            status: 'completed'
+            person_id: mainPersonId,
+            client_id: mainPersonId ? null : (editingActivity?.client_id || null),
+            status: 'completed',
+            visit_metadata: visitMetadata,
         };
 
         if (editingActivity) {
@@ -137,7 +187,29 @@ export function ActivityDialog({
         }
 
         // Preguntar si desea actualizar el estado en el CRM
-        if (personId) {
+        // Para visitas, preguntar por cada persona vinculada
+        if (isVisita) {
+            const personsToUpdate: string[] = [];
+            if (buyerPersonId && (punta === 'compradora' || punta === 'ambas')) personsToUpdate.push(buyerPersonId);
+            if (sellerPersonId && (punta === 'vendedora' || punta === 'ambas')) personsToUpdate.push(sellerPersonId);
+
+            personsToUpdate.forEach(pid => {
+                const statusLabel = getStatusLabel(type);
+                toast(`¿Actualizar estado a "${statusLabel}"?`, {
+                    action: {
+                        label: "Sí",
+                        onClick: () => {
+                            updatePersonStatusAction(pid, type, date)
+                                .then(res => {
+                                    if (res.success) toast.success(`CRM: Estado de relación actualizado`);
+                                    else toast.error("Error al actualizar estado en CRM");
+                                });
+                        }
+                    },
+                    duration: 6000,
+                });
+            });
+        } else if (personId) {
             const statusLabel = getStatusLabel(type);
             toast(`¿Actualizar estado a "${statusLabel}"?`, {
                 action: {
@@ -168,6 +240,87 @@ export function ActivityDialog({
         }
     };
 
+    // ── Render Visit-Specific Form Fields ──
+    const renderVisitFields = () => (
+        <>
+            {/* Selector de Punta */}
+            <div className="space-y-2">
+                <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold">Tipo de Punta</Label>
+                <Select value={punta} onValueChange={(v) => setPunta(v as PuntaType)}>
+                    <SelectTrigger className="bg-white/[0.02] border-white/[0.08] rounded-xl text-white">
+                        <SelectValue placeholder="Seleccionar punta..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1a1a1e] border-white/10 rounded-xl">
+                        <SelectItem value="compradora" className="text-white/80 focus:bg-white/[0.06] focus:text-white rounded-lg">
+                            🛒 Punta Compradora
+                        </SelectItem>
+                        <SelectItem value="vendedora" className="text-white/80 focus:bg-white/[0.06] focus:text-white rounded-lg">
+                            🏠 Punta Vendedora
+                        </SelectItem>
+                        <SelectItem value="ambas" className="text-white/80 focus:bg-white/[0.06] focus:text-white rounded-lg">
+                            🤝 Ambas Puntas
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Person Selectors based on punta */}
+            {(punta === 'compradora' || punta === 'ambas') && (
+                <div className="space-y-2">
+                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                        <User className="w-3 h-3" /> Cliente Comprador
+                    </Label>
+                    <PersonSelector
+                        value={buyerPersonId}
+                        onChange={(id) => setBuyerPersonId(id)}
+                        placeholder="Buscar comprador..."
+                    />
+                </div>
+            )}
+
+            {(punta === 'vendedora' || punta === 'ambas') && (
+                <div className="space-y-2">
+                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                        <User className="w-3 h-3" /> Cliente Vendedor
+                    </Label>
+                    <PersonSelector
+                        value={sellerPersonId}
+                        onChange={(id) => setSellerPersonId(id)}
+                        placeholder="Buscar vendedor..."
+                    />
+                </div>
+            )}
+
+            {/* Propiedad - texto libre */}
+            <div className="space-y-2">
+                <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                    <MapPin className="w-3 h-3" /> Propiedad
+                </Label>
+                <Input
+                    placeholder="Ej. Av. Santa Fe 1200, 4to B"
+                    value={propertyAddress}
+                    onChange={(e) => setPropertyAddress(e.target.value)}
+                    className="bg-white/[0.02] border-white/[0.08] rounded-xl text-white placeholder:text-white/30"
+                />
+            </div>
+
+            {/* Feedback del comprador - solo si punta compradora o ambas */}
+            {(punta === 'compradora' || punta === 'ambas') && (
+                <div className="space-y-2">
+                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                        <MessageCircle className="w-3 h-3" /> Devolución del Comprador
+                    </Label>
+                    <Textarea
+                        placeholder="¿Qué le pareció la propiedad al comprador?"
+                        value={buyerFeedback}
+                        onChange={(e) => setBuyerFeedback(e.target.value)}
+                        className="bg-white/[0.02] border-white/[0.08] rounded-xl min-h-[80px] text-white placeholder:text-white/30"
+                    />
+                </div>
+            )}
+        </>
+    );
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-[#09090b] border-white/10 shadow-[0_0_50px_-12px_rgba(139,92,246,0.25)] text-white sm:max-w-md z-[9999]">
@@ -193,25 +346,28 @@ export function ActivityDialog({
                                 const personData = Array.isArray(act.person) ? act.person[0] : act.person;
                                 const client = clients?.find(c => c.id === act.client_id);
 
-                                const notes = act.notes || '';
-                                const hasSeparator = notes.includes(' || ');
+                                const actNotes = act.notes || '';
+                                const hasSeparator = actNotes.includes(' || ');
 
                                 let contactName = '';
                                 let activityNotes = '';
 
                                 if (personData) {
                                     contactName = `${personData.first_name} ${personData.last_name}`;
-                                    activityNotes = notes;
+                                    activityNotes = actNotes;
                                 } else if (client) {
                                     contactName = `${(client as any).first_name} ${(client as any).last_name}`;
-                                    activityNotes = notes;
+                                    activityNotes = actNotes;
                                 } else if (hasSeparator) {
-                                    const parts = notes.split(' || ');
+                                    const parts = actNotes.split(' || ');
                                     contactName = parts[0]?.trim() || '';
                                     activityNotes = parts.slice(1).join(' || ').trim();
                                 } else {
-                                    activityNotes = notes;
+                                    activityNotes = actNotes;
                                 }
+
+                                // Visit metadata display
+                                const vm = act.visit_metadata;
 
                                 return (
                                     <div key={act.id} className="p-4 glass bg-white/[0.02] border border-white/[0.04] rounded-xl flex items-start justify-between group gap-4">
@@ -225,6 +381,19 @@ export function ActivityDialog({
                                                         <p className="font-bold text-white text-sm">
                                                             {contactName}
                                                         </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {/* Visit metadata badges */}
+                                            {vm && (
+                                                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                                        {vm.punta === 'compradora' ? '🛒 Compradora' : vm.punta === 'vendedora' ? '🏠 Vendedora' : '🤝 Ambas'}
+                                                    </span>
+                                                    {vm.property_address && (
+                                                        <span className="text-[10px] text-white/50 flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3" /> {vm.property_address}
+                                                        </span>
                                                     )}
                                                 </div>
                                             )}
@@ -263,19 +432,24 @@ export function ActivityDialog({
                     </div>
                 ) : (
                     <div className="space-y-4 py-4">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold">Cliente</Label>
-                                <PersonSelector
-                                    value={personId}
-                                    onChange={(id) => setPersonId(id)}
-                                    placeholder="Buscar o crear cliente..."
-                                />
+                        {isVisita ? (
+                            /* ── Visit-specific form ── */
+                            <div className="space-y-4">
+                                {renderVisitFields()}
                             </div>
-                        </div>
-
-
-
+                        ) : (
+                            /* ── Standard form (other activity types) ── */
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold">Cliente</Label>
+                                    <PersonSelector
+                                        value={personId}
+                                        onChange={(id) => setPersonId(id)}
+                                        placeholder="Buscar o crear cliente..."
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label>Notas</Label>
@@ -304,3 +478,4 @@ export function ActivityDialog({
         </Dialog>
     );
 }
+

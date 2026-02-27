@@ -16,6 +16,13 @@ export type ActivityInsert = {
     time?: string | null;
     status?: string;
     notes?: string | null;
+    visit_metadata?: {
+        punta: 'compradora' | 'vendedora' | 'ambas';
+        buyer_person_id?: string | null;
+        seller_person_id?: string | null;
+        property_address?: string | null;
+        buyer_feedback?: string | null;
+    } | null;
 };
 
 /**
@@ -48,6 +55,13 @@ export async function updatePersonStatusAction(
 
 export async function createActivityAction(data: ActivityInsert) {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Block future dates — activities can only be created for today or earlier
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    if (data.date > today) {
+        return { success: false, error: 'No se pueden cargar actividades con fecha futura.' };
+    }
 
     const { data: activity, error } = await supabase
         .from('activities' as any)
@@ -65,6 +79,78 @@ export async function createActivityAction(data: ActivityInsert) {
             .from('persons' as any)
             .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
             .eq('id', data.person_id);
+    }
+
+    // ── Registro acumulativo de visitas en person_history ──
+    if (data.type === 'visita' && data.visit_metadata) {
+        const vm = data.visit_metadata;
+        const agentId = user?.id || null;
+
+        // Helper para obtener nombre de una persona
+        const getPersonName = async (id: string) => {
+            const { data: p } = await supabase
+                .from('persons' as any)
+                .select('first_name, last_name')
+                .eq('id', id)
+                .single();
+            const person = p as any;
+            return person ? `${person.first_name} ${person.last_name}` : 'Sin nombre';
+        };
+
+        // Registrar visita para el COMPRADOR
+        const buyerId = vm.buyer_person_id || (vm.punta === 'compradora' ? data.person_id : null);
+        if (buyerId) {
+            await (supabase as any)
+                .from('person_history')
+                .insert({
+                    person_id: buyerId,
+                    event_type: 'visit_record',
+                    agent_id: agentId,
+                    field_name: 'visit_buyer',
+                    new_value: vm.property_address || 'Sin dirección',
+                    metadata: {
+                        role: 'buyer',
+                        property_address: vm.property_address,
+                        feedback: vm.buyer_feedback || null,
+                        activity_date: data.date,
+                        punta: vm.punta
+                    }
+                });
+
+            // Actualizar last_interaction_at para el comprador también
+            await supabase
+                .from('persons' as any)
+                .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
+                .eq('id', buyerId);
+        }
+
+        // Registrar visita para el VENDEDOR
+        const sellerId = vm.seller_person_id || (vm.punta === 'vendedora' ? data.person_id : null);
+        if (sellerId) {
+            const buyerName = buyerId ? await getPersonName(buyerId) : 'Comprador externo';
+            await (supabase as any)
+                .from('person_history')
+                .insert({
+                    person_id: sellerId,
+                    event_type: 'visit_record',
+                    agent_id: agentId,
+                    field_name: 'visit_seller',
+                    new_value: vm.property_address || 'Sin dirección',
+                    metadata: {
+                        role: 'seller',
+                        property_address: vm.property_address,
+                        visitor_name: buyerName,
+                        activity_date: data.date,
+                        punta: vm.punta
+                    }
+                });
+
+            // Actualizar last_interaction_at para el vendedor también
+            await supabase
+                .from('persons' as any)
+                .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
+                .eq('id', sellerId);
+        }
     }
 
     revalidatePath('/dashboard/my-week');
