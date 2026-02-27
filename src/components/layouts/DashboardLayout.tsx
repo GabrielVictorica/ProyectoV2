@@ -18,7 +18,8 @@ import {
     Handshake,
     Target,
     CalendarDays,
-    ChevronRight
+    ChevronRight,
+    Trophy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +31,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PageTransitionWrapper } from '@/components/ui/PageTransitionWrapper';
+import { hasCompetitionAccess } from '@/features/competition/constants';
 
 // --- Static Constants (Outside component to avoid re-creation) ---
 
@@ -164,8 +166,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             { href: '/dashboard/admin/billing', label: 'Finanzas', icon: DollarSign },
         ] : [];
 
-        return { main, team, admin };
-    }, [isGod, isParent, canManageUsers]);
+        const competition = hasCompetitionAccess({
+            role: role || null,
+            firstName: auth?.profile?.first_name,
+            lastName: auth?.profile?.last_name,
+        }) ? [
+            { href: '/dashboard/competition', label: 'Copa', icon: Trophy }
+        ] : [];
+
+        return { main, team, admin, competition };
+    }, [isGod, isParent, canManageUsers, auth, role]);
 
     const badge = useMemo(() => {
         if (isGod) return { text: 'Super Admin', color: 'bg-violet-500/80' };
@@ -284,6 +294,29 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                     </span>
                                 </div>
                                 {dynamicItems.admin.map((item) => (
+                                    <NavigationLink
+                                        key={item.href}
+                                        item={item}
+                                        pathname={pathname}
+                                        auth={auth}
+                                        isParent={isParent}
+                                        role={role}
+                                        queryClient={queryClient}
+                                        supabase={supabase}
+                                    />
+                                ))}
+                            </>
+                        )}
+
+                        {/* Competition section */}
+                        {dynamicItems.competition.length > 0 && (
+                            <>
+                                <div className="pt-6 pb-2">
+                                    <span className="px-4 text-xs font-semibold text-amber-500/40 uppercase tracking-wider">
+                                        🏆 Competencia
+                                    </span>
+                                </div>
+                                {dynamicItems.competition.map((item) => (
                                     <NavigationLink
                                         key={item.href}
                                         item={item}
