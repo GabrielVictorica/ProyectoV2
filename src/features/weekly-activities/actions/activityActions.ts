@@ -294,10 +294,42 @@ export async function getWeeklyDataAction(
         if (activitiesResult.error) throw activitiesResult.error;
         if (transactionsResult.error) throw transactionsResult.error;
 
+        const activities = activitiesResult.data;
+
+        // Fetch missing names for visit_metadata (buyer and seller)
+        const personIdsToFetch = new Set<string>();
+        activities?.forEach((act: any) => {
+            if (act.visit_metadata) {
+                if (act.visit_metadata.buyer_person_id) personIdsToFetch.add(act.visit_metadata.buyer_person_id);
+                if (act.visit_metadata.seller_person_id) personIdsToFetch.add(act.visit_metadata.seller_person_id);
+            }
+        });
+
+        if (personIdsToFetch.size > 0) {
+            const { data: personsInfo } = await adminClient
+                .from('persons' as any)
+                .select('id, first_name, last_name')
+                .in('id', Array.from(personIdsToFetch));
+
+            const personMap = new Map();
+            personsInfo?.forEach((p: any) => personMap.set(p.id, `${p.first_name} ${p.last_name}`));
+
+            activities?.forEach((act: any) => {
+                if (act.visit_metadata) {
+                    if (act.visit_metadata.buyer_person_id) {
+                        act.visit_metadata.buyer_name = personMap.get(act.visit_metadata.buyer_person_id);
+                    }
+                    if (act.visit_metadata.seller_person_id) {
+                        act.visit_metadata.seller_name = personMap.get(act.visit_metadata.seller_person_id);
+                    }
+                }
+            });
+        }
+
         return {
             success: true,
             data: {
-                activities: activitiesResult.data,
+                activities: activities,
                 transactions: transactionsResult.data
             }
         };
