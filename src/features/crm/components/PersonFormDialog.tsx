@@ -30,7 +30,7 @@ const FAMILY_COMPOSITIONS = [
 
 const SOURCES = [
     'Instagram', 'Facebook', 'Google', 'Referido',
-    'Portal Inmobiliario', 'Cartel', 'Networking', 'Farming'
+    'Portal Inmobiliario', 'Cartel', 'Networking', 'Farming', 'Guardia/Oficina'
 ];
 
 const TAG_GROUPS: MultiSelectOptionGroup[] = [
@@ -720,21 +720,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                                         </motion.div>
                                                     )}
 
-                                                    <FormField control={form.control} name="tags" render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel className={labelClass}>Etiquetas / Tags</FormLabel>
-                                                            <FormControl>
-                                                                <SmartMultiSelect
-                                                                    groups={TAG_GROUPS}
-                                                                    selected={field.value ? field.value.split(',').map(s => s.trim()).filter(Boolean) : []}
-                                                                    onChange={(vals) => field.onChange(vals.join(', '))}
-                                                                    title="Seleccionar etiquetas"
-                                                                    placeholder="Buscar o crear..."
-                                                                    icon={Tag}
-                                                                />
-                                                            </FormControl>
-                                                        </FormItem>
-                                                    )} />
+
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <FormField control={form.control} name="lastInteractionAt" render={({ field }) => (

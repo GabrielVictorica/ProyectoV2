@@ -43,7 +43,7 @@ import { getStatusLabel } from "../constants/relationshipStatuses";
 import { useCRM, usePerson, crmKeys } from '../hooks/useCRM';
 import { toast } from "sonner";
 import { LIFECYCLE_STATUSES, LOST_REASONS } from "../constants/lifecycleStatuses";
-import { updatePersonLifecycleStatusAction } from "../actions/personActions";
+import { updatePersonLifecycleStatusAction, getPersonVisitHistoryAction } from "../actions/personActions";
 import { cn } from "@/lib/utils";
 import {
     Select,
@@ -414,6 +414,13 @@ export function PersonDetailSheet({ open, onOpenChange, person: initialPerson, o
 
                         <Separator className="bg-white/10" />
 
+                        {/* ── Panel de Visitas (solo si status === 'visita') ── */}
+                        {person.relationship_status === 'visita' && (
+                            <VisitHistoryPanel personId={person.id} />
+                        )}
+
+                        <Separator className="bg-white/10" />
+
                         {/* Actividad / Línea de Tiempo */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -501,5 +508,101 @@ export function PersonDetailSheet({ open, onOpenChange, person: initialPerson, o
                 </ScrollArea>
             </SheetContent>
         </Sheet >
+    );
+}
+
+// ── Panel de Historial de Visitas ──
+function VisitHistoryPanel({ personId }: { personId: string }) {
+    const [visits, setVisits] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        getPersonVisitHistoryAction(personId).then(res => {
+            if (!cancelled && res.success && res.data) {
+                setVisits(res.data);
+            }
+            if (!cancelled) setLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, [personId]);
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-teal-400" />
+                    Historial de Visitas
+                </h3>
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6 flex justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-teal-400" />
+                Historial de Visitas
+                {visits.length > 0 && (
+                    <Badge className="bg-teal-500/10 text-teal-400 border-teal-500/20 text-[10px]">
+                        {visits.length} {visits.length === 1 ? 'visita' : 'visitas'}
+                    </Badge>
+                )}
+            </h3>
+
+            {visits.length === 0 ? (
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-8 text-center">
+                    <p className="text-white/20 italic text-sm">Sin visitas registradas aún</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {visits.map((v: any) => {
+                        const meta = v.metadata || {};
+                        const addr = meta.property_address || v.new_value || 'Sin dirección';
+                        const role = meta.role;
+                        const eventDate = v.created_at ? format(new Date(v.created_at), "d MMM yyyy", { locale: es }) : '';
+
+                        return (
+                            <div key={v.id} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.04] transition-colors">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <span className="font-medium text-sm text-white">
+                                                {addr}
+                                            </span>
+                                            <Badge className={cn(
+                                                "text-[9px] uppercase tracking-wider",
+                                                role === 'buyer'
+                                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                                    : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                            )}>
+                                                {role === 'buyer' ? '🛒 Comprador' : '🏠 Vendedor'}
+                                            </Badge>
+                                        </div>
+                                        {role === 'buyer' && meta.feedback && (
+                                            <p className="text-xs text-white/50 italic mt-1 bg-white/[0.02] p-2 rounded-lg border border-white/[0.03]">
+                                                &ldquo;{meta.feedback}&rdquo;
+                                            </p>
+                                        )}
+                                        {role === 'seller' && meta.visitor_name && (
+                                            <p className="text-xs text-white/40 mt-1">
+                                                Visitado por: {meta.visitor_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] text-white/30 font-mono shrink-0">
+                                        {eventDate}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
     );
 }

@@ -206,7 +206,8 @@ export type PersonHistoryEventType =
     | 'lifecycle_change'
     | 'note_added'
     | 'contact'
-    | 'acm_result';
+    | 'acm_result'
+    | 'visit_record';
 
 export interface PersonHistoryEvent {
     id: string;

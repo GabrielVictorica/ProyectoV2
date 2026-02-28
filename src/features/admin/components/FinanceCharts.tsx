@@ -78,7 +78,7 @@ export function FinanceCharts({ summaryData }: FinanceChartsProps) {
                                     borderRadius: '8px',
                                     fontSize: '12px'
                                 }}
-                                formatter={(value: number) => [formatCurrency(value), 'Deuda']}
+                                formatter={(value: any) => [formatCurrency(value || 0), 'Deuda']}
                             />
                             <Bar
                                 dataKey="total"

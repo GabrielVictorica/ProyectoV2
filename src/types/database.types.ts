@@ -765,6 +765,11 @@ export type Database = {
                     }
                 ]
             }
+
+            profile_supervisors: { Row: any; Insert: any; Update: any; Relationships: any[] }
+            agent_objectives: { Row: any; Insert: any; Update: any; Relationships: any[] }
+            persons: { Row: any; Insert: any; Update: any; Relationships: any[] }
+            person_searches: { Row: any; Insert: any; Update: any; Relationships: any[] }
         }
         Views: {
             view_financial_metrics: {
@@ -783,7 +788,13 @@ export type Database = {
                     double_sided_count: number
                     single_sided_count: number
                 }
+                Relationships: []
             }
+
+            view_agent_progress: { Row: any; Relationships: any[] }
+            view_team_objectives_summary: { Row: any; Relationships: any[] }
+            view_anonymous_clients: { Row: any; Relationships: any[] }
+            view_agent_progress_extended: { Row: any; Relationships: any[] }
         }
         Functions: {
             get_user_organization: {

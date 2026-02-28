@@ -256,8 +256,8 @@ export async function getWeeklyDataAction(
         if (!requesterProfileResult.data) return { success: false, error: 'Perfil no encontrado' };
         if (!targetProfileResult.data) return { success: false, error: 'Usuario destino no encontrado' };
 
-        const userProfile = requesterProfileResult.data as { role: string; organization_id: string };
-        const targetProfile = targetProfileResult.data as { organization_id: string; reports_to_organization_id: string | null };
+        const userProfile = (requesterProfileResult.data as unknown) as { role: string; organization_id: string };
+        const targetProfile = (targetProfileResult.data as unknown) as { organization_id: string; reports_to_organization_id: string | null };
 
 
         // Lógica de autorización

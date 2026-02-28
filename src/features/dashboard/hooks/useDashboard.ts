@@ -51,8 +51,8 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
     ]);
 
     // 3. Procesar datos de transacciones (Ventas y Comisiones)
-    const totalSalesVolume = salesData?.reduce((sum, t) => sum + (t.actual_price || 0), 0) || 0;
-    const totalCommissions = salesData?.reduce((sum, t) => sum + (t.total_commission || 0), 0) || 0;
+    const totalSalesVolume = salesData?.reduce((sum: number, t: any) => sum + (t.actual_price || 0), 0) || 0;
+    const totalCommissions = salesData?.reduce((sum: number, t: any) => sum + (t.total_commission || 0), 0) || 0;
 
     // 4. Calcular Ranking de Agentes si es Broker
     let agentRanking = [];

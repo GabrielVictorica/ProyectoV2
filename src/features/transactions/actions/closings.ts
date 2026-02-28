@@ -101,8 +101,8 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     if (txRes.error) throw new Error(txRes.error.message);
     if (metricsRes.error) throw new Error(metricsRes.error.message);
 
-    const transactions = (txRes.data || []) as TransactionWithRelations[];
-    const metricsData = (metricsRes.data || []) as FinancialMetrics[];
+    const transactions = (txRes.data as unknown || []) as TransactionWithRelations[];
+    const metricsData = (metricsRes.data as unknown || []) as FinancialMetrics[];
 
     // 6. Aggregation
     const aggregated = metricsData.reduce((acc, m) => {

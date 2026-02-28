@@ -188,7 +188,7 @@ export async function createClientAction(
         }
 
         revalidatePath('/dashboard/clients');
-        return { success: true, data: data as Client };
+        return { success: true, data: (data as unknown) as Client };
     } catch (err) {
         console.error('Error in createClientAction:', err);
         if (err instanceof z.ZodError) {

@@ -1,0 +1,299 @@
+﻿src/types/database.types.ts(69,21): error TS1131: Property or signature expected.
+src/types/database.types.ts(76,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(77,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(93,24): error TS1109: Expression expected.
+src/types/database.types.ts(96,28): error TS1109: Expression expected.
+src/types/database.types.ts(97,28): error TS1109: Expression expected.
+src/types/database.types.ts(98,27): error TS1109: Expression expected.
+src/types/database.types.ts(99,26): error TS1109: Expression expected.
+src/types/database.types.ts(100,33): error TS1109: Expression expected.
+src/types/database.types.ts(101,30): error TS1109: Expression expected.
+src/types/database.types.ts(102,32): error TS1109: Expression expected.
+src/types/database.types.ts(103,32): error TS1109: Expression expected.
+src/types/database.types.ts(106,24): error TS1109: Expression expected.
+src/types/database.types.ts(107,37): error TS1109: Expression expected.
+src/types/database.types.ts(108,34): error TS1109: Expression expected.
+src/types/database.types.ts(109,28): error TS1109: Expression expected.
+src/types/database.types.ts(110,28): error TS1109: Expression expected.
+src/types/database.types.ts(111,27): error TS1109: Expression expected.
+src/types/database.types.ts(112,26): error TS1109: Expression expected.
+src/types/database.types.ts(113,33): error TS1109: Expression expected.
+src/types/database.types.ts(114,30): error TS1109: Expression expected.
+src/types/database.types.ts(115,32): error TS1109: Expression expected.
+src/types/database.types.ts(116,32): error TS1109: Expression expected.
+src/types/database.types.ts(118,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(123,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(124,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(145,29): error TS1109: Expression expected.
+src/types/database.types.ts(146,37): error TS1109: Expression expected.
+src/types/database.types.ts(147,41): error TS1109: Expression expected.
+src/types/database.types.ts(148,32): error TS1109: Expression expected.
+src/types/database.types.ts(149,26): error TS1109: Expression expected.
+src/types/database.types.ts(150,27): error TS1109: Expression expected.
+src/types/database.types.ts(151,24): error TS1109: Expression expected.
+src/types/database.types.ts(152,31): error TS1109: Expression expected.
+src/types/database.types.ts(153,32): error TS1109: Expression expected.
+src/types/database.types.ts(154,30): error TS1109: Expression expected.
+src/types/database.types.ts(156,32): error TS1109: Expression expected.
+src/types/database.types.ts(157,27): error TS1109: Expression expected.
+src/types/database.types.ts(158,40): error TS1109: Expression expected.
+src/types/database.types.ts(160,32): error TS1109: Expression expected.
+src/types/database.types.ts(163,29): error TS1109: Expression expected.
+src/types/database.types.ts(164,37): error TS1109: Expression expected.
+src/types/database.types.ts(165,41): error TS1109: Expression expected.
+src/types/database.types.ts(166,32): error TS1109: Expression expected.
+src/types/database.types.ts(167,26): error TS1109: Expression expected.
+src/types/database.types.ts(168,27): error TS1109: Expression expected.
+src/types/database.types.ts(169,24): error TS1109: Expression expected.
+src/types/database.types.ts(170,31): error TS1109: Expression expected.
+src/types/database.types.ts(171,32): error TS1109: Expression expected.
+src/types/database.types.ts(172,30): error TS1109: Expression expected.
+src/types/database.types.ts(173,26): error TS1109: Expression expected.
+src/types/database.types.ts(174,32): error TS1109: Expression expected.
+src/types/database.types.ts(175,27): error TS1109: Expression expected.
+src/types/database.types.ts(176,40): error TS1109: Expression expected.
+src/types/database.types.ts(177,26): error TS1109: Expression expected.
+src/types/database.types.ts(178,32): error TS1109: Expression expected.
+src/types/database.types.ts(180,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(198,32): error TS1109: Expression expected.
+src/types/database.types.ts(199,32): error TS1109: Expression expected.
+src/types/database.types.ts(200,46): error TS1109: Expression expected.
+src/types/database.types.ts(203,31): error TS1109: Expression expected.
+src/types/database.types.ts(205,37): error TS1109: Expression expected.
+src/types/database.types.ts(206,31): error TS1109: Expression expected.
+src/types/database.types.ts(207,27): error TS1109: Expression expected.
+src/types/database.types.ts(208,26): error TS1109: Expression expected.
+src/types/database.types.ts(209,32): error TS1109: Expression expected.
+src/types/database.types.ts(212,32): error TS1109: Expression expected.
+src/types/database.types.ts(213,32): error TS1109: Expression expected.
+src/types/database.types.ts(214,46): error TS1109: Expression expected.
+src/types/database.types.ts(215,32): error TS1109: Expression expected.
+src/types/database.types.ts(216,24): error TS1109: Expression expected.
+src/types/database.types.ts(217,31): error TS1109: Expression expected.
+src/types/database.types.ts(218,31): error TS1109: Expression expected.
+src/types/database.types.ts(219,37): error TS1109: Expression expected.
+src/types/database.types.ts(220,31): error TS1109: Expression expected.
+src/types/database.types.ts(221,27): error TS1109: Expression expected.
+src/types/database.types.ts(222,26): error TS1109: Expression expected.
+src/types/database.types.ts(223,32): error TS1109: Expression expected.
+src/types/database.types.ts(225,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(229,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(237,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(238,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(252,32): error TS1109: Expression expected.
+src/types/database.types.ts(253,24): error TS1109: Expression expected.
+src/types/database.types.ts(257,30): error TS1109: Expression expected.
+src/types/database.types.ts(258,31): error TS1109: Expression expected.
+src/types/database.types.ts(259,29): error TS1109: Expression expected.
+src/types/database.types.ts(260,32): error TS1109: Expression expected.
+src/types/database.types.ts(261,24): error TS1109: Expression expected.
+src/types/database.types.ts(262,26): error TS1109: Expression expected.
+src/types/database.types.ts(264,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(268,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(276,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(277,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(311,29): error TS1109: Expression expected.
+src/types/database.types.ts(313,31): error TS1109: Expression expected.
+src/types/database.types.ts(314,30): error TS1109: Expression expected.
+src/types/database.types.ts(315,26): error TS1109: Expression expected.
+src/types/database.types.ts(316,34): error TS1109: Expression expected.
+src/types/database.types.ts(317,32): error TS1109: Expression expected.
+src/types/database.types.ts(318,30): error TS1109: Expression expected.
+src/types/database.types.ts(319,33): error TS1109: Expression expected.
+src/types/database.types.ts(320,34): error TS1109: Expression expected.
+src/types/database.types.ts(321,35): error TS1109: Expression expected.
+src/types/database.types.ts(322,32): error TS1109: Expression expected.
+src/types/database.types.ts(323,30): error TS1109: Expression expected.
+src/types/database.types.ts(324,24): error TS1109: Expression expected.
+src/types/database.types.ts(325,28): error TS1109: Expression expected.
+src/types/database.types.ts(326,33): error TS1109: Expression expected.
+src/types/database.types.ts(327,34): error TS1109: Expression expected.
+src/types/database.types.ts(328,34): error TS1109: Expression expected.
+src/types/database.types.ts(329,36): error TS1109: Expression expected.
+src/types/database.types.ts(331,27): error TS1109: Expression expected.
+src/types/database.types.ts(332,38): error TS1109: Expression expected.
+src/types/database.types.ts(333,31): error TS1109: Expression expected.
+src/types/database.types.ts(335,32): error TS1109: Expression expected.
+src/types/database.types.ts(336,32): error TS1109: Expression expected.
+src/types/database.types.ts(337,31): error TS1109: Expression expected.
+src/types/database.types.ts(338,33): error TS1109: Expression expected.
+src/types/database.types.ts(339,38): error TS1109: Expression expected.
+src/types/database.types.ts(342,29): error TS1109: Expression expected.
+src/types/database.types.ts(343,30): error TS1109: Expression expected.
+src/types/database.types.ts(344,31): error TS1109: Expression expected.
+src/types/database.types.ts(345,30): error TS1109: Expression expected.
+src/types/database.types.ts(346,26): error TS1109: Expression expected.
+src/types/database.types.ts(347,34): error TS1109: Expression expected.
+src/types/database.types.ts(348,32): error TS1109: Expression expected.
+src/types/database.types.ts(349,30): error TS1109: Expression expected.
+src/types/database.types.ts(350,33): error TS1109: Expression expected.
+src/types/database.types.ts(351,34): error TS1109: Expression expected.
+src/types/database.types.ts(352,35): error TS1109: Expression expected.
+src/types/database.types.ts(353,32): error TS1109: Expression expected.
+src/types/database.types.ts(354,30): error TS1109: Expression expected.
+src/types/database.types.ts(355,24): error TS1109: Expression expected.
+src/types/database.types.ts(356,28): error TS1109: Expression expected.
+src/types/database.types.ts(357,33): error TS1109: Expression expected.
+src/types/database.types.ts(358,34): error TS1109: Expression expected.
+src/types/database.types.ts(359,34): error TS1109: Expression expected.
+src/types/database.types.ts(360,36): error TS1109: Expression expected.
+src/types/database.types.ts(361,37): error TS1109: Expression expected.
+src/types/database.types.ts(362,27): error TS1109: Expression expected.
+src/types/database.types.ts(363,38): error TS1109: Expression expected.
+src/types/database.types.ts(364,31): error TS1109: Expression expected.
+src/types/database.types.ts(365,27): error TS1109: Expression expected.
+src/types/database.types.ts(366,32): error TS1109: Expression expected.
+src/types/database.types.ts(367,32): error TS1109: Expression expected.
+src/types/database.types.ts(368,31): error TS1109: Expression expected.
+src/types/database.types.ts(369,33): error TS1109: Expression expected.
+src/types/database.types.ts(370,38): error TS1109: Expression expected.
+src/types/database.types.ts(372,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(376,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(383,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(390,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(398,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(399,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(413,32): error TS1109: Expression expected.
+src/types/database.types.ts(414,24): error TS1109: Expression expected.
+src/types/database.types.ts(415,36): error TS1109: Expression expected.
+src/types/database.types.ts(416,27): error TS1109: Expression expected.
+src/types/database.types.ts(420,30): error TS1109: Expression expected.
+src/types/database.types.ts(421,31): error TS1109: Expression expected.
+src/types/database.types.ts(422,32): error TS1109: Expression expected.
+src/types/database.types.ts(423,24): error TS1109: Expression expected.
+src/types/database.types.ts(424,36): error TS1109: Expression expected.
+src/types/database.types.ts(425,27): error TS1109: Expression expected.
+src/types/database.types.ts(426,33): error TS1109: Expression expected.
+src/types/database.types.ts(428,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(432,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(439,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(447,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(448,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(457,27): error TS1109: Expression expected.
+src/types/database.types.ts(458,32): error TS1109: Expression expected.
+src/types/database.types.ts(459,24): error TS1109: Expression expected.
+src/types/database.types.ts(463,27): error TS1109: Expression expected.
+src/types/database.types.ts(464,32): error TS1109: Expression expected.
+src/types/database.types.ts(465,24): error TS1109: Expression expected.
+src/types/database.types.ts(466,26): error TS1109: Expression expected.
+src/types/database.types.ts(468,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(478,32): error TS1109: Expression expected.
+src/types/database.types.ts(479,26): error TS1109: Expression expected.
+src/types/database.types.ts(480,24): error TS1109: Expression expected.
+src/types/database.types.ts(484,32): error TS1109: Expression expected.
+src/types/database.types.ts(485,26): error TS1109: Expression expected.
+src/types/database.types.ts(486,24): error TS1109: Expression expected.
+src/types/database.types.ts(487,26): error TS1109: Expression expected.
+src/types/database.types.ts(489,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(515,24): error TS1109: Expression expected.
+src/types/database.types.ts(519,28): error TS1109: Expression expected.
+src/types/database.types.ts(521,29): error TS1109: Expression expected.
+src/types/database.types.ts(522,27): error TS1109: Expression expected.
+src/types/database.types.ts(523,28): error TS1109: Expression expected.
+src/types/database.types.ts(524,37): error TS1109: Expression expected.
+src/types/database.types.ts(525,38): error TS1109: Expression expected.
+src/types/database.types.ts(526,36): error TS1109: Expression expected.
+src/types/database.types.ts(527,37): error TS1109: Expression expected.
+src/types/database.types.ts(528,36): error TS1109: Expression expected.
+src/types/database.types.ts(529,33): error TS1109: Expression expected.
+src/types/database.types.ts(530,34): error TS1109: Expression expected.
+src/types/database.types.ts(531,36): error TS1109: Expression expected.
+src/types/database.types.ts(532,37): error TS1109: Expression expected.
+src/types/database.types.ts(533,32): error TS1109: Expression expected.
+src/types/database.types.ts(534,32): error TS1109: Expression expected.
+src/types/database.types.ts(537,24): error TS1109: Expression expected.
+src/types/database.types.ts(538,37): error TS1109: Expression expected.
+src/types/database.types.ts(539,29): error TS1109: Expression expected.
+src/types/database.types.ts(540,28): error TS1109: Expression expected.
+src/types/database.types.ts(541,28): error TS1109: Expression expected.
+src/types/database.types.ts(542,30): error TS1109: Expression expected.
+src/types/database.types.ts(543,29): error TS1109: Expression expected.
+src/types/database.types.ts(544,27): error TS1109: Expression expected.
+src/types/database.types.ts(545,28): error TS1109: Expression expected.
+src/types/database.types.ts(546,37): error TS1109: Expression expected.
+src/types/database.types.ts(547,38): error TS1109: Expression expected.
+src/types/database.types.ts(548,36): error TS1109: Expression expected.
+src/types/database.types.ts(549,37): error TS1109: Expression expected.
+src/types/database.types.ts(550,36): error TS1109: Expression expected.
+src/types/database.types.ts(551,33): error TS1109: Expression expected.
+src/types/database.types.ts(552,34): error TS1109: Expression expected.
+src/types/database.types.ts(553,36): error TS1109: Expression expected.
+src/types/database.types.ts(554,37): error TS1109: Expression expected.
+src/types/database.types.ts(555,32): error TS1109: Expression expected.
+src/types/database.types.ts(556,32): error TS1109: Expression expected.
+src/types/database.types.ts(558,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(563,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(564,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(590,24): error TS1109: Expression expected.
+src/types/database.types.ts(592,33): error TS1109: Expression expected.
+src/types/database.types.ts(594,38): error TS1109: Expression expected.
+src/types/database.types.ts(596,27): error TS1109: Expression expected.
+src/types/database.types.ts(597,43): error TS1109: Expression expected.
+src/types/database.types.ts(601,32): error TS1109: Expression expected.
+src/types/database.types.ts(602,33): error TS1109: Expression expected.
+src/types/database.types.ts(603,30): error TS1109: Expression expected.
+src/types/database.types.ts(604,31): error TS1109: Expression expected.
+src/types/database.types.ts(605,27): error TS1109: Expression expected.
+src/types/database.types.ts(606,46): error TS1109: Expression expected.
+src/types/database.types.ts(607,46): error TS1109: Expression expected.
+src/types/database.types.ts(608,51): error TS1109: Expression expected.
+src/types/database.types.ts(609,32): error TS1109: Expression expected.
+src/types/database.types.ts(610,32): error TS1109: Expression expected.
+src/types/database.types.ts(613,24): error TS1109: Expression expected.
+src/types/database.types.ts(614,37): error TS1109: Expression expected.
+src/types/database.types.ts(615,33): error TS1109: Expression expected.
+src/types/database.types.ts(616,30): error TS1109: Expression expected.
+src/types/database.types.ts(617,38): error TS1109: Expression expected.
+src/types/database.types.ts(618,34): error TS1109: Expression expected.
+src/types/database.types.ts(619,27): error TS1109: Expression expected.
+src/types/database.types.ts(620,43): error TS1109: Expression expected.
+src/types/database.types.ts(621,44): error TS1109: Expression expected.
+src/types/database.types.ts(622,38): error TS1109: Expression expected.
+src/types/database.types.ts(623,36): error TS1109: Expression expected.
+src/types/database.types.ts(624,32): error TS1109: Expression expected.
+src/types/database.types.ts(625,33): error TS1109: Expression expected.
+src/types/database.types.ts(626,30): error TS1109: Expression expected.
+src/types/database.types.ts(627,31): error TS1109: Expression expected.
+src/types/database.types.ts(628,27): error TS1109: Expression expected.
+src/types/database.types.ts(629,46): error TS1109: Expression expected.
+src/types/database.types.ts(630,46): error TS1109: Expression expected.
+src/types/database.types.ts(631,51): error TS1109: Expression expected.
+src/types/database.types.ts(632,32): error TS1109: Expression expected.
+src/types/database.types.ts(633,32): error TS1109: Expression expected.
+src/types/database.types.ts(635,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(639,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(646,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(653,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(660,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(668,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(669,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(687,31): error TS1109: Expression expected.
+src/types/database.types.ts(688,32): error TS1109: Expression expected.
+src/types/database.types.ts(690,24): error TS1109: Expression expected.
+src/types/database.types.ts(691,27): error TS1109: Expression expected.
+src/types/database.types.ts(693,33): error TS1109: Expression expected.
+src/types/database.types.ts(694,28): error TS1109: Expression expected.
+src/types/database.types.ts(695,26): error TS1109: Expression expected.
+src/types/database.types.ts(697,32): error TS1109: Expression expected.
+src/types/database.types.ts(700,30): error TS1109: Expression expected.
+src/types/database.types.ts(701,31): error TS1109: Expression expected.
+src/types/database.types.ts(702,32): error TS1109: Expression expected.
+src/types/database.types.ts(703,26): error TS1109: Expression expected.
+src/types/database.types.ts(704,24): error TS1109: Expression expected.
+src/types/database.types.ts(705,27): error TS1109: Expression expected.
+src/types/database.types.ts(706,37): error TS1109: Expression expected.
+src/types/database.types.ts(707,33): error TS1109: Expression expected.
+src/types/database.types.ts(708,28): error TS1109: Expression expected.
+src/types/database.types.ts(709,26): error TS1109: Expression expected.
+src/types/database.types.ts(710,26): error TS1109: Expression expected.
+src/types/database.types.ts(711,32): error TS1109: Expression expected.
+src/types/database.types.ts(713,36): error TS1011: An element access expression should take an argument.
+src/types/database.types.ts(717,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(724,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(731,22): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(739,17): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(740,13): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(741,9): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(781,25): error TS1005: ';' expected.
+src/types/database.types.ts(783,5): error TS1128: Declaration or statement expected.
+src/types/database.types.ts(784,1): error TS1128: Declaration or statement expected.

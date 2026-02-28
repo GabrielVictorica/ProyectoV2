@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest) {
 
         // 1. Actualizar tabla principal (organizations)
         const { data: org, error: orgError } = await adminClient
-            .from('organizations' as any)
+            .from('organizations')
             .update({
                 name,
                 slug,
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
                 billing_address: billing_address || null, // Legacy string
                 royalty_percentage: royalty_percentage ?? null,
                 org_status: org_status || 'active',
-            } as any)
+            })
             .eq('id', id)
             .select()
             .single();
