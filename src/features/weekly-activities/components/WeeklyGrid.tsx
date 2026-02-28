@@ -116,9 +116,16 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                     const isFuture = dateStr > todayStr;
                                     const cellData = data[dateStr];
                                     const activities = cellData?.activities.filter(a => a.type === row.id) || [];
-                                    const count = row.isVirtual
-                                        ? cellData?.transactionCount || 0
-                                        : activities.length;
+                                    let count = 0;
+                                    if (row.isVirtual) {
+                                        count = cellData?.transactionCount || 0;
+                                    } else {
+                                        if (row.id === 'visita') {
+                                            count = activities.reduce((acc, a) => acc + (a.visit_metadata?.punta === 'ambas' ? 2 : 1), 0);
+                                        } else {
+                                            count = activities.length;
+                                        }
+                                    }
 
                                     return (
                                         <td key={dIdx} className={`p-4 text-center border-r last:border-r-0 border-white/[0.04] relative ${isFuture ? 'opacity-20 pointer-events-none' : ''}`}>
@@ -164,13 +171,56 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">
-                                                                    {activities.map((act, aIdx) => {
+                                                                    {activities.flatMap((act, aIdx) => {
+                                                                        const activityNotes = act.notes || '';
+
+                                                                        if (act.type === 'visita' && act.visit_metadata?.punta === 'ambas') {
+                                                                            const buyerName = act.visit_metadata.buyer_name || (act.person?.id === act.visit_metadata.buyer_person_id ? `${act.person?.first_name} ${act.person?.last_name}` : 'Comprador');
+                                                                            const sellerName = act.visit_metadata.seller_name || (act.person?.id === act.visit_metadata.seller_person_id ? `${act.person?.first_name} ${act.person?.last_name}` : 'Vendedor');
+
+                                                                            return [
+                                                                                <div
+                                                                                    key={`${aIdx}-buyer`}
+                                                                                    className="text-xs space-y-0.5 border-l-2 border-amber-500/50 pl-2 hover:border-amber-400 hover:bg-white/[0.02] cursor-pointer p-1 rounded-r-lg transition-all group/item mb-1"
+                                                                                    onClick={() => handleCellClick(dateStr, row, activities, act.id)}
+                                                                                >
+                                                                                    <div className="flex items-start justify-between gap-2">
+                                                                                        <p className="font-bold text-white leading-tight">
+                                                                                            {buyerName}
+                                                                                        </p>
+                                                                                        <span className="text-[9px] text-amber-400 font-medium uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/10 rounded border border-amber-500/20 shrink-0">Comprador</span>
+                                                                                    </div>
+                                                                                    {activityNotes && (
+                                                                                        <p className="text-white/60 italic leading-tight line-clamp-2">
+                                                                                            {activityNotes}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>,
+                                                                                <div
+                                                                                    key={`${aIdx}-seller`}
+                                                                                    className="text-xs space-y-0.5 border-l-2 border-emerald-500/50 pl-2 hover:border-emerald-400 hover:bg-white/[0.02] cursor-pointer p-1 rounded-r-lg transition-all group/item"
+                                                                                    onClick={() => handleCellClick(dateStr, row, activities, act.id)}
+                                                                                >
+                                                                                    <div className="flex items-start justify-between gap-2">
+                                                                                        <p className="font-bold text-white leading-tight">
+                                                                                            {sellerName}
+                                                                                        </p>
+                                                                                        <span className="text-[9px] text-emerald-400 font-medium uppercase tracking-wider px-1.5 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20 shrink-0">Vendedor</span>
+                                                                                    </div>
+                                                                                    {activityNotes && (
+                                                                                        <p className="text-white/60 italic leading-tight line-clamp-2">
+                                                                                            {activityNotes}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                            ];
+                                                                        }
+
                                                                         const personName = act.person
                                                                             ? `${act.person.first_name} ${act.person.last_name}`
                                                                             : null;
-                                                                        const activityNotes = act.notes || '';
 
-                                                                        return (
+                                                                        return [
                                                                             <div
                                                                                 key={aIdx}
                                                                                 className="text-xs space-y-0.5 border-l-2 border-white/20 pl-2 hover:border-violet-500/50 hover:bg-white/[0.02] cursor-pointer p-1 rounded-r-lg transition-all group/item"
@@ -190,7 +240,7 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                                                     <p className="text-white/40 italic">Sin detalle</p>
                                                                                 )}
                                                                             </div>
-                                                                        );
+                                                                        ];
                                                                     })}
                                                                 </div>
                                                             )}

@@ -30,6 +30,8 @@ export type WeeklyActivity = {
         seller_person_id?: string | null;
         property_address?: string | null;
         buyer_feedback?: string | null;
+        buyer_name?: string | null;
+        seller_name?: string | null;
     } | null;
     person?: {
         id: string;

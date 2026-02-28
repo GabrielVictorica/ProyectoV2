@@ -74,7 +74,11 @@ export function WeeklyDashboard() {
             day.activities.forEach(act => {
                 // Sum all activities except referrals
                 if (act.type !== 'referido') {
-                    greenCount++;
+                    if (act.type === 'visita' && act.visit_metadata?.punta === 'ambas') {
+                        greenCount += 2;
+                    } else {
+                        greenCount++;
+                    }
                 }
 
                 if (act.type === 'pre_listing' || act.type === 'pre_buying') criticalCount++;
