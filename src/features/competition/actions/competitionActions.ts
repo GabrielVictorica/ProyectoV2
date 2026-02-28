@@ -648,10 +648,6 @@ export async function removeTeamMemberAction(
     }
 }
 
-/**
- * Gets all agents from the org that are NOT yet in the competition.
- * Used by the "Add Agent" dropdown.
- */
 export async function getAvailableAgentsAction(
     organizationId: string
 ): Promise<{ success: boolean; data?: any[]; error?: string }> {
@@ -659,6 +655,15 @@ export async function getAvailableAgentsAction(
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autenticado' };
+
+        // Check if the user is god
+        const { data: profile } = await supabase
+            .from('profiles' as any)
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        const isGod = (profile as any)?.role === 'god';
 
         const adminClient = createAdminClient();
 
@@ -670,14 +675,25 @@ export async function getAvailableAgentsAction(
 
         const existingIds = (existing || []).map((e: any) => e.agent_id);
 
-        // Get all agents from the org (excluding god and parent roles)
-        const { data: agents, error } = await adminClient
+        // Build query for available agents
+        let query = adminClient
             .from('profiles' as any)
             .select('id, first_name, last_name')
-            .eq('organization_id', organizationId)
             .eq('is_active', true)
-            .eq('role', 'child')
             .order('first_name');
+
+        // If not god, strictly filter by role 'child' and organizationId
+        if (!isGod) {
+            query = query
+                .eq('organization_id', organizationId)
+                .eq('role', 'child');
+        } else {
+            // If god, we still want to primarily see 'child' agents and maybe 'god' (Gabriel himself)
+            // Supabase OR filter to get both child and god roles:
+            query = query.or('role.eq.child,role.eq.god');
+        }
+
+        const { data: agents, error } = await query;
 
         if (error) throw error;
 
