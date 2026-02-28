@@ -22,7 +22,7 @@ export const personSchema = z.object({
     preferredChannel: z.string().optional().nullable(),
     bestContactTime: z.string().optional().nullable(),
 
-    relationshipStatus: z.string().default('reunion_verde'),
+    relationshipStatus: z.string().default('contacto_telefonico'),
     lifecycleStatus: z.enum(['active', 'following_up', 'lost']).default('active'),
     lostReason: z.string().optional().nullable(),
     nextActionAt: z.string().optional().nullable(),
