@@ -29,7 +29,7 @@ const FAMILY_COMPOSITIONS = [
 ];
 
 const SOURCES = [
-    'Instagram', 'Facebook', 'Google', 'Referido',
+    'Instagram', 'Facebook', 'Google', 'Referido', 'Base de Relaciones',
     'Portal Inmobiliario', 'Cartel', 'Networking', 'Farming', 'Guardia/Oficina'
 ];
 
@@ -191,7 +191,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
             influenceLevel: person?.influence_level || initialData?.influenceLevel || 3,
             preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',
             bestContactTime: person?.best_contact_time || initialData?.bestContactTime || '',
-            relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'reunion_verde',
+            relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'contacto_telefonico',
             lifecycleStatus: (person?.lifecycle_status as any) || (initialData as any)?.lifecycleStatus || 'active',
             lostReason: person?.lost_reason || (initialData as any)?.lostReason || '',
             lastInteractionAt: person?.last_interaction_at ? new Date(person.last_interaction_at).toISOString().split('T')[0] : (initialData?.lastInteractionAt || ''),
@@ -223,7 +223,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                 influenceLevel: person?.influence_level || initialData?.influenceLevel || 3,
                 preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',
                 bestContactTime: person?.best_contact_time || initialData?.bestContactTime || '',
-                relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'reunion_verde',
+                relationshipStatus: person?.relationship_status || initialData?.relationshipStatus || 'contacto_telefonico',
                 lifecycleStatus: (person?.lifecycle_status as any) || (initialData as any)?.lifecycleStatus || 'active',
                 lostReason: person?.lost_reason || (initialData as any)?.lostReason || '',
                 lastInteractionAt: person?.last_interaction_at ? new Date(person.last_interaction_at).toISOString().split('T')[0] : (initialData?.lastInteractionAt || ''),
