@@ -51,10 +51,10 @@ export function useOrganizations(options?: { enabled?: boolean }) {
 
             const today = new Date();
 
-            return (orgs || []).map(org => {
-                const orgBilling = (billingInfo || []).filter(b => b.organization_id === org.id);
+            return (orgs || []).map((org: any) => {
+                const orgBilling = (billingInfo || []).filter((b: any) => b.organization_id === org.id);
 
-                const overdue_count = orgBilling.filter(b => {
+                const overdue_count = orgBilling.filter((b: any) => {
                     const dueDate = new Date(b.first_due_date || b.due_date);
                     return dueDate < today || b.status === 'overdue';
                 }).length;
@@ -97,8 +97,8 @@ export function useUsers(options?: { enabled?: boolean }) {
             // Ahora enriquecemos con la info del parent si existe
             const profiles = data || [];
             const parentIds = profiles
-                .map(p => p.parent_id)
-                .filter((id): id is string => id !== null);
+                .map((p: any) => p.parent_id)
+                .filter((id: any): id is string => id !== null);
 
             let parentsMap: Record<string, { first_name: string; last_name: string }> = {};
 
@@ -110,12 +110,12 @@ export function useUsers(options?: { enabled?: boolean }) {
 
                 if (parents) {
                     parentsMap = Object.fromEntries(
-                        parents.map(p => [p.id, { first_name: p.first_name, last_name: p.last_name }])
+                        parents.map((p: any) => [p.id, { first_name: p.first_name, last_name: p.last_name }])
                     );
                 }
             }
 
-            return profiles.map(profile => ({
+            return profiles.map((profile: any) => ({
                 ...profile,
                 parent: profile.parent_id ? parentsMap[profile.parent_id] || null : null,
             })) as UserWithOrganization[];

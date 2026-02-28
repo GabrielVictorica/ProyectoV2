@@ -208,6 +208,8 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
                 listings_goal_annual: row.listings_goal_annual || 0,
                 required_prelistings_annual: row.required_prelistings_annual || 0,
                 required_prelistings_weekly: Number(row.required_prelistings_weekly) || 0,
+                sales_effectiveness_ratio: row.sales_effectiveness_ratio || 2,
+                minimum_listings_required: row.minimum_listings_required || 0,
             }));
         },
     });

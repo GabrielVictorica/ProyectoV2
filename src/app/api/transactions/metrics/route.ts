@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
                 // Ver métricas de su org O de agentes bajo su supervisión/reporte
                 query = query.or(`organization_id.eq.${profile.organization_id},agent_id.in.(${allAllowedAgentIds.join(',')})`);
             } else {
-                query = query.eq('organization_id', profile.organization_id);
+                query = query.eq('organization_id', profile.organization_id as string);
             }
         } else {
             // Child solo ve sus propias métricas

@@ -25,7 +25,7 @@ import {
 import { useObjectives } from '../hooks/useObjectives';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { OBJECTIVES_DEFAULTS } from '../lib/constants';
-import { Loader2, Calculator, Target, TrendingUp, Lock } from 'lucide-react';
+import { Loader2, Calculator, Target, TrendingUp, Lock, AlertTriangle, Info } from 'lucide-react';
 
 const goalSchema = z.object({
     annualBillingGoal: z.coerce.number().min(0, 'La meta debe ser mayor a 0'),
@@ -38,6 +38,7 @@ const goalSchema = z.object({
     workingWeeks: z.coerce.number().min(1).max(52),
     listingsGoalAnnual: z.coerce.number().min(0).optional(),
     plToListingConversionTarget: z.coerce.number().min(1).max(100).optional(),
+    salesEffectivenessRatio: z.coerce.number().min(1).max(20).optional(),
     listingsGoalStartDate: z.string().optional().nullable(),
     listingsGoalEndDate: z.string().optional().nullable(),
 });
@@ -84,6 +85,7 @@ export function GoalSettingDialog({
             workingWeeks: OBJECTIVES_DEFAULTS.WORKING_WEEKS,
             listingsGoalAnnual: 0,
             plToListingConversionTarget: 40,
+            salesEffectivenessRatio: OBJECTIVES_DEFAULTS.SALES_EFFECTIVENESS_RATIO,
             listingsGoalStartDate: null,
             listingsGoalEndDate: null,
         },
@@ -103,6 +105,7 @@ export function GoalSettingDialog({
                 workingWeeks: progress.working_weeks ?? 48,
                 listingsGoalAnnual: progress.listings_goal_annual ?? 0,
                 plToListingConversionTarget: progress.pl_to_listing_conversion_target ?? 40,
+                salesEffectivenessRatio: progress.sales_effectiveness_ratio ?? OBJECTIVES_DEFAULTS.SALES_EFFECTIVENESS_RATIO,
                 listingsGoalStartDate: progress.listings_goal_start_date ?? null,
                 listingsGoalEndDate: progress.listings_goal_end_date ?? null,
             });
@@ -132,12 +135,14 @@ export function GoalSettingDialog({
     const splitPct = form.watch('splitPercentage');
     const convRate = form.watch('conversionRate');
     const workWeeks = form.watch('workingWeeks');
+    const salesEffRatio = form.watch('salesEffectivenessRatio') || OBJECTIVES_DEFAULTS.SALES_EFFECTIVENESS_RATIO;
 
     // Memoizar cálculos para evitar recálculos innecesarios
     const calculations = useMemo(() => {
         const estimatedPuntas = (avgTicket > 0 && avgComm > 0)
             ? Math.ceil(annualGoal / (avgTicket * (avgComm / 100)))
             : 0;
+        const minimumListings = Math.ceil(estimatedPuntas * salesEffRatio);
         const requiredPlPbAnnual = estimatedPuntas * convRate;
         const weeklyPlPb = workWeeks > 0 ? requiredPlPbAnnual / workWeeks : 0;
         const netIncome = annualGoal * (splitPct / 100);
@@ -164,11 +169,23 @@ export function GoalSettingDialog({
         }
 
         const weeklyPlForListings = weeksForListings > 0 ? requiredPlForListings / weeksForListings : 0;
+        const isBelowMinimum = listingsGoal > 0 && listingsGoal < minimumListings;
 
-        return { estimatedPuntas, requiredPlPbAnnual, weeklyPlPb, netIncome, requiredPlForListings, weeklyPlForListings, listingsGoal, weeksForListings, hasDateRange };
-    }, [annualGoal, avgTicket, avgComm, splitPct, convRate, workWeeks, form.watch('listingsGoalAnnual'), form.watch('plToListingConversionTarget'), form.watch('listingsGoalStartDate'), form.watch('listingsGoalEndDate')]);
+        return { estimatedPuntas, minimumListings, requiredPlPbAnnual, weeklyPlPb, netIncome, requiredPlForListings, weeklyPlForListings, listingsGoal, weeksForListings, hasDateRange, isBelowMinimum };
+    }, [annualGoal, avgTicket, avgComm, splitPct, convRate, workWeeks, salesEffRatio, form.watch('listingsGoalAnnual'), form.watch('plToListingConversionTarget'), form.watch('listingsGoalStartDate'), form.watch('listingsGoalEndDate')]);
 
-    const { estimatedPuntas, requiredPlPbAnnual, weeklyPlPb, netIncome, requiredPlForListings, weeklyPlForListings, listingsGoal, weeksForListings, hasDateRange } = calculations;
+    const { estimatedPuntas, minimumListings, requiredPlPbAnnual, weeklyPlPb, netIncome, requiredPlForListings, weeklyPlForListings, listingsGoal, weeksForListings, hasDateRange, isBelowMinimum } = calculations;
+
+    // Auto-fill listings goal with minimum when entering Step 3
+    useEffect(() => {
+        if (step === 3 && minimumListings > 0) {
+            const currentListings = form.getValues('listingsGoalAnnual') || 0;
+            if (currentListings < minimumListings) {
+                form.setValue('listingsGoalAnnual', minimumListings);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, minimumListings]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -300,7 +317,7 @@ export function GoalSettingDialog({
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50">
+                            <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50">
                                 <div className="grid gap-1">
                                     <Label htmlFor="splitPercentage" className="text-xs flex items-center gap-1">
                                         Split %
@@ -331,6 +348,21 @@ export function GoalSettingDialog({
                                         className="bg-slate-900/50 border-slate-700 h-8 text-sm"
                                         {...form.register('workingWeeks')}
                                     />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label htmlFor="salesEffectivenessRatio" className="text-xs" title="Captaciones necesarias por cada punta cerrada (ej: 2 = necesitas 2 captaciones por venta)">
+                                        Efectividad Venta
+                                    </Label>
+                                    <Input
+                                        id="salesEffectivenessRatio"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        step="1"
+                                        className="bg-slate-900/50 border-slate-700 h-8 text-sm"
+                                        {...form.register('salesEffectivenessRatio')}
+                                    />
+                                    <p className="text-[9px] text-slate-500">Ratio captaciones:punta</p>
                                 </div>
                             </div>
 
@@ -391,6 +423,19 @@ export function GoalSettingDialog({
                                 </div>
                             </div>
 
+                            {/* Banner informativo: cálculo automático */}
+                            {minimumListings > 0 && (
+                                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+                                    <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                                    <div className="text-xs text-blue-300/90">
+                                        <span className="font-semibold">Cálculo automático:</span>{' '}
+                                        Tu facturación requiere <span className="font-bold text-white">{estimatedPuntas}</span> puntas
+                                        {' '}→ Con efectividad <span className="font-bold text-white">{salesEffRatio}:1</span>
+                                        {' '}→ Mínimo <span className="font-bold text-emerald-400">{minimumListings}</span> captaciones
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="listingsGoalAnnual">
@@ -400,12 +445,22 @@ export function GoalSettingDialog({
                                         id="listingsGoalAnnual"
                                         type="number"
                                         placeholder={hasDateRange ? "Ej: 5 (en este trimestre)" : "Ej: 20 (en el año)"}
-                                        className="bg-slate-800/50 border-slate-700"
+                                        className={`bg-slate-800/50 border-slate-700 ${isBelowMinimum ? 'border-amber-500/50 focus:ring-amber-500/30' : ''}`}
                                         {...form.register('listingsGoalAnnual')}
                                     />
-                                    <p className="text-xs text-slate-500">
-                                        ¿Cuántas propiedades quieres captar {hasDateRange ? 'en este periodo' : 'este año'}?
-                                    </p>
+                                    {isBelowMinimum ? (
+                                        <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                            <span>Por debajo del mínimo requerido ({minimumListings}). Podrías no alcanzar tu meta de facturación.</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-500">
+                                            {minimumListings > 0
+                                                ? `Mínimo recomendado: ${minimumListings}. Puedes proyectar más captaciones.`
+                                                : `¿Cuántas propiedades quieres captar ${hasDateRange ? 'en este periodo' : 'este año'}?`
+                                            }
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="grid gap-2">

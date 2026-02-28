@@ -154,7 +154,7 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
         });
 
         revalidatePath('/dashboard/crm');
-        return { success: true, data: data as Person };
+        return { success: true, data: (data as unknown) as Person };
     } catch (err) {
         console.error('Error in createPersonAction:', err);
         if (err instanceof z.ZodError) {
@@ -249,7 +249,7 @@ export async function updatePersonAction(id: string, formData: Partial<z.infer<t
         }
 
         revalidatePath('/dashboard/crm');
-        return { success: true, data: data as Person };
+        return { success: true, data: (data as unknown) as Person };
     } catch (err) {
         console.error('Error in updatePersonAction:', err);
         return { success: false, error: 'Error al actualizar la persona' };
@@ -415,7 +415,7 @@ export async function getPersonsAction(filters: {
         const { data, error } = await query;
         if (error) throw error;
 
-        return { success: true, data: data as Person[] };
+        return { success: true, data: (data as unknown) as Person[] };
     } catch (err) {
         console.error('Error in getPersonsAction:', err);
         return { success: false, error: 'Error al obtener personas' };
@@ -547,7 +547,7 @@ export async function getRecentPersonsAction(): Promise<ActionResult<Person[]>> 
 
         if (error) throw error;
 
-        return { success: true, data: data as Person[] };
+        return { success: true, data: (data as unknown) as Person[] };
     } catch (err) {
         console.error('Error in getRecentPersonsAction:', err);
         return { success: false, error: 'Error al obtener contactos recientes' };
@@ -567,7 +567,7 @@ export async function getPersonByIdAction(id: string): Promise<ActionResult<Pers
 
         if (error) throw error;
 
-        return { success: true, data: data as Person };
+        return { success: true, data: (data as unknown) as Person };
     } catch (err) {
         console.error('Error in getPersonByIdAction:', err);
         return { success: false, error: 'Error al obtener la persona' };
@@ -678,5 +678,45 @@ export async function deletePersonAction(id: string): Promise<ActionResult<void>
     } catch (err) {
         console.error('Error in deletePersonAction:', err);
         return { success: false, error: 'Error al eliminar la relación' };
+    }
+}
+
+/**
+ * Obtiene el historial de visitas acumulativas de una persona.
+ * Filtra solo los eventos de tipo 'visit_record' del person_history.
+ */
+export async function getPersonVisitHistoryAction(personId: string): Promise<ActionResult<PersonHistoryEvent[]>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const { data, error } = await (supabase as any)
+            .from('person_history')
+            .select(`
+                id,
+                person_id,
+                event_type,
+                field_name,
+                old_value,
+                new_value,
+                metadata,
+                created_at,
+                agent_id,
+                agent:profiles!person_history_agent_id_fkey (
+                    first_name,
+                    last_name
+                )
+            `)
+            .eq('person_id', personId)
+            .eq('event_type', 'visit_record')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return { success: true, data: (data || []) as PersonHistoryEvent[] };
+    } catch (err) {
+        console.error('Error in getPersonVisitHistoryAction:', err);
+        return { success: false, error: 'Error al obtener historial de visitas' };
     }
 }

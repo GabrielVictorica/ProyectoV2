@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
-import { Target, ArrowDown, Calculator } from 'lucide-react';
+import { Target, ArrowDown, Calculator, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { ViewAgentProgress } from '../types/supabase';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ export function ObjectivesListingsFunnel({ progress, isLoading }: ObjectivesList
     const conversion = progress.pl_to_listing_conversion_target || 40;
     const listingsGoal = progress.listings_goal_annual;
     const weeklyPl = progress.required_prelistings_weekly || 0;
+    const minimumRequired = progress.minimum_listings_required || 0;
 
     const startDate = progress.listings_goal_start_date;
     const endDate = progress.listings_goal_end_date;
@@ -162,10 +163,28 @@ export function ObjectivesListingsFunnel({ progress, isLoading }: ObjectivesList
                                     {hasPeriod ? 'Captaciones Periodo' : 'Captaciones Anuales'}
                                 </p>
                             </div>
-                            <div className="mt-4 pt-3 border-t border-indigo-500/20">
+                            <div className="mt-4 pt-3 border-t border-indigo-500/20 space-y-2">
                                 <p className="text-xs text-indigo-300 w-full text-center">
                                     Base de tu inventario vendible
                                 </p>
+                                {minimumRequired > 0 && (
+                                    <div className={cn(
+                                        "flex items-center justify-center gap-1.5 text-[10px] font-bold rounded-full px-3 py-1 mx-auto w-fit",
+                                        listingsGoal > minimumRequired
+                                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                                            : listingsGoal === minimumRequired
+                                                ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                                                : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                                    )}>
+                                        {listingsGoal > minimumRequired ? (
+                                            <><CheckCircle2 className="w-3 h-3" /> Por encima del mínimo ({minimumRequired})</>
+                                        ) : listingsGoal === minimumRequired ? (
+                                            <><AlertTriangle className="w-3 h-3" /> Mínimo requerido</>
+                                        ) : (
+                                            <><AlertTriangle className="w-3 h-3" /> Por debajo del mínimo ({minimumRequired})</>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Flecha móvil para desktop (entrada) */}

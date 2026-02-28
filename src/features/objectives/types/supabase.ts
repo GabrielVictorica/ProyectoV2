@@ -38,6 +38,8 @@ export interface ViewAgentProgress {
     weekly_green_meetings_count: number;
     weekly_critical_activities_count: number;
     actual_active_listings_count: number;
+    sales_effectiveness_ratio: number;
+    minimum_listings_required: number;
 }
 
 // Tipos para view_agent_progress_extended (incluye datos de perfil)
@@ -95,6 +97,8 @@ export interface AgentWithProgress {
     listings_goal_annual: number;
     required_prelistings_annual: number;
     required_prelistings_weekly: number;
+    sales_effectiveness_ratio: number;
+    minimum_listings_required: number;
 }
 
 // Tipo para el historial promedio

@@ -17,6 +17,9 @@ export const OBJECTIVES_DEFAULTS = {
 
     /** Moneda por defecto */
     DEFAULT_CURRENCY: 'USD',
+
+    /** Ratio de efectividad de venta (2 = 2:1, necesitas 2 captaciones por punta) */
+    SALES_EFFECTIVENESS_RATIO: 2,
 } as const;
 
 /**
@@ -36,6 +39,7 @@ export const calculateDerivedMetrics = (params: {
     conversionRate: number;
     workingWeeks: number;
     monthlyLivingExpenses: number;
+    salesEffectivenessRatio?: number;
 }) => {
     const {
         annualBillingGoal,
@@ -44,7 +48,8 @@ export const calculateDerivedMetrics = (params: {
         splitPercentage,
         conversionRate,
         workingWeeks,
-        monthlyLivingExpenses
+        monthlyLivingExpenses,
+        salesEffectivenessRatio = OBJECTIVES_DEFAULTS.SALES_EFFECTIVENESS_RATIO,
     } = params;
 
     const avgCommissionPerPunta = averageTicketTarget * (averageCommissionTarget / 100);
@@ -52,6 +57,8 @@ export const calculateDerivedMetrics = (params: {
     const estimatedPuntas = avgCommissionPerPunta > 0
         ? Math.ceil(annualBillingGoal / avgCommissionPerPunta)
         : 0;
+
+    const minimumListingsRequired = Math.ceil(estimatedPuntas * salesEffectivenessRatio);
 
     const requiredPlPbAnnual = estimatedPuntas * conversionRate;
     const weeklyPlPb = workingWeeks > 0 ? requiredPlPbAnnual / workingWeeks : 0;
@@ -63,6 +70,7 @@ export const calculateDerivedMetrics = (params: {
 
     return {
         estimatedPuntas,
+        minimumListingsRequired,
         requiredPlPbAnnual,
         weeklyPlPb,
         netIncomeGoal,

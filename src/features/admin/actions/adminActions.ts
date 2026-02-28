@@ -102,6 +102,7 @@ const upsertGoalSchema = z.object({
     workingWeeks: z.coerce.number().min(1).max(52).default(48),
     listingsGoalAnnual: z.coerce.number().min(0).optional().default(0),
     plToListingConversionTarget: z.coerce.number().min(1).max(100).optional().default(40),
+    salesEffectivenessRatio: z.coerce.number().min(1).max(20).optional().default(2),
     listingsGoalStartDate: z.string().optional().nullable(),
     listingsGoalEndDate: z.string().optional().nullable(),
 });
@@ -132,11 +133,11 @@ export async function verifyGodUser(): Promise<{
             return { isGod: false, error: 'No autenticado' };
         }
 
-        const { data: profile, error } = await (supabase
+        const { data: profile, error } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', user.id)
-            .single() as any);
+            .single();
 
         if (error || !profile) {
             return { isGod: false, error: 'Perfil no encontrado' };
@@ -178,7 +179,7 @@ export async function createOrganizationAction(
 
         // 3. Crear organización
         const { data: org, error: orgError } = await adminClient
-            .from('organizations' as any)
+            .from('organizations')
             .insert({
                 name: validatedData.name,
                 slug: validatedData.slug,
@@ -190,7 +191,7 @@ export async function createOrganizationAction(
                 billing_address: validatedData.billing_address || null,
                 royalty_percentage: validatedData.royalty_percentage ?? 0,
                 is_active: true,
-            } as any)
+            })
             .select('id')
             .single();
 
@@ -209,7 +210,7 @@ export async function createOrganizationAction(
 
         if (officeAddr && (officeAddr.street || officeAddr.city)) {
             await adminClient
-                .from('organization_addresses' as any)
+                .from('organization_addresses')
                 .insert({
                     organization_id: orgId,
                     address_type: 'office',
@@ -219,12 +220,12 @@ export async function createOrganizationAction(
                     city: officeAddr.city || null,
                     postal_code: officeAddr.postalCode || null,
                     province: officeAddr.province || null,
-                } as any);
+                });
         }
 
         if (billingAddr && (billingAddr.street || billingAddr.city)) {
             await adminClient
-                .from('organization_addresses' as any)
+                .from('organization_addresses')
                 .insert({
                     organization_id: orgId,
                     address_type: 'billing',
@@ -234,7 +235,7 @@ export async function createOrganizationAction(
                     city: billingAddr.city || null,
                     postal_code: billingAddr.postalCode || null,
                     province: billingAddr.province || null,
-                } as any);
+                });
         }
 
         // 4. Verificar si el usuario ya existe en Auth
@@ -249,7 +250,7 @@ export async function createOrganizationAction(
 
             // Actualizar su perfil para vincularlo a la nueva organización
             const { error: updateError } = await adminClient
-                .from('profiles' as any)
+                .from('profiles')
                 .update({
                     organization_id: orgId,
                 })
@@ -282,7 +283,7 @@ export async function createOrganizationAction(
 
             // 5. Crear perfil del Broker (Solo si es nuevo)
             const { error: profileError } = await adminClient
-                .from('profiles' as any)
+                .from('profiles')
                 .insert({
                     id: userId,
                     first_name: validatedData.brokerFirstName,
@@ -291,7 +292,7 @@ export async function createOrganizationAction(
                     organization_id: orgId,
                     is_active: true,
                     default_split_percentage: validatedData.brokerSplitPercentage,
-                } as any);
+                });
 
             if (profileError) {
                 // Rollback usuario y organización
@@ -369,7 +370,7 @@ export async function createUserAction(
 
         // 3. Crear perfil
         const { error: profileError } = await adminClient
-            .from('profiles' as any)
+            .from('profiles')
             .insert({
                 id: userId,
                 first_name: validatedData.firstName,
@@ -379,7 +380,7 @@ export async function createUserAction(
                 phone: validatedData.phone || null,
                 is_active: true,
                 default_split_percentage: validatedData.defaultSplitPercentage,
-            } as any);
+            });
 
         if (profileError) {
             // Rollback: eliminar usuario de auth si falla el perfil
@@ -395,7 +396,7 @@ export async function createUserAction(
             }));
 
             const { error: supervisorError } = await adminClient
-                .from('profile_supervisors' as any)
+                .from('profile_supervisors')
                 .insert(supervisorInserts);
 
             if (supervisorError) {
@@ -452,7 +453,7 @@ export async function updateUserAction(
                     .select('organization_id')
                     .eq('id', userId)
                     .single();
-                orgId = currentProfile?.organization_id;
+                orgId = currentProfile?.organization_id || undefined;
             }
 
             if (orgId) {
@@ -474,14 +475,14 @@ export async function updateUserAction(
         }
 
         const { error } = await adminClient
-            .from('profiles' as any)
+            .from('profiles')
             .update({
                 first_name: validatedData.firstName,
                 last_name: validatedData.lastName,
                 phone: validatedData.phone || null,
                 default_split_percentage: validatedData.defaultSplitPercentage,
                 organization_id: validatedData.organizationId || undefined,
-            } as any)
+            })
             .eq('id', userId);
 
         if (error) throw error;
@@ -489,7 +490,7 @@ export async function updateUserAction(
         // 2. Sincronizar supervisores (N:N)
         // Eliminamos los actuales y re-insertamos los nuevos
         const { error: deleteError } = await adminClient
-            .from('profile_supervisors' as any)
+            .from('profile_supervisors')
             .delete()
             .eq('agent_id', userId);
 
@@ -504,7 +505,7 @@ export async function updateUserAction(
             }));
 
             const { error: insertError } = await adminClient
-                .from('profile_supervisors' as any)
+                .from('profile_supervisors')
                 .insert(supervisorInserts);
 
             if (insertError) {
@@ -536,13 +537,13 @@ export async function getOrganizationsAction(): Promise<ActionResult<Array<{ id:
         }
 
         const adminClient = createAdminClient();
-        const { data, error } = await (adminClient
+        const { data, error } = await adminClient
             .from('organizations')
             .select('id, name, slug')
-            .order('name') as any);
+            .order('name');
         if (error) throw error;
 
-        return { success: true, data: (data as any) || [] };
+        return { success: true, data: data || [] };
     } catch (err) {
         console.error('Error fetching organizations:', err);
         return { success: false, error: 'Error al obtener organizaciones' };
@@ -562,16 +563,16 @@ export async function getParentUsersAction(
         }
 
         const adminClient = createAdminClient();
-        const { data, error } = await (adminClient
+        const { data, error } = await adminClient
             .from('profiles')
             .select('id, first_name, last_name')
             .eq('organization_id', organizationId)
             .eq('role', 'parent')
-            .eq('is_active', true) as any);
+            .eq('is_active', true);
 
         if (error) throw error;
 
-        const parents = ((data as any[]) || []).map(p => ({
+        const parents = (data || []).map(p => ({
             id: p.id,
             name: `${p.first_name} ${p.last_name}`,
         }));
@@ -809,6 +810,7 @@ export async function upsertGoalAction(
                 working_weeks: validatedData.workingWeeks,
                 listings_goal_annual: validatedData.listingsGoalAnnual,
                 pl_to_listing_conversion_target: validatedData.plToListingConversionTarget,
+                sales_effectiveness_ratio: validatedData.salesEffectivenessRatio,
                 listings_goal_start_date: validatedData.listingsGoalStartDate,
                 listings_goal_end_date: validatedData.listingsGoalEndDate,
             } as any, { onConflict: 'agent_id, year' }));

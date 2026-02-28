@@ -175,7 +175,7 @@ export default function TeamPage() {
                             <Phone className="h-4 w-4" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={member.email || ''}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={(member as any).email || ''}>
                         <Mail className="h-4 w-4" />
                     </Button>
                 </div>

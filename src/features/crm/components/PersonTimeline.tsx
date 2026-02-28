@@ -10,7 +10,8 @@ import {
     Phone,
     MessageSquare,
     UserCircle,
-    FileText
+    FileText,
+    MapPin
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusLabel } from '../constants/relationshipStatuses';
@@ -60,6 +61,12 @@ const EVENT_CONFIG = {
         color: 'text-emerald-400',
         bgColor: 'bg-emerald-500/10',
         label: 'Nota Agregada'
+    },
+    visit_record: {
+        icon: MapPin,
+        color: 'text-teal-400',
+        bgColor: 'bg-teal-500/10',
+        label: 'Visita Registrada'
     }
 };
 
@@ -207,6 +214,21 @@ function renderEventDescription(event: PersonHistoryEvent) {
 
         case 'edit':
             return `Información del perfil actualizada.`;
+
+        case 'visit_record': {
+            const addr = event.metadata?.property_address || event.new_value || 'Sin dirección';
+            const role = event.metadata?.role;
+            if (role === 'buyer') {
+                const feedback = event.metadata?.feedback;
+                return feedback
+                    ? `Visitó la propiedad "${addr}". Devolución: ${feedback}`
+                    : `Visitó la propiedad "${addr}".`;
+            } else if (role === 'seller') {
+                const visitor = event.metadata?.visitor_name || 'Un comprador';
+                return `${visitor} visitó la propiedad "${addr}".`;
+            }
+            return `Visita registrada en "${addr}".`;
+        }
 
         default:
             return `Evento registrado en el historial del lead.`;

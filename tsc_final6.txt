@@ -1,0 +1,74 @@
+﻿src/app/api/admin/organizations/route.ts(64,21): error TS2345: Argument of type '{ name: any; slug: any; email: any; phone: any; address: any; legal_name: any; cuit: any; billing_address: any; royalty_percentage: any; org_status: any; }' is not assignable to parameter of type 'never'.
+src/app/api/transactions/metrics/route.ts(43,21): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/transactions/metrics/route.ts(45,28): error TS2339: Property 'role' does not exist on type 'never'.
+src/app/api/transactions/metrics/route.ts(60,59): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/app/api/transactions/metrics/route.ts(69,64): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/app/api/transactions/metrics/route.ts(71,61): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(148,22): error TS2339: Property 'role' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(183,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Argument of type '{ name: string; slug: string; email: string | null; phone: string | null; address: string | null; legal_name: string | null; cuit: string | null; billing_address: string | null; royalty_percentage: number; is_active: boolean; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'name' does not exist in type 'never[]'.
+src/features/admin/actions/adminActions.ts(214,18): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organization_addresses", never, "POST">', gave the following error.
+    Argument of type '{ organization_id: string; address_type: string; street: string | null; number: string | null; floor: string | null; city: string | null; postal_code: string | null; province: string | null; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organization_addresses", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'organization_id' does not exist in type 'never[]'.
+src/features/admin/actions/adminActions.ts(229,18): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organization_addresses", never, "POST">', gave the following error.
+    Argument of type '{ organization_id: string; address_type: string; street: string | null; number: string | null; floor: string | null; city: string | null; postal_code: string | null; province: string | null; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organization_addresses", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'organization_id' does not exist in type 'never[]'.
+src/features/admin/actions/adminActions.ts(254,25): error TS2345: Argument of type '{ organization_id: string; }' is not assignable to parameter of type 'never'.
+src/features/admin/actions/adminActions.ts(287,18): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profiles", never, "POST">', gave the following error.
+    Argument of type '{ id: string; first_name: string; last_name: string; role: string; organization_id: string; is_active: boolean; default_split_percentage: number; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profiles", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'id' does not exist in type 'never[]'.
+src/features/admin/actions/adminActions.ts(346,67): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(374,14): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profiles", never, "POST">', gave the following error.
+    Argument of type '{ id: string; first_name: string; last_name: string; role: Database["public"]["Enums"]["user_role"]; organization_id: string; phone: string | null; is_active: boolean; default_split_percentage: number; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profiles", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'id' does not exist in type 'never[]'.
+src/features/admin/actions/adminActions.ts(400,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profile_supervisors", never, "POST">', gave the following error.
+    Argument of type '{ agent_id: string; supervisor_id: string; }[]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profile_supervisors", never, "POST">', gave the following error.
+    Argument of type '{ agent_id: string; supervisor_id: string; }[]' is not assignable to parameter of type 'never[]'.
+      Type '{ agent_id: string; supervisor_id: string; }' is not assignable to type 'never'.
+src/features/admin/actions/adminActions.ts(456,41): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(467,71): error TS2339: Property 'organization_id' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(479,21): error TS2345: Argument of type '{ first_name: string; last_name: string; phone: string | null; default_split_percentage: number; organization_id: string | undefined; }' is not assignable to parameter of type 'never'.
+src/features/admin/actions/adminActions.ts(509,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profile_supervisors", never, "POST">', gave the following error.
+    Argument of type '{ agent_id: string; supervisor_id: string; }[]' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "profile_supervisors", never, "POST">', gave the following error.
+    Argument of type '{ agent_id: string; supervisor_id: string; }[]' is not assignable to parameter of type 'never[]'.
+      Type '{ agent_id: string; supervisor_id: string; }' is not assignable to type 'never'.
+src/features/admin/actions/adminActions.ts(576,19): error TS2339: Property 'id' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(577,24): error TS2339: Property 'first_name' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(577,40): error TS2339: Property 'last_name' does not exist on type 'never'.
+src/features/admin/actions/adminActions.ts(710,59): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/admin/actions/adminActions.ts(755,21): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/admin/actions/testTypes.ts(5,39): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Argument of type '{ name: string; slug: string; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Object literal may only specify known properties, and 'name' does not exist in type 'never[]'.
+src/features/admin/hooks/useAdmin.ts(139,25): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: never, options?: { count?: "exact" | "planned" | "estimated" | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Argument of type '{ name: string; slug: string; email?: string | undefined; phone?: string | undefined; address?: string | undefined; }' is not assignable to parameter of type 'never'.
+  Overload 2 of 2, '(values: never[], options?: { count?: "exact" | "planned" | "estimated" | undefined; defaultToNull?: boolean | undefined; } | undefined): PostgrestFilterBuilder<{ PostgrestVersion: "12"; }, never, never, null, "organizations", never, "POST">', gave the following error.
+    Argument of type '{ name: string; slug: string; email?: string | undefined; phone?: string | undefined; address?: string | undefined; }' is not assignable to parameter of type 'never[]'.
+      Type '{ name: string; slug: string; email?: string | undefined; phone?: string | undefined; address?: string | undefined; }' is missing the following properties from type 'never[]': length, pop, push, concat, and 35 more.
+src/features/weekly-activities/actions/activityActions.ts(41,17): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(80,21): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(123,25): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(151,25): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(166,17): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(179,21): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(223,25): error TS2345: Argument of type 'any' is not assignable to parameter of type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(259,53): error TS2339: Property 'data' does not exist on type 'never'.
+src/features/weekly-activities/actions/activityActions.ts(260,52): error TS2339: Property 'data' does not exist on type 'never'.

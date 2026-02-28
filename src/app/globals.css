@@ -52,7 +52,7 @@
 
 :root {
   --radius: 0.625rem;
-  
+
   /* Base colors - Light mode (fallback) */
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -72,14 +72,14 @@
   --border: rgba(0, 0, 0, 0.08);
   --input: rgba(0, 0, 0, 0.08);
   --ring: #8b5cf6;
-  
+
   /* Chart colors */
   --chart-1: #8b5cf6;
   --chart-2: #06b6d4;
   --chart-3: #10b981;
   --chart-4: #f59e0b;
   --chart-5: #ef4444;
-  
+
   /* Sidebar */
   --sidebar: rgba(255, 255, 255, 0.6);
   --sidebar-foreground: #0a0a0a;
@@ -99,46 +99,46 @@
   /* Base - Near black with subtle blue undertone */
   --background: #030712;
   --foreground: #f8fafc;
-  
+
   /* Cards - Glassmorphism surfaces */
   --card: rgba(255, 255, 255, 0.03);
   --card-foreground: #f1f5f9;
-  
+
   /* Popovers/Dropdowns */
   --popover: rgba(15, 23, 42, 0.95);
   --popover-foreground: #f1f5f9;
-  
+
   /* Primary - Electric Violet */
   --primary: #8b5cf6;
   --primary-foreground: #ffffff;
-  
+
   /* Secondary - Muted surfaces */
   --secondary: rgba(255, 255, 255, 0.06);
   --secondary-foreground: #e2e8f0;
-  
+
   /* Muted text and backgrounds */
   --muted: rgba(255, 255, 255, 0.04);
   --muted-foreground: #94a3b8;
-  
+
   /* Accent - Subtle highlight */
   --accent: rgba(139, 92, 246, 0.15);
   --accent-foreground: #c4b5fd;
-  
+
   /* Destructive */
   --destructive: #f87171;
-  
+
   /* Borders - Very subtle */
   --border: rgba(255, 255, 255, 0.06);
   --input: rgba(255, 255, 255, 0.08);
   --ring: #8b5cf6;
-  
+
   /* Chart colors - Vibrant for dark mode */
   --chart-1: #a78bfa;
   --chart-2: #22d3ee;
   --chart-3: #34d399;
   --chart-4: #fbbf24;
   --chart-5: #fb7185;
-  
+
   /* Sidebar - Glass effect */
   --sidebar: rgba(255, 255, 255, 0.02);
   --sidebar-foreground: #f1f5f9;
@@ -158,16 +158,16 @@
   * {
     @apply border-border outline-ring/50;
   }
-  
+
   html {
     scroll-behavior: smooth;
   }
-  
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
+
   /* Selection highlight */
   ::selection {
     background-color: rgba(139, 92, 246, 0.3);
@@ -227,45 +227,60 @@
 }
 
 @keyframes aurora-drift-1 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   25% {
     transform: translate(50px, 30px) scale(1.05);
   }
+
   50% {
     transform: translate(20px, -20px) scale(0.95);
   }
+
   75% {
     transform: translate(-30px, 20px) scale(1.02);
   }
 }
 
 @keyframes aurora-drift-2 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   33% {
     transform: translate(-40px, -30px) scale(1.08);
   }
+
   66% {
     transform: translate(30px, 40px) scale(0.92);
   }
 }
 
 @keyframes aurora-drift-3 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
+
   20% {
     transform: translate(60px, 20px) scale(1.03);
   }
+
   40% {
     transform: translate(30px, -40px) scale(0.97);
   }
+
   60% {
     transform: translate(-20px, 30px) scale(1.05);
   }
+
   80% {
     transform: translate(-40px, -10px) scale(0.98);
   }
@@ -307,11 +322,9 @@
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0) 0%,
-    rgba(139, 92, 246, 0) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0) 0%,
+      rgba(139, 92, 246, 0) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -322,17 +335,15 @@
 }
 
 .card-glow:hover::before {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.5) 0%,
-    rgba(59, 130, 246, 0.3) 50%,
-    rgba(16, 185, 129, 0.5) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(139, 92, 246, 0.5) 0%,
+      rgba(59, 130, 246, 0.3) 50%,
+      rgba(16, 185, 129, 0.5) 100%);
   opacity: 1;
 }
 
 .card-glow:hover {
-  box-shadow: 
+  box-shadow:
     0 0 0 1px rgba(139, 92, 246, 0.1),
     0 8px 40px rgba(139, 92, 246, 0.08);
 }
@@ -410,4 +421,17 @@
 
 [data-slot="select-content"]::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 92, 246, 0.35);
+}
+
+/* ========================================================================
+   COMPETITION SHIMMER ANIMATION
+   ======================================================================== */
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
 }
