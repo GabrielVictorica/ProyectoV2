@@ -53,7 +53,7 @@ export function SmartCreatableSelect({
         if (value && !sets.has(value)) {
             sets.add(value)
         }
-        return Array.from(sets).sort()
+        return Array.from(sets)
     }, [initialOptions, value])
 
     const normalizedInput = toTitleCase(inputValue)

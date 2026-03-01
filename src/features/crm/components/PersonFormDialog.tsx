@@ -29,7 +29,7 @@ const FAMILY_COMPOSITIONS = [
 ];
 
 const SOURCES = [
-    'Instagram', 'Facebook', 'Google', 'Referido', 'Base de Relaciones',
+    'Base de Relaciones', 'Instagram', 'Facebook', 'Google', 'Referido',
     'Portal Inmobiliario', 'Cartel', 'Networking', 'Farming', 'Guardia/Oficina'
 ];
 
@@ -186,7 +186,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
             interestsHobbies: person?.interests_hobbies || initialData?.interestsHobbies || '',
             personalityNotes: person?.personality_notes || initialData?.personalityNotes || '',
             contactType: (person?.contact_type as string[]) || initialData?.contactType || [],
-            source: person?.source || initialData?.source || 'Instagram',
+            source: person?.source || initialData?.source || 'Base de Relaciones',
             referredById: person?.referred_by_id || initialData?.referredById || '',
             influenceLevel: person?.influence_level || initialData?.influenceLevel || 3,
             preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',

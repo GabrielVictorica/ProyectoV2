@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Person } from '@/features/clients/types';
-import { searchPersonsAction, getRecentPersonsAction, getPersonByIdAction } from '@/features/crm/actions/personActions';
+import { searchPersonsAction, getRecentPersonsAction, getPersonByIdAction, getPersonsAction } from '@/features/crm/actions/personActions';
 import { PersonFormDialog } from '@/features/crm/components/PersonFormDialog';
 import { Search, UserPlus, X, Check, User, Phone, Mail, Loader2, Sparkles, History, UserPlus2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,8 @@ interface PersonSelectorProps {
 
 export function PersonSelector({ value, onChange, placeholder = "Buscar persona...", className }: PersonSelectorProps) {
     const [search, setSearch] = useState('');
+    const [allPersons, setAllPersons] = useState<Person[]>([]);
+    const [hasLoadedAll, setHasLoadedAll] = useState(false);
     const [results, setResults] = useState<Person[]>([]);
     const [recentPersons, setRecentPersons] = useState<Person[]>([]);
     const [loading, setLoading] = useState(false);
@@ -35,6 +37,22 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         };
         fetchRecent();
     }, []);
+
+    // Cargar TODAS las personas para búsqueda local instantánea
+    useEffect(() => {
+        const fetchAll = async () => {
+            if (isOpen && !hasLoadedAll && !loading) {
+                setLoading(true);
+                const res = await getPersonsAction(); // Trae activos por defecto
+                if (res.success) {
+                    setAllPersons(res.data || []);
+                    setHasLoadedAll(true);
+                }
+                setLoading(false);
+            }
+        };
+        fetchAll();
+    }, [isOpen, hasLoadedAll]);
 
     // Resolver ID a Persona si viene por prop
     useEffect(() => {
@@ -64,24 +82,23 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Búsqueda con debounce
+    // Búsqueda LOCAL (Instantánea)
     useEffect(() => {
-        const fetchResults = async () => {
-            if (search.length < 2) {
-                setResults([]);
-                return;
-            }
-            setLoading(true);
-            const result = await searchPersonsAction(search);
-            if (result.success) {
-                setResults(result.data || []);
-            }
-            setLoading(false);
-        };
+        if (search.length < 2) {
+            setResults([]);
+            return;
+        }
 
-        const timer = setTimeout(fetchResults, 300);
-        return () => clearTimeout(timer);
-    }, [search]);
+        const query = search.toLowerCase();
+        const filtered = allPersons.filter(p =>
+            p.first_name.toLowerCase().includes(query) ||
+            p.last_name.toLowerCase().includes(query) ||
+            (p.email && p.email.toLowerCase().includes(query)) ||
+            (p.phone && p.phone.toLowerCase().includes(query))
+        );
+
+        setResults(filtered.slice(0, 10)); // Limitar a 10 resultados para la UI
+    }, [search, allPersons]);
 
     const handleSelect = (person: Person) => {
         setSelectedPerson(person);
