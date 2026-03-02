@@ -39,13 +39,23 @@ export interface ClosingsFilters {
 export async function getClosingsDashboardDataAction(filters: ClosingsFilters = {}): Promise<ClosingsDashboardData> {
     const supabase = await createClient();
 
-    // 1. Auth Check (RLS depends on this)
+    // 1. Auth Check
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    // 2. Prepare Queries (Native RLS will filter results automatically)
-    // We only apply UI filters (Year, Month, etc.) here.
+    // Obtener perfil para saber el rol y la organización
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, organization_id')
+        .eq('id', user.id)
+        .single();
 
+    if (!profile) throw new Error('Profile not found');
+
+    const role = profile.role;
+    const userOrgId = profile.organization_id;
+
+    // 2. Prepare Queries
     let txQuery = supabase
         .from('transactions')
         .select(`
@@ -61,6 +71,16 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     let metricsQuery = supabase
         .from('view_financial_metrics')
         .select('*');
+
+    // FILTRADO ESTRICTO DE SEGURIDAD BASADO EN ROLES
+    // Esto asegura que, independientemente de los filtros de UI, los usuarios no vean datos de otros
+    if (role === 'child') {
+        txQuery = txQuery.eq('agent_id', user.id);
+        metricsQuery = metricsQuery.eq('agent_id', user.id);
+    } else if (role === 'parent' && userOrgId) {
+        txQuery = txQuery.eq('organization_id', userOrgId);
+        metricsQuery = metricsQuery.eq('organization_id', userOrgId);
+    }
 
     // 3. Apply UI Filters
     if (filters.organizationId && filters.organizationId !== 'all') {
@@ -95,13 +115,19 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     }
 
     // 4. Team Members (For Filter Dropdowns)
-    // RLS should also filter this list based on user role
-    // (e.g. God sees all, Parent sees org, Child sees self or peers?)
-    // If profiles RLS is strict, this might return empty or just self.
-    const { data: teamMembers } = await supabase
+    let teamQuery = supabase
         .from('profiles')
         .select('id, first_name, last_name, role, organization_id')
         .order('first_name', { ascending: true });
+
+    // Filtrar también el listado de equipo por seguridad
+    if (role === 'child') {
+        teamQuery = teamQuery.eq('id', user.id);
+    } else if (role === 'parent' && userOrgId) {
+        teamQuery = teamQuery.eq('organization_id', userOrgId);
+    }
+
+    const { data: teamMembers } = await teamQuery;
 
     // 5. Execute
     const [txRes, metricsRes] = await Promise.all([
