@@ -604,6 +604,7 @@ export type Database = {
                     master_commission_amount: number
                     office_commission_amount: number
                     royalty_percentage_at_closure: number
+                    status: string
                     created_at: string | null
                     updated_at: string | null
                 }
@@ -627,6 +628,7 @@ export type Database = {
                     master_commission_amount?: number
                     office_commission_amount?: number
                     royalty_percentage_at_closure?: number
+                    status?: string
                     created_at?: string | null
                     updated_at?: string | null
                 }
@@ -650,6 +652,7 @@ export type Database = {
                     master_commission_amount?: number
                     office_commission_amount?: number
                     royalty_percentage_at_closure?: number
+                    status?: string
                     created_at?: string | null
                     updated_at?: string | null
                 }
@@ -778,6 +781,7 @@ export type Database = {
                     agent_id: string
                     year: number
                     month: number
+                    status: string
                     total_sales_volume: number
                     total_gross_commission: number
                     total_net_income: number

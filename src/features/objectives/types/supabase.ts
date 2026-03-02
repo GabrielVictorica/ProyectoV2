@@ -20,6 +20,10 @@ export interface ViewAgentProgress {
     currency: string;
     actual_gross_income: number;
     actual_puntas_count: number;
+    completed_gross_income: number;
+    reserved_gross_income: number;
+    completed_puntas_count: number;
+    reserved_puntas_count: number;
     progress_percentage: number;
     gap_to_goal: number;
     estimated_puntas_needed: number;
@@ -60,6 +64,10 @@ export interface ViewTeamObjectivesSummary {
     avg_progress: number;
     total_puntas_needed: number;
     total_puntas_closed: number;
+    total_completed_income: number;
+    total_reserved_income: number;
+    total_completed_puntas: number;
+    total_reserved_puntas: number;
 }
 
 // Tipos para view_financial_metrics
@@ -99,6 +107,10 @@ export interface AgentWithProgress {
     required_prelistings_weekly: number;
     sales_effectiveness_ratio: number;
     minimum_listings_required: number;
+    completed_gross_income: number;
+    reserved_gross_income: number;
+    completed_puntas_count: number;
+    reserved_puntas_count: number;
 }
 
 // Tipo para el historial promedio

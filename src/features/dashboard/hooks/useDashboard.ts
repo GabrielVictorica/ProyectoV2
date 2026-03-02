@@ -27,7 +27,7 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
 
     let salesQuery = supabase
         .from('transactions')
-        .select('actual_price, total_commission, agent_id, profiles(first_name, last_name)');
+        .select('actual_price, gross_commission, agent_id, profiles(first_name, last_name)');
 
     if (isParent && orgId) {
         propertiesQuery = propertiesQuery.eq('organization_id', orgId);
@@ -52,7 +52,7 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
 
     // 3. Procesar datos de transacciones (Ventas y Comisiones)
     const totalSalesVolume = salesData?.reduce((sum: number, t: any) => sum + (t.actual_price || 0), 0) || 0;
-    const totalCommissions = salesData?.reduce((sum: number, t: any) => sum + (t.total_commission || 0), 0) || 0;
+    const totalCommissions = salesData?.reduce((sum: number, t: any) => sum + (t.gross_commission || 0), 0) || 0;
 
     // 4. Calcular Ranking de Agentes si es Broker
     let agentRanking = [];

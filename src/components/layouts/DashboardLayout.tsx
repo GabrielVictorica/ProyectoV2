@@ -45,7 +45,7 @@ const MAIN_ITEMS = [
 const TRACKING_ITEMS = [
     { href: '/dashboard/my-week', label: 'Mi Semana', icon: CalendarDays },
     { href: '/dashboard/objectives', label: 'Control y Objetivos', icon: Target },
-    { href: '/dashboard/closings', label: 'Cierres', icon: Handshake },
+    { href: '/dashboard/closings', label: 'Operaciones', icon: Handshake },
 ];
 
 // --- Memoized Components ---

@@ -26,7 +26,7 @@ export function BillingProgressBar({ teamId, facturacion, delay = 0 }: BillingPr
                     <span className="text-lg">{config.emoji}</span>
                     <div>
                         <p className="text-sm font-semibold text-white">{config.name}</p>
-                        <p className="text-[10px] text-slate-500">Facturación</p>
+                        <p className="text-[10px] text-slate-500">Facturación & Reservas</p>
                     </div>
                 </div>
                 <div className="text-right">
@@ -46,8 +46,8 @@ export function BillingProgressBar({ teamId, facturacion, delay = 0 }: BillingPr
                     animate={{ width: `${percentage}%` }}
                     transition={{ duration: 1.2, delay: delay + 0.3, ease: 'easeOut' }}
                     className={`absolute inset-y-0 left-0 rounded-full ${teamId === 'negro'
-                            ? 'bg-gradient-to-r from-slate-500 to-slate-300'
-                            : 'bg-gradient-to-r from-amber-600 to-amber-400'
+                        ? 'bg-gradient-to-r from-slate-500 to-slate-300'
+                        : 'bg-gradient-to-r from-amber-600 to-amber-400'
                         }`}
                 />
             </div>

@@ -178,22 +178,23 @@ export async function getCompetitionDataAction(
                 .lte('date', endDate),
             adminClient
                 .from('transactions' as any)
-                .select('agent_id, sides, gross_commission, transaction_date')
+                .select('agent_id, sides, gross_commission, transaction_date, status')
                 .in('agent_id', agentIds)
                 .gte('transaction_date', startDate)
-                .lte('transaction_date', endDate),
+                .lte('transaction_date', endDate)
+                .neq('status', 'cancelled'),
             adminClient
                 .from('persons' as any)
                 .select('agent_id, created_at')
                 .in('agent_id', agentIds)
-                .gte('created_at', startDate + 'T00:00:00Z')
-                .lte('created_at', endDate + 'T23:59:59Z'),
+                .gte('created_at', startDate + 'T00:00:00-03:00')
+                .lte('created_at', endDate + 'T23:59:59-03:00'),
             adminClient
                 .from('person_searches' as any)
                 .select('agent_id, created_at')
                 .in('agent_id', agentIds)
-                .gte('created_at', startDate + 'T00:00:00Z')
-                .lte('created_at', endDate + 'T23:59:59Z'),
+                .gte('created_at', startDate + 'T00:00:00-03:00')
+                .lte('created_at', endDate + 'T23:59:59-03:00'),
             adminClient
                 .from('view_agent_progress' as any)
                 .select('agent_id, weekly_pl_pb_target, required_prelistings_weekly')
@@ -457,7 +458,7 @@ export async function getCompetitionDataAction(
             }
 
             // Only include weeks that have some data or are in the past
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
             if (monday <= today) {
                 weeklyResults.push({
                     weekStart: monday,
