@@ -54,6 +54,10 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         avg_progress: 0,
         total_puntas_needed: acc.total_puntas_needed + Number(curr.total_puntas_needed || 0),
         total_puntas_closed: acc.total_puntas_closed + Number(curr.total_puntas_closed || 0),
+        total_completed_income: acc.total_completed_income + Number(curr.total_completed_income || 0),
+        total_reserved_income: acc.total_reserved_income + Number(curr.total_reserved_income || 0),
+        total_completed_puntas: acc.total_completed_puntas + Number(curr.total_completed_puntas || 0),
+        total_reserved_puntas: acc.total_reserved_puntas + Number(curr.total_reserved_puntas || 0),
     }), {
         year,
         organization_id: null,
@@ -63,6 +67,10 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         avg_progress: 0,
         total_puntas_needed: 0,
         total_puntas_closed: 0,
+        total_completed_income: 0,
+        total_reserved_income: 0,
+        total_completed_puntas: 0,
+        total_reserved_puntas: 0,
     });
 
     aggregated.avg_progress = aggregated.total_team_goal > 0
@@ -210,6 +218,10 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
                 required_prelistings_weekly: Number(row.required_prelistings_weekly) || 0,
                 sales_effectiveness_ratio: row.sales_effectiveness_ratio || 2,
                 minimum_listings_required: row.minimum_listings_required || 0,
+                completed_gross_income: row.completed_gross_income || 0,
+                reserved_gross_income: row.reserved_gross_income || 0,
+                completed_puntas_count: row.completed_puntas_count || 0,
+                reserved_puntas_count: row.reserved_puntas_count || 0,
             }));
         },
     });

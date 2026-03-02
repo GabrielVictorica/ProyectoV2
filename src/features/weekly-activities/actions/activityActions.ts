@@ -58,7 +58,8 @@ export async function createActivityAction(data: ActivityInsert) {
     const { data: { user } } = await supabase.auth.getUser();
 
     // Block future dates — activities can only be created for today or earlier
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use Argentina timezone (UTC-3) so agents can create activities until midnight local time
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }); // YYYY-MM-DD
     if (data.date > today) {
         return { success: false, error: 'No se pueden cargar actividades con fecha futura.' };
     }
@@ -285,7 +286,7 @@ export async function getWeeklyDataAction(
                 .lte('date', endDate),
             adminClient
                 .from('transactions' as any)
-                .select('id, transaction_date, buyer_name, seller_name, buyer_person_id, seller_person_id, actual_price, notes, property_id, custom_property_title, property:properties(title)')
+                .select('id, status, transaction_date, buyer_name, seller_name, buyer_person_id, seller_person_id, actual_price, notes, property_id, custom_property_title, property:properties(title)')
                 .eq('agent_id', agentId)
                 .gte('transaction_date', startDate)
                 .lte('transaction_date', endDate)

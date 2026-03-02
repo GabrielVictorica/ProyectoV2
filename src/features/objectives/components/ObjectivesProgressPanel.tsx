@@ -100,6 +100,20 @@ export function ObjectivesProgressPanel({
                                                     <p className="text-5xl md:text-6xl font-black text-white tracking-tight drop-shadow-sm">
                                                         {formatCurrency(progress.actual_gross_income)}
                                                     </p>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <span className="flex items-center gap-1.5 text-xs">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                                                            <span className="text-emerald-400 font-medium">{formatCurrency(progress.completed_gross_income || 0)}</span>
+                                                            <span className="text-slate-600">cerrado</span>
+                                                        </span>
+                                                        {(progress.reserved_gross_income || 0) > 0 && (
+                                                            <span className="flex items-center gap-1.5 text-xs">
+                                                                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                                                                <span className="text-amber-400 font-medium">{formatCurrency(progress.reserved_gross_income || 0)}</span>
+                                                                <span className="text-slate-600">reservado</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 <div className="hidden md:block w-px h-16 bg-slate-800" />
@@ -116,18 +130,53 @@ export function ObjectivesProgressPanel({
 
                                             {/* Barra de Progreso Principal */}
                                             <div className="mt-10 relative">
-                                                <div className="h-4 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5 p-1">
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${progressPercentage}%` }}
-                                                        transition={{ duration: 1, ease: "easeOut" }}
-                                                        className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
-                                                    />
+                                                <div className="h-4 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5 p-1 flex">
+                                                    {(() => {
+                                                        const completedPct = progress.annual_billing_goal > 0
+                                                            ? Math.min(100, ((progress.completed_gross_income || 0) / progress.annual_billing_goal) * 100)
+                                                            : 0;
+                                                        const reservedPct = progress.annual_billing_goal > 0
+                                                            ? Math.min(100 - completedPct, ((progress.reserved_gross_income || 0) / progress.annual_billing_goal) * 100)
+                                                            : 0;
+                                                        return (
+                                                            <>
+                                                                <motion.div
+                                                                    initial={{ width: 0 }}
+                                                                    animate={{ width: `${completedPct}%` }}
+                                                                    transition={{ duration: 1, ease: "easeOut" }}
+                                                                    className="h-full rounded-l-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                                                />
+                                                                {reservedPct > 0 && (
+                                                                    <motion.div
+                                                                        initial={{ width: 0 }}
+                                                                        animate={{ width: `${reservedPct}%` }}
+                                                                        transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+                                                                        className="h-full bg-gradient-to-r from-amber-500/70 to-amber-400/50"
+                                                                        style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 6px)' }}
+                                                                    />
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="flex justify-between items-center mt-3 px-1">
-                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                                        {progressPercentage.toFixed(1)}% completado
-                                                    </p>
+                                                    <div className="flex items-center gap-4">
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                            {progressPercentage.toFixed(1)}% completado
+                                                        </p>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="flex items-center gap-1 text-[10px]">
+                                                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                                <span className="text-emerald-400/70 font-medium">Cerrado</span>
+                                                            </span>
+                                                            {(progress.reserved_gross_income || 0) > 0 && (
+                                                                <span className="flex items-center gap-1 text-[10px]">
+                                                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                                    <span className="text-amber-400/70 font-medium">Reservado</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                                         Faltan {formatCurrency(progress.gap_to_goal || 0)}
                                                     </p>

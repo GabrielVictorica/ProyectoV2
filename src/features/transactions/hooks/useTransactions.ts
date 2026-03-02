@@ -29,6 +29,7 @@ export interface Transaction {
     office_commission_amount: number;
     master_commission_amount: number;
     royalty_percentage_at_closure: number;
+    status: string;
     notes: string | null;
     created_at: string | null;
     updated_at: string | null;
@@ -104,6 +105,7 @@ export interface CreateTransactionInput {
     buyer_person_id?: string | null;
     seller_person_id?: string | null;
     custom_property_title?: string | null;
+    status?: string;
     notes?: string | null;
 }
 
@@ -126,6 +128,7 @@ export interface UpdateTransactionInput {
     agent_id?: string | null;
     organization_id?: string | null;
     custom_property_title?: string | null;
+    status?: string;
     notes?: string | null;
 }
 

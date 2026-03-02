@@ -44,20 +44,19 @@ import {
     DollarSign,
     RefreshCw,
     Shield,
-    TrendingUp,
     BarChart3,
     Handshake,
-    CheckCircle2,
     Calendar,
     Building2,
     Users,
     X,
     Search,
-    Layers
+    Plus
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { DynamicTypography } from '@/components/ui/DynamicTypography';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function ClosingsPage() {
     const { data: auth, isLoading: isLoadingAuth } = useAuth();
@@ -70,6 +69,7 @@ export function ClosingsPage() {
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [selectedAgent, setSelectedAgent] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'completed'>('all');
 
     const filters = {
         year: selectedYear,
@@ -163,14 +163,18 @@ export function ClosingsPage() {
         if (!transactions) return [];
         return transactions.filter(tx => {
             const searchLower = searchQuery.toLowerCase();
-            const propertyTitle = (tx.property?.title || '').toLowerCase();
+            const propertyTitle = (tx.property?.title || tx.custom_property_title || '').toLowerCase();
             const agentName = tx.agent ? `${tx.agent.first_name} ${tx.agent.last_name}`.toLowerCase() : '';
 
-            return searchQuery === '' ||
+            const matchesSearch = searchQuery === '' ||
                 propertyTitle.includes(searchLower) ||
                 agentName.includes(searchLower);
+
+            const matchesTab = selectedTab === 'all' || tx.status === selectedTab;
+
+            return matchesSearch && matchesTab;
         });
-    }, [transactions, searchQuery]);
+    }, [transactions, searchQuery, selectedTab]);
 
     const handleRefresh = () => {
         // Invalidar la nueva query unificada
@@ -233,11 +237,11 @@ export function ClosingsPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                        Cierres
+                        Operaciones
                     </h1>
                     <p className="text-slate-400 mt-1 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Seguimiento financiero y objetivos logrados
+                        <Handshake className="h-4 w-4 text-emerald-500" />
+                        Gestión de ventas, reservas y cierres
                     </p>
                 </div>
 
@@ -387,143 +391,100 @@ export function ClosingsPage() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+            {/* Summary Cards */}
+            <div className={`grid grid-cols-1 gap-4 ${isGodOrParent ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'}`}>
+                {/* Card 1: Volumen de Ventas */}
                 <motion.div variants={itemVariants}>
-                    <KPICard
-                        title="Operaciones"
-                        value={metrics?.closedDealsCount || 0}
-                        icon={<Handshake className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="purple"
-                    />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                    <KPICard
-                        title="Puntas"
-                        value={metrics?.totalPuntas || 0}
-                        icon={<Layers className="h-5 w-5" />}
+                    <SummaryCard
+                        title="Volumen de Ventas"
+                        icon={<DollarSign className="h-5 w-5" />}
+                        mainValue={formatCurrency((metrics?.totalRealVolume || 0) + (metrics?.totalProjectedVolume || 0))}
                         loading={isLoading}
                         color="blue"
+                        details={[
+                            { label: 'Cerrado', value: formatCurrency(metrics?.totalRealVolume || 0), color: 'emerald' },
+                            { label: 'Reservado', value: formatCurrency(metrics?.totalProjectedVolume || 0), color: 'amber' },
+                        ]}
                     />
                 </motion.div>
+
+                {/* Card 2: Comisiones */}
                 <motion.div variants={itemVariants}>
-                    <KPICard
-                        title="Vol. de Ventas"
-                        value={formatCurrency(metrics?.totalSalesVolume || 0)}
-                        icon={<DollarSign className="h-5 w-5" />}
+                    <SummaryCard
+                        title={role === 'child' ? 'Mi Comisión' : 'Comisiones'}
+                        icon={<BarChart3 className="h-5 w-5" />}
+                        mainValue={formatCurrency(
+                            role === 'child'
+                                ? (metrics?.totalNetIncome || 0)
+                                : (metrics?.totalRealCommission || 0) + (metrics?.totalProjectedCommission || 0)
+                        )}
                         loading={isLoading}
                         color="green"
-                        isString
+                        details={
+                            role === 'child'
+                                ? [
+                                    { label: 'Neto facturado', value: formatCurrency(metrics?.totalNetIncome || 0), color: 'emerald' },
+                                ]
+                                : [
+                                    { label: 'Facturado', value: formatCurrency(metrics?.totalRealCommission || 0), color: 'emerald' },
+                                    { label: 'Proyectado', value: formatCurrency(metrics?.totalProjectedCommission || 0), color: 'amber' },
+                                ]
+                        }
                     />
                 </motion.div>
+
+                {/* Card 3: Operaciones */}
                 <motion.div variants={itemVariants}>
-                    <KPICard
-                        title={role === 'parent' ? "Facturación BRUTA" : "Finanzas"}
-                        value={formatCurrency(metrics?.totalGrossCommission || 0)}
-                        icon={<BarChart3 className="h-5 w-5" />}
+                    <SummaryCard
+                        title="Operaciones"
+                        icon={<Handshake className="h-5 w-5" />}
+                        mainValue={`${metrics?.closedDealsCount || 0}`}
+                        mainSuffix={`· ${metrics?.totalPuntas || 0} puntas`}
                         loading={isLoading}
-                        color="yellow"
-                        isString
+                        color="purple"
+                        details={[
+                            { label: 'Cierres', value: String(transactions.filter(t => (t.status || 'completed') === 'completed').length), color: 'emerald' },
+                            { label: 'Reservas', value: String(transactions.filter(t => t.status === 'pending').length), color: 'amber' },
+                            { label: 'Ticket Prom.', value: formatCurrency(metrics?.averageTicket || 0), color: 'slate' },
+                        ]}
                     />
                 </motion.div>
 
-                {/* Desglose para Dios */}
-                {role === 'god' && (
-                    <>
-                        <motion.div variants={itemVariants}>
-                            <KPICard
-                                title="Royalty Dios"
-                                value={formatCurrency(metrics?.totalMasterIncome || 0)}
-                                icon={<Shield className="h-5 w-5" />}
-                                loading={isLoading}
-                                color="purple"
-                                isString
-                            />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                            <KPICard
-                                title="Neto Oficinas"
-                                value={formatCurrency(metrics?.totalOfficeIncome || 0)}
-                                icon={<Building2 className="h-5 w-5" />}
-                                loading={isLoading}
-                                color="blue"
-                                isString
-                            />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                            <KPICard
-                                title="Pago Agentes"
-                                value={formatCurrency(metrics?.totalNetIncome || 0)}
-                                icon={<Users className="h-5 w-5" />}
-                                loading={isLoading}
-                                color="green"
-                                isString
-                            />
-                        </motion.div>
-                    </>
-                )}
-
-                {/* Desglose para Parent (Broker) */}
-                {role === 'parent' && (
-                    <>
-                        <motion.div variants={itemVariants}>
-                            <KPICard
-                                title="Facturación Neta"
-                                value={formatCurrency(metrics?.totalOfficeIncome || 0)}
-                                icon={<Building2 className="h-5 w-5" />}
-                                loading={isLoading}
-                                color="blue"
-                                isString
-                            />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                            <KPICard
-                                title="Pago Agentes"
-                                value={formatCurrency(metrics?.totalNetIncome || 0)}
-                                icon={<Users className="h-5 w-5" />}
-                                loading={isLoading}
-                                color="green"
-                                isString
-                            />
-                        </motion.div>
-                    </>
-                )}
-
-                {/* Desglose para Child (Agente) */}
-                {role === 'child' && (
+                {/* Card 4: Desglose Financiero (God/Parent only) */}
+                {isGodOrParent && (
                     <motion.div variants={itemVariants}>
-                        <KPICard
-                            title="Mi Comisión"
-                            value={formatCurrency(metrics?.totalNetIncome || 0)}
-                            icon={<TrendingUp className="h-5 w-5" />}
+                        <SummaryCard
+                            title="Desglose Financiero"
+                            icon={<Shield className="h-5 w-5" />}
+                            mainValue={formatCurrency(metrics?.totalGrossCommission || 0)}
+                            mainSuffix="bruto"
                             loading={isLoading}
-                            color="green"
-                            isString
+                            color="yellow"
+                            details={[
+                                ...(role === 'god' ? [{ label: 'Royalty', value: formatCurrency(metrics?.totalMasterIncome || 0), color: 'purple' as const }] : []),
+                                { label: 'Oficina', value: formatCurrency(metrics?.totalOfficeIncome || 0), color: 'blue' as const },
+                                { label: 'Agentes', value: formatCurrency(metrics?.totalNetIncome || 0), color: 'emerald' as const },
+                            ]}
                         />
                     </motion.div>
                 )}
-
-                <motion.div variants={itemVariants}>
-                    <KPICard
-                        title="Ticket Prom."
-                        value={formatCurrency(metrics?.averageTicket || 0)}
-                        icon={<TrendingUp className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="yellow"
-                        isString
-                    />
-                </motion.div>
             </div>
 
 
             {/* Transactions Table */}
             <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden shadow-2xl">
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <CardTitle className="text-white flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-purple-400" />
-                        Historial de Cierres
+                        Historial de Operaciones
                     </CardTitle>
+                    <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as any)} className="w-full sm:w-auto">
+                        <TabsList className="bg-slate-800/50 border-slate-700">
+                            <TabsTrigger value="all" className="data-[state=active]:bg-slate-700 text-slate-400 data-[state=active]:text-white data-[state=active]:shadow-xl transition-all">Todas ({transactions.length})</TabsTrigger>
+                            <TabsTrigger value="pending" className="data-[state=active]:bg-amber-500/20 text-amber-500/70 data-[state=active]:text-amber-400 data-[state=active]:shadow-lg shadow-amber-500/20 transition-all">Reservas ({transactions.filter(t => t.status === 'pending').length})</TabsTrigger>
+                            <TabsTrigger value="completed" className="data-[state=active]:bg-emerald-500/20 text-emerald-500/70 data-[state=active]:text-emerald-400 data-[state=active]:shadow-lg shadow-emerald-500/20 transition-all">Cierres ({transactions.filter(t => (t.status || 'completed') === 'completed').length})</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (
@@ -540,6 +501,7 @@ export function ClosingsPage() {
                                             <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Agente</TableHead>
                                         )}
                                         <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Propiedad</TableHead>
+                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Estado</TableHead>
                                         <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Precio</TableHead>
                                         <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Puntas</TableHead>
                                         <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Bruta</TableHead>
@@ -570,6 +532,15 @@ export function ClosingsPage() {
                                             <TableCell className="text-white font-sans max-w-[200px] truncate">
                                                 {tx.property?.title || tx.custom_property_title || (
                                                     <span className="text-slate-500 italic">Sin propiedad</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {tx.status === 'pending' ? (
+                                                    <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">Reserva</Badge>
+                                                ) : tx.status === 'cancelled' ? (
+                                                    <Badge variant="outline" className="border-red-500/50 text-red-500 bg-red-500/10">Caída</Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="border-emerald-500/50 text-emerald-500 bg-emerald-500/10">Cierre Final</Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-white">
@@ -616,7 +587,7 @@ export function ClosingsPage() {
                                                                 </AlertDialogTrigger>
                                                                 <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
                                                                     <AlertDialogHeader>
-                                                                        <AlertDialogTitle>¿Eliminar este cierre?</AlertDialogTitle>
+                                                                        <AlertDialogTitle>¿Eliminar esta operación?</AlertDialogTitle>
                                                                         <AlertDialogDescription className="text-slate-400">
                                                                             Esta acción no se puede deshacer. Los KPIs se actualizarán automáticamente.
                                                                         </AlertDialogDescription>
@@ -643,17 +614,17 @@ export function ClosingsPage() {
                         </div>
                     ) : (
                         <div className="py-20 text-center">
-                            <TrendingUp className="h-12 w-12 text-slate-800 mx-auto mb-4" />
+                            <Handshake className="h-12 w-12 text-slate-800 mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-slate-500">No se encontraron transacciones</h3>
                             <p className="text-slate-400 mb-4">
-                                Registra tu primera operación cerrada
+                                Registra tu primera operación
                             </p>
                             <CloseTransactionDialog
                                 onSuccess={handleRefresh}
                                 trigger={
                                     <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
-                                        <Handshake className="mr-2 h-4 w-4" />
-                                        Cerrar Primera Operación
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Registrar Operación
                                     </Button>
                                 }
                             />
@@ -665,21 +636,23 @@ export function ClosingsPage() {
     );
 }
 
-// KPI Card Component
-function KPICard({
+// Summary Card Component (replaces individual KPI cards)
+function SummaryCard({
     title,
-    value,
     icon,
+    mainValue,
+    mainSuffix,
     loading,
     color,
-    isString = false,
+    details,
 }: {
     title: string;
-    value: string | number;
     icon: React.ReactNode;
+    mainValue: string;
+    mainSuffix?: string;
     loading: boolean;
     color: 'green' | 'blue' | 'purple' | 'yellow';
-    isString?: boolean;
+    details: { label: string; value: string; color: 'emerald' | 'amber' | 'purple' | 'blue' | 'slate' }[];
 }) {
     const themes = {
         green: {
@@ -708,34 +681,68 @@ function KPICard({
         },
     };
 
+    const dotColors: Record<string, string> = {
+        emerald: 'bg-emerald-500',
+        amber: 'bg-amber-500',
+        purple: 'bg-purple-500',
+        blue: 'bg-blue-500',
+        slate: 'bg-slate-500',
+    };
+
+    const textColors: Record<string, string> = {
+        emerald: 'text-emerald-400',
+        amber: 'text-amber-400',
+        purple: 'text-purple-400',
+        blue: 'text-blue-400',
+        slate: 'text-slate-400',
+    };
+
     const t = themes[color];
 
     return (
-        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md`}>
-            <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
-                <div className="flex flex-col gap-1">
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10">
+        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.01] hover:shadow-lg group shadow-md`}>
+            <CardContent className="p-5 relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className={`${t.text} opacity-70`}>{icon}</div>
+                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
                         {title}
                     </p>
-
-                    {loading ? (
-                        <Skeleton className="h-8 w-32 bg-slate-800/50 mt-1" />
-                    ) : (
-                        <div className="flex items-baseline gap-1 z-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            {isString && !isNaN(Number(value)) && (
-                                <span className="text-slate-500 font-medium text-sm self-center opacity-70 mb-0.5">$</span>
-                            )}
-                            <DynamicTypography
-                                value={isString ? value : value.toLocaleString()}
-                                className="text-white font-black tracking-tighter drop-shadow-md"
-                                baseSize="text-3xl"
-                            />
-                        </div>
-                    )}
                 </div>
+
+                {loading ? (
+                    <Skeleton className="h-9 w-40 bg-slate-800/50" />
+                ) : (
+                    <div className="flex items-baseline gap-2 mb-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <DynamicTypography
+                            value={mainValue}
+                            className="text-white font-black tracking-tighter drop-shadow-md"
+                            baseSize="text-2xl"
+                        />
+                        {mainSuffix && (
+                            <span className="text-slate-500 text-xs font-medium">{mainSuffix}</span>
+                        )}
+                    </div>
+                )}
+
+                {/* Inline breakdown */}
+                {!loading && (
+                    <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                        {details.map((d, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 text-slate-500">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${dotColors[d.color]}`} />
+                                    {d.label}
+                                </span>
+                                <span className={`font-semibold tabular-nums ${textColors[d.color]}`}>
+                                    {d.value}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </CardContent>
 
-            <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.05] group-hover:opacity-[0.10] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
                 <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
                     {icon}
                 </div>

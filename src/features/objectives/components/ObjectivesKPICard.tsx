@@ -17,6 +17,13 @@ interface ObjectivesKPICardProps {
     showProgress?: boolean;
     progressValue?: number;
     progressTotal?: number;
+    segmentedProgress?: {
+        completed: number;
+        reserved: number;
+        total: number;
+        completedLabel?: string;
+        reservedLabel?: string;
+    };
 }
 
 const colorClasses = {
@@ -60,6 +67,7 @@ export function ObjectivesKPICard({
     showProgress = false,
     progressValue = 0,
     progressTotal = 100,
+    segmentedProgress,
 }: ObjectivesKPICardProps) {
     const percentage = progressTotal > 0 ? Math.min(100, (progressValue / progressTotal) * 100) : 0;
     const isCompleted = percentage >= 100;
@@ -108,22 +116,37 @@ export function ObjectivesKPICard({
                                 )}
                             </div>
 
-                            {/* Progress Bar within the safe zone */}
-                            {showProgress && (
-                                <div className="mt-2 space-y-1 w-full max-w-[80%]">
-                                    <div className="h-1 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm">
-                                        <div
-                                            className={cn("h-full rounded-full transition-all duration-1000 ease-out", progressColorRaw)}
-                                            style={{ width: `${percentage}%` }}
-                                        />
+                            {/* Segmented Progress Bar (Cerrado + Reservado) */}
+                            {segmentedProgress && (
+                                <div className="mt-2 space-y-1.5 w-full max-w-[90%]">
+                                    <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm flex">
+                                        {segmentedProgress.total > 0 && (
+                                            <>
+                                                <div
+                                                    className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                                                    style={{ width: `${Math.min(100, (segmentedProgress.completed / segmentedProgress.total) * 100)}%` }}
+                                                />
+                                                <div
+                                                    className="h-full bg-amber-500/70 transition-all duration-1000 ease-out"
+                                                    style={{ width: `${Math.min(100 - (segmentedProgress.completed / segmentedProgress.total) * 100, (segmentedProgress.reserved / segmentedProgress.total) * 100)}%` }}
+                                                />
+                                            </>
+                                        )}
                                     </div>
-                                    <div className="flex justify-between items-center text-[9px] text-slate-400 font-medium">
-                                        <span>{percentage.toFixed(0)}%</span>
+                                    <div className="flex items-center gap-3 text-[9px] font-medium">
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                            <span className="text-emerald-400">{segmentedProgress.completedLabel || segmentedProgress.completed}</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                            <span className="text-amber-400">{segmentedProgress.reservedLabel || segmentedProgress.reserved}</span>
+                                        </span>
                                     </div>
                                 </div>
                             )}
 
-                            {!showProgress && subtitle && (
+                            {!showProgress && !segmentedProgress && subtitle && (
                                 <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1">{subtitle}</p>
                             )}
                         </div>

@@ -27,7 +27,7 @@ const ROWS = [
     { id: 'acm', label: 'ACM', color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
     { id: 'captacion', label: 'Captación', color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
     { id: 'visita', label: 'Visita', color: 'text-rose-400', bgColor: 'bg-rose-500/10' },
-    { id: 'reserva', label: 'Reserva', color: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
+    { id: 'reserva', label: 'Reserva', color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', isVirtual: true },
     { id: 'cierre', label: 'Cierre', color: 'text-indigo-400', bgColor: 'bg-indigo-500/10', isVirtual: true },
     { id: 'referido', label: 'Referido', color: 'text-orange-400', bgColor: 'bg-orange-500/10' },
 ];
@@ -118,7 +118,11 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                     const activities = cellData?.activities.filter(a => a.type === row.id) || [];
                                     let count = 0;
                                     if (row.isVirtual) {
-                                        count = cellData?.transactionCount || 0;
+                                        if (row.id === 'reserva') {
+                                            count = cellData?.reservaCount || 0;
+                                        } else {
+                                            count = cellData?.cierreCount || 0;
+                                        }
                                     } else {
                                         if (row.id === 'visita') {
                                             count = activities.reduce((acc, a) => acc + (a.visit_metadata?.punta === 'ambas' ? 2 : 1), 0);
@@ -147,27 +151,29 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                             </p>
                                                             {row.isVirtual ? (
                                                                 <div className="space-y-3">
-                                                                    {(cellData?.transactions || []).map((trans, tIdx) => (
-                                                                        <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
-                                                                            <div className="flex justify-between items-start gap-2">
-                                                                                <p className="font-bold text-white text-sm leading-tight max-w-[160px] truncate">
-                                                                                    {trans.property?.title || 'Propiedad sin título'}
-                                                                                </p>
-                                                                                <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
-                                                                                    ${trans.actual_price?.toLocaleString() || '0'}
-                                                                                </span>
+                                                                    {(cellData?.transactions || [])
+                                                                        .filter(trans => row.id === 'reserva' ? trans.status === 'pending' : trans.status !== 'pending')
+                                                                        .map((trans, tIdx) => (
+                                                                            <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
+                                                                                <div className="flex justify-between items-start gap-2">
+                                                                                    <p className="font-bold text-white text-sm leading-tight max-w-[160px] truncate">
+                                                                                        {trans.property?.title || 'Propiedad sin título'}
+                                                                                    </p>
+                                                                                    <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
+                                                                                        ${trans.actual_price?.toLocaleString() || '0'}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
+                                                                                    <span>Vendedor: {trans.seller_name || '-'}</span>
+                                                                                    <span>Comprador: {trans.buyer_name || '-'}</span>
+                                                                                </div>
+                                                                                {trans.notes && (
+                                                                                    <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
+                                                                                        "{trans.notes}"
+                                                                                    </p>
+                                                                                )}
                                                                             </div>
-                                                                            <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
-                                                                                <span>Vendedor: {trans.seller_name || '-'}</span>
-                                                                                <span>Comprador: {trans.buyer_name || '-'}</span>
-                                                                            </div>
-                                                                            {trans.notes && (
-                                                                                <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
-                                                                                    "{trans.notes}"
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
+                                                                        ))}
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">

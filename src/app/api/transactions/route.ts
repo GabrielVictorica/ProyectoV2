@@ -123,7 +123,8 @@ export async function POST(request: NextRequest) {
             seller_person_id,
             notes,
             organization_id, // Solo para GOD
-            custom_property_title
+            custom_property_title,
+            status
         } = body;
 
         if (!actual_price) {
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
                 organization_id: orgId,
                 property_id: property_id || null,
                 agent_id: finalAgentId,
-                transaction_date: transaction_date || new Date().toISOString().split('T')[0],
+                transaction_date: transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
                 actual_price: parseFloat(actual_price),
                 sides: parseInt(sides),
                 commission_percentage: parseFloat(commission_percentage),
@@ -227,6 +228,7 @@ export async function POST(request: NextRequest) {
                 seller_person_id: seller_person_id || null,
                 notes: notes || null,
                 custom_property_title: custom_property_title || null,
+                status: status || 'completed',
             })
             .select(`
                 *,
@@ -240,7 +242,7 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
 
         // Auto-update last_interaction_at for linked persons and their clients
-        const txDate = transaction_date || new Date().toISOString().split('T')[0];
+        const txDate = transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
         const personIdsToUpdate = [buyer_person_id, seller_person_id].filter(Boolean);
 
         for (const personId of personIdsToUpdate) {
@@ -250,21 +252,50 @@ export async function POST(request: NextRequest) {
                 .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
                 .eq('id', personId);
 
-            // Update all clients linked to this person (Targeting base table person_searches)
-            await (adminClient as any)
-                .from('person_searches')
-                .update({
-                    last_interaction_at: txDate,
-                    updated_at: new Date().toISOString(),
-                    status: 'closed' // Auto-archive searches when operation closes
-                })
-                .eq('person_id', personId);
+            // Solo cerrar búsquedas si es un cierre final (no reserva)
+            if (status !== 'pending') {
+                await (adminClient as any)
+                    .from('person_searches')
+                    .update({
+                        last_interaction_at: txDate,
+                        updated_at: new Date().toISOString(),
+                        status: 'closed'
+                    })
+                    .eq('person_id', personId);
+            } else {
+                // Para reservas, solo actualizar la fecha de interacción
+                await (adminClient as any)
+                    .from('person_searches')
+                    .update({
+                        last_interaction_at: txDate,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('person_id', personId);
+            }
         }
 
+        // Auto-generate activity (usar 'cierre' como tipo para ambos estados)
+        const activityNotes = status === 'pending'
+            ? `Reserva registrada desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`
+            : `Cierre efectivo registrado desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`;
+        await (adminClient as any)
+            .from('activities')
+            .insert({
+                organization_id: orgId,
+                agent_id: finalAgentId,
+                property_id: property_id || null,
+                client_id: null,
+                type: 'cierre',
+                status: 'completed',
+                date: txDate,
+                time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
+                notes: activityNotes,
+            });
+
         return NextResponse.json({ success: true, data });
-    } catch (err) {
+    } catch (err: any) {
         console.error('Error creating transaction:', err);
-        return NextResponse.json({ error: 'Error al crear transacción' }, { status: 500 });
+        return NextResponse.json({ error: err?.message || 'Error al crear transacción' }, { status: 500 });
     }
 }
 
@@ -288,7 +319,7 @@ export async function PUT(request: NextRequest) {
         // Obtener transacción actual para verificar permisos (Incluimos campos críticos para recálculo)
         const { data: currentTx } = await (adminClient as any)
             .from('transactions')
-            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage, buyer_person_id, seller_person_id, transaction_date, sides, property_id')
+            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage, buyer_person_id, seller_person_id, transaction_date, sides, property_id, status, custom_property_title')
             .eq('id', id)
             .single();
 
@@ -317,7 +348,7 @@ export async function PUT(request: NextRequest) {
             'commission_percentage', 'agent_split_percentage',
             'buyer_name', 'seller_name', 'buyer_id', 'seller_id',
             'buyer_person_id', 'seller_person_id',
-            'notes', 'custom_property_title', 'agent_id', 'organization_id'
+            'notes', 'custom_property_title', 'agent_id', 'organization_id', 'status'
         ];
 
         for (const field of allowedFields) {
@@ -402,15 +433,42 @@ export async function PUT(request: NextRequest) {
                 .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
                 .eq('id', personId);
 
-            // Update all clients linked to this person (Targeting base table person_searches)
+            // Solo cerrar búsquedas si el status final es completed
+            const finalStatus = updates.status || currentTx.status;
+            if (finalStatus === 'completed') {
+                await (adminClient as any)
+                    .from('person_searches')
+                    .update({
+                        last_interaction_at: txDate,
+                        updated_at: new Date().toISOString(),
+                        status: 'closed'
+                    })
+                    .eq('person_id', personId);
+            } else {
+                await (adminClient as any)
+                    .from('person_searches')
+                    .update({
+                        last_interaction_at: txDate,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('person_id', personId);
+            }
+        }
+
+        if (currentTx.status === 'pending' && updates.status === 'completed') {
             await (adminClient as any)
-                .from('person_searches')
-                .update({
-                    last_interaction_at: txDate,
-                    updated_at: new Date().toISOString(),
-                    status: 'closed' // Auto-archive searches
-                })
-                .eq('person_id', personId);
+                .from('activities')
+                .insert({
+                    organization_id: updateData.organization_id || currentTx.organization_id,
+                    agent_id: updateData.agent_id || currentTx.agent_id,
+                    property_id: updateData.property_id || currentTx.property_id || null,
+                    client_id: null,
+                    type: 'cierre',
+                    status: 'completed',
+                    date: txDate,
+                    time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
+                    notes: `Evolución de Reserva a Cierre Final. Operación: ${updateData.custom_property_title || currentTx.custom_property_title || 'Propiedad'}`,
+                });
         }
 
         return NextResponse.json({ success: true, data });

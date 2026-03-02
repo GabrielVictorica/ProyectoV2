@@ -68,6 +68,13 @@ export function ObjectivesKPIGrid({
                         loading={isLoading}
                         color="green"
                         isString
+                        segmentedProgress={{
+                            completed: teamSummary?.total_completed_income || 0,
+                            reserved: teamSummary?.total_reserved_income || 0,
+                            total: teamSummary?.total_team_income || 1,
+                            completedLabel: `Cerrado ${formatCurrency(teamSummary?.total_completed_income || 0)}`,
+                            reservedLabel: `Reservado ${formatCurrency(teamSummary?.total_reserved_income || 0)}`,
+                        }}
                     />
                 </motion.div>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
@@ -82,11 +89,18 @@ export function ObjectivesKPIGrid({
                 </motion.div>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.2 }}>
                     <ObjectivesKPICard
-                        title="Puntas Cerradas"
+                        title="Puntas Totales"
                         value={teamSummary?.total_puntas_closed || 0}
                         icon={<CheckCircle2 className="h-5 w-5" />}
                         loading={isLoading}
                         color="green"
+                        segmentedProgress={{
+                            completed: teamSummary?.total_completed_puntas || 0,
+                            reserved: teamSummary?.total_reserved_puntas || 0,
+                            total: teamSummary?.total_puntas_closed || 1,
+                            completedLabel: `${teamSummary?.total_completed_puntas || 0} cerr.`,
+                            reservedLabel: `${teamSummary?.total_reserved_puntas || 0} res.`,
+                        }}
                     />
                 </motion.div>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.25 }}>
@@ -151,7 +165,7 @@ export function ObjectivesKPIGrid({
                 {/* 2. Puntas Cerradas (Anual) */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.05 }}>
                     <ObjectivesKPICard
-                        title="Puntas Cerradas"
+                        title="Puntas Totales"
                         value={progress.actual_puntas_count || 0}
                         icon={<CheckCircle2 className="h-5 w-5" />}
                         loading={isLoading}
@@ -160,6 +174,13 @@ export function ObjectivesKPIGrid({
                         progressValue={progress.actual_puntas_count || 0}
                         progressTotal={Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0))}
                         subtitle={`Meta Anual: ${Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0))}`}
+                        segmentedProgress={{
+                            completed: progress.completed_puntas_count || 0,
+                            reserved: progress.reserved_puntas_count || 0,
+                            total: Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0)) || 1,
+                            completedLabel: `${progress.completed_puntas_count || 0} cerradas`,
+                            reservedLabel: `${progress.reserved_puntas_count || 0} reservadas`,
+                        }}
                     />
                 </motion.div>
 

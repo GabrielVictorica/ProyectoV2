@@ -44,6 +44,8 @@ export type WeeklyActivity = {
 export type WeeklyDataMap = Record<string, {
     activities: WeeklyActivity[];
     transactionCount: number;
+    reservaCount: number;
+    cierreCount: number;
     transactions: any[];
 }>;
 
@@ -80,7 +82,7 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
                 const day = new Date(weekStart);
                 day.setDate(weekStart.getDate() + i);
                 const dateStr = day.toISOString().split('T')[0];
-                map[dateStr] = { activities: [], transactionCount: 0, transactions: [] };
+                map[dateStr] = { activities: [], transactionCount: 0, reservaCount: 0, cierreCount: 0, transactions: [] };
             }
 
             (activities as any[])?.forEach(act => {
@@ -114,6 +116,11 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
                     };
 
                     map[trans.transaction_date].transactionCount += 1;
+                    if (trans.status === 'pending') {
+                        map[trans.transaction_date].reservaCount += 1;
+                    } else {
+                        map[trans.transaction_date].cierreCount += 1;
+                    }
                     map[trans.transaction_date].transactions.push(enhancedTrans);
                 }
             });

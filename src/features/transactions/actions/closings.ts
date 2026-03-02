@@ -9,7 +9,7 @@ export interface ClosingsDashboardData {
     metrics: FinancialMetrics[];
     teamMembers: any[];
     aggregatedMetrics: {
-        totalSalesVolume: number;
+        totalSalesVolume: number; // For backward compatibility if needed, or total combined
         totalGrossCommission: number;
         totalNetIncome: number;
         totalMasterIncome: number;
@@ -19,6 +19,12 @@ export interface ClosingsDashboardData {
         singleSidedCount: number;
         totalPuntas: number;
         averageTicket: number;
+        // Nuevas métricas desglosadas por estado
+        totalRealVolume: number;
+        totalRealCommission: number;
+        totalProjectedVolume: number;
+        totalProjectedCommission: number;
+        totalLostVolume: number;
     } | null;
 }
 
@@ -27,6 +33,7 @@ export interface ClosingsFilters {
     month?: number;
     organizationId?: string;
     agentId?: string;
+    status?: 'all' | 'pending' | 'completed' | 'cancelled';
 }
 
 export async function getClosingsDashboardDataAction(filters: ClosingsFilters = {}): Promise<ClosingsDashboardData> {
@@ -73,6 +80,10 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         metricsQuery = metricsQuery.eq('year', filters.year);
     }
 
+    if (filters.status && filters.status !== 'all') {
+        txQuery = txQuery.eq('status', filters.status);
+    }
+
     if (filters.month) {
         if (filters.year) {
             const lastDay = new Date(filters.year, filters.month, 0).getDate();
@@ -107,20 +118,35 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     // 6. Aggregation
     const aggregated = metricsData.reduce((acc, m) => {
         const puntas = (m.single_sided_count || 0) + ((m.double_sided_count || 0) * 2);
-        return {
-            totalSalesVolume: acc.totalSalesVolume + (m.total_sales_volume || 0),
-            totalGrossCommission: acc.totalGrossCommission + (m.total_gross_commission || 0),
-            totalNetIncome: acc.totalNetIncome + (m.total_net_income || 0),
-            totalMasterIncome: acc.totalMasterIncome + (m.total_master_income || 0),
-            totalOfficeIncome: acc.totalOfficeIncome + (m.total_office_income || 0),
-            closedDealsCount: acc.closedDealsCount + (m.closed_deals_count || 0),
-            doubleSidedCount: acc.doubleSidedCount + (m.double_sided_count || 0),
-            singleSidedCount: acc.singleSidedCount + (m.single_sided_count || 0),
-            totalPuntas: acc.totalPuntas + puntas,
-        };
+
+        // Sumamos al total general
+        acc.totalSalesVolume += (m.total_sales_volume || 0);
+        acc.totalGrossCommission += (m.total_gross_commission || 0);
+        acc.totalNetIncome += (m.total_net_income || 0);
+        acc.totalMasterIncome += (m.total_master_income || 0);
+        acc.totalOfficeIncome += (m.total_office_income || 0);
+        acc.closedDealsCount += (m.closed_deals_count || 0);
+        acc.doubleSidedCount += (m.double_sided_count || 0);
+        acc.singleSidedCount += (m.single_sided_count || 0);
+        acc.totalPuntas += puntas;
+
+        // Sumamos según estado (NULL/undefined = completed para transacciones legacy)
+        const txStatus = (m as any).status || 'completed';
+        if (txStatus === 'completed') {
+            acc.totalRealVolume += (m.total_sales_volume || 0);
+            acc.totalRealCommission += (m.total_gross_commission || 0);
+        } else if (txStatus === 'pending') {
+            acc.totalProjectedVolume += (m.total_sales_volume || 0);
+            acc.totalProjectedCommission += (m.total_gross_commission || 0);
+        } else if (txStatus === 'cancelled') {
+            acc.totalLostVolume += (m.total_sales_volume || 0);
+        }
+
+        return acc;
     }, {
         totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-        totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+        totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0,
+        totalRealVolume: 0, totalRealCommission: 0, totalProjectedVolume: 0, totalProjectedCommission: 0, totalLostVolume: 0
     });
 
     const averageTicket = aggregated.closedDealsCount > 0 ? aggregated.totalSalesVolume / aggregated.closedDealsCount : 0;
