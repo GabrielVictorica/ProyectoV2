@@ -182,7 +182,7 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
                         initial={{ opacity: 0, y: 10, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.98 }}
-                        className="absolute top-full left-0 right-0 mt-3 bg-[#0c0c0e]/95 backdrop-blur-2xl border border-white/[0.08] rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] z-[100] overflow-hidden"
+                        className="absolute top-full left-0 right-0 mt-3 bg-[#0c0c0e]/95 backdrop-blur-2xl border border-white/[0.08] rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] z-[10050] overflow-hidden"
                     >
                         <div className="max-h-[380px] overflow-y-auto p-3 custom-scrollbar">
                             {/* Buscar Título */}
