@@ -339,3 +339,32 @@ export async function getWeeklyDataAction(
         return { success: false, error: err.message || 'Error al obtener datos semanales' };
     }
 }
+
+/**
+ * Obtiene los detalles de estado y nombre para múltiples personas.
+ * Se usa para evaluar si es necesario proponer una actualización de estado del CRM
+ * después de registrar una actividad.
+ */
+export async function getPersonsStatusDetailsAction(personIds: string[]) {
+    if (!personIds || personIds.length === 0) {
+        return { success: true, data: [] };
+    }
+
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autenticado' };
+
+        const { data, error } = await supabase
+            .from('persons' as any)
+            .select('id, first_name, last_name, relationship_status')
+            .in('id', personIds);
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (err: any) {
+        console.error('Error in getPersonsStatusDetailsAction:', err);
+        return { success: false, error: err.message || 'Error al obtener detalles de estado de las personas' };
+    }
+}

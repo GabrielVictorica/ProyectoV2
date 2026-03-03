@@ -32,7 +32,7 @@ import {
 import { useClients } from '@/features/clients/hooks/useClients';
 import { useWeeklyActivities, WeeklyActivity } from '../hooks/useWeeklyActivities';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { updatePersonStatusAction } from '../actions/activityActions';
+import { updatePersonStatusAction, getPersonsStatusDetailsAction } from '../actions/activityActions';
 import { toast } from 'sonner';
 import { getStatusLabel } from '@/features/crm/constants/relationshipStatuses';
 import { Trash2, Plus, ArrowLeft, Edit2, User, MapPin, MessageCircle } from 'lucide-react';
@@ -211,21 +211,40 @@ export function ActivityDialog({
 
         // Preguntar si desea actualizar el estado en el CRM
         // Para visitas, preguntar por cada persona vinculada
-        const newQueue: PendingUpdate[] = [];
+        const personsToUpdateIds: string[] = [];
         if (isVisita) {
-            const personsToUpdate: string[] = [];
-            if (buyerPersonId && (punta === 'compradora' || punta === 'ambas')) personsToUpdate.push(buyerPersonId);
-            if (sellerPersonId && (punta === 'vendedora' || punta === 'ambas')) personsToUpdate.push(sellerPersonId);
-
-            personsToUpdate.forEach(pid => {
-                const person = clients.find(c => c.id === pid);
-                const name = person ? `${person.first_name} ${person.last_name}` : 'el cliente';
-                newQueue.push({ personId: pid, personName: name, type, date });
-            });
+            if (buyerPersonId && (punta === 'compradora' || punta === 'ambas')) personsToUpdateIds.push(buyerPersonId);
+            if (sellerPersonId && (punta === 'vendedora' || punta === 'ambas')) personsToUpdateIds.push(sellerPersonId);
         } else if (personId) {
-            const person = clients.find(c => c.id === personId);
-            const name = person ? `${person.first_name} ${person.last_name}` : 'el cliente';
-            newQueue.push({ personId: personId, personName: name, type, date });
+            personsToUpdateIds.push(personId);
+        }
+
+        const newQueue: PendingUpdate[] = [];
+
+        if (personsToUpdateIds.length > 0) {
+            // Fetch the ACTUAL current relationships statuses from DB safely
+            const res = await getPersonsStatusDetailsAction(personsToUpdateIds);
+
+            if (res.success && res.data) {
+                res.data.forEach((personData: any) => {
+                    // Only ask if the person is NOT already in the target state
+                    if (personData.relationship_status !== type) {
+                        newQueue.push({
+                            personId: personData.id,
+                            personName: `${personData.first_name} ${personData.last_name}`,
+                            type: type,
+                            date: date
+                        });
+                    }
+                });
+            } else {
+                // Fallback to old behavior if fetch fails (unlikely)
+                personsToUpdateIds.forEach(pid => {
+                    const person = clients.find(c => c.id === pid);
+                    const name = person ? `${person.first_name} ${person.last_name}` : 'el cliente';
+                    newQueue.push({ personId: pid, personName: name, type, date });
+                });
+            }
         }
 
         if (newQueue.length > 0) {
