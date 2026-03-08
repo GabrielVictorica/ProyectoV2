@@ -212,9 +212,14 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
         },
     });
 
-    // Reset form when person changes or dialog opens
+    const prevOpenRef = React.useRef(open);
+
+    // Reset form solely when the dialog transitions from closed to open
+    // to prevent wiping user input randomly when background data refreshes.
     useEffect(() => {
-        if (open) {
+        const justOpened = open && !prevOpenRef.current;
+
+        if (justOpened) {
             setActiveTab('identity');
             form.reset({
                 firstName: person?.first_name || initialData?.firstName || '',
@@ -229,7 +234,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                 interestsHobbies: person?.interests_hobbies || initialData?.interestsHobbies || '',
                 personalityNotes: person?.personality_notes || initialData?.personalityNotes || '',
                 contactType: (person?.contact_type as string[]) || initialData?.contactType || [],
-                source: person?.source || initialData?.source || 'Instagram',
+                source: person?.source || initialData?.source || 'Base de Relaciones',
                 referredById: person?.referred_by_id || initialData?.referredById || '',
                 influenceLevel: person?.influence_level || initialData?.influenceLevel || 3,
                 preferredChannel: person?.preferred_channel || initialData?.preferredChannel || '',
@@ -244,6 +249,8 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
             });
             setShowDiscardWarning(false);
         }
+
+        prevOpenRef.current = open;
     }, [person, initialData, open, form]);
 
     const currentTabIndex = TABS.findIndex(t => t.value === activeTab);

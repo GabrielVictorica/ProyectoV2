@@ -63,7 +63,7 @@ export async function searchPersonsAction(query: string): Promise<ActionResult<P
         // El RLS se encargará de filtrar por org/agent basado en el usuario logueado
         let sqlQuery = supabase
             .from('persons')
-            .select('*');
+            .select('*, agent:profiles!persons_agent_id_fkey(first_name, last_name)');
 
         if (query) {
             sqlQuery = sqlQuery.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`);
@@ -541,7 +541,7 @@ export async function getRecentPersonsAction(): Promise<ActionResult<Person[]>> 
 
         const { data, error } = await supabase
             .from('persons')
-            .select('*')
+            .select('*, agent:profiles!persons_agent_id_fkey(first_name, last_name)')
             .order('last_interaction_at', { ascending: false, nullsFirst: false })
             .limit(3);
 

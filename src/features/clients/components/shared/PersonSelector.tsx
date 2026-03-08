@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Person } from '@/features/clients/types';
 import { searchPersonsAction, getRecentPersonsAction, getPersonByIdAction, getPersonsAction } from '@/features/crm/actions/personActions';
 import { PersonFormDialog } from '@/features/crm/components/PersonFormDialog';
+import { usePermissions } from '@/features/auth/hooks/useAuth';
 import { Search, UserPlus, X, Check, User, Phone, Mail, Loader2, Sparkles, History, UserPlus2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +19,8 @@ interface PersonSelectorProps {
 }
 
 export function PersonSelector({ value, onChange, placeholder = "Buscar persona...", className }: PersonSelectorProps) {
+    const { isGod, isParent } = usePermissions();
+    const showAgentInfo = isGod || isParent;
     const [search, setSearch] = useState('');
     const [allPersons, setAllPersons] = useState<Person[]>([]);
     const [hasLoadedAll, setHasLoadedAll] = useState(false);
@@ -211,6 +214,11 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
                                                     </p>
                                                     <p className="text-[11px] text-white/30 group-hover:text-white/40 transition-colors">
                                                         Contacto reciente
+                                                        {showAgentInfo && person.agent && (
+                                                            <span className="text-[10px] text-violet-400 font-medium ml-2 uppercase tracking-wide">
+                                                                Resp: {person.agent.first_name} {person.agent.last_name}
+                                                            </span>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -234,6 +242,11 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
                                                     </p>
                                                     <p className="text-[11px] text-white/30 truncate max-w-[180px]">
                                                         {person.phone || person.email || 'Sin datos de contacto'}
+                                                        {showAgentInfo && person.agent && (
+                                                            <span className="text-[10px] text-violet-400 font-medium ml-2 uppercase tracking-wide">
+                                                                Resp: {person.agent.first_name} {person.agent.last_name}
+                                                            </span>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
