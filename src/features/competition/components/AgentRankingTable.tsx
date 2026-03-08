@@ -1,8 +1,16 @@
 'use client';
 
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Medal, TrendingUp } from 'lucide-react';
+import { Medal, TrendingUp, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { TEAMS_CONFIG, POINTS_TABLE } from '../constants';
 import type { AgentScore } from '../actions/competitionActions';
 
@@ -13,17 +21,17 @@ interface AgentRankingTableProps {
 }
 
 const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
-    pre_listing: { label: 'PL', color: 'text-violet-400' },
-    cierre: { label: 'Cierre', color: 'text-indigo-400' },
-    captacion: { label: 'Capt.', color: 'text-amber-400' },
-    pre_buying: { label: 'PB', color: 'text-fuchsia-400' },
-    reunion_verde: { label: 'RV', color: 'text-emerald-400' },
+    reunion_verde: { label: 'Reunión Verde', color: 'text-emerald-400' },
+    pre_listing: { label: 'Pre-Listing', color: 'text-violet-400' },
+    pre_buying: { label: 'Pre-Buying', color: 'text-fuchsia-400' },
     acm: { label: 'ACM', color: 'text-blue-400' },
-    visita: { label: 'Vis.', color: 'text-rose-400' },
-    nuevo_contacto: { label: 'Cont.', color: 'text-cyan-400' },
-    nueva_busqueda: { label: 'Búsq.', color: 'text-teal-400' },
-    referido_bonus: { label: 'Ref+', color: 'text-orange-400' },
-    perfect_weeks: { label: 'SP', color: 'text-yellow-400' },
+    captacion: { label: 'Captación', color: 'text-amber-400' },
+    visita: { label: 'Visita', color: 'text-rose-400' },
+    cierre: { label: 'Cierre', color: 'text-indigo-400' },
+    nuevo_contacto: { label: 'Contacto', color: 'text-cyan-400' },
+    nueva_busqueda: { label: 'Búsqueda', color: 'text-teal-400' },
+    referido_bonus: { label: 'Referido', color: 'text-orange-400' },
+    perfect_weeks: { label: 'Semanas Perf.', color: 'text-yellow-400' },
 };
 
 function getMedalColor(index: number) {
@@ -34,8 +42,12 @@ function getMedalColor(index: number) {
 }
 
 export function AgentRankingTable({ agents, title = 'Ranking Individual', delay = 0 }: AgentRankingTableProps) {
+    const [teamFilter, setTeamFilter] = useState<'all' | 'negro' | 'dorado'>('all');
+
+    const filteredAgents = agents.filter(a => teamFilter === 'all' || a.team === teamFilter);
+
     // Sort by total points DESC, tiebreak by PL count DESC
-    const sorted = [...agents].sort((a, b) => {
+    const sorted = [...filteredAgents].sort((a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
         return (b.counts.pre_listing || 0) - (a.counts.pre_listing || 0);
     });
@@ -48,10 +60,31 @@ export function AgentRankingTable({ agents, title = 'Ranking Individual', delay 
             className="bg-white/[0.03] rounded-2xl border border-white/[0.06] backdrop-blur-xl overflow-hidden"
         >
             {/* Header */}
-            <div className="px-5 py-4 border-b border-white/[0.06]">
+            <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-violet-400" />
                     <h3 className="text-base font-bold text-white">{title}</h3>
+                </div>
+
+                {/* Team Filter */}
+                <div className="flex items-center gap-2 text-xs">
+                    <Filter className="w-3.5 h-3.5 text-slate-500" />
+                    <Select value={teamFilter} onValueChange={(value) => setTeamFilter(value as 'all' | 'negro' | 'dorado')}>
+                        <SelectTrigger className="h-8 bg-[#09090b] border-white/10 text-slate-300 text-xs w-[150px] focus:ring-1 focus:ring-violet-500">
+                            <SelectValue placeholder="Ambos equipos" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#09090b] border-white/10 text-slate-300">
+                            <SelectItem value="all" className="text-xs hover:bg-white/5 focus:bg-white/5 focus:text-white cursor-pointer transition-colors">
+                                Ambos equipos
+                            </SelectItem>
+                            <SelectItem value="negro" className="text-xs hover:bg-white/5 focus:bg-white/5 focus:text-white cursor-pointer transition-colors">
+                                <span className="flex items-center gap-2">{TEAMS_CONFIG.negro.emoji} Equipo Negro</span>
+                            </SelectItem>
+                            <SelectItem value="dorado" className="text-xs hover:bg-white/5 focus:bg-white/5 focus:text-white cursor-pointer transition-colors">
+                                <span className="flex items-center gap-2">{TEAMS_CONFIG.dorado.emoji} Equipo Dorado</span>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
