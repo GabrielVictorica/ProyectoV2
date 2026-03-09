@@ -105,6 +105,7 @@ export function ActivityDialog({
     const [currentUpdate, setCurrentUpdate] = useState<PendingUpdate | null>(null);
     const [showMainAlert, setShowMainAlert] = useState(false);
     const [showAreYouSure, setShowAreYouSure] = useState(false);
+    const [showValidation, setShowValidation] = useState(false);
 
     // Reset view when opening
     useEffect(() => {
@@ -135,6 +136,7 @@ export function ActivityDialog({
         setSellerPersonId(null);
         setPropertyAddress('');
         setBuyerFeedback('');
+        setShowValidation(false);
     };
 
     const handleEdit = (act: WeeklyActivity) => {
@@ -182,6 +184,22 @@ export function ActivityDialog({
         if (!auth?.profile?.organization_id || !auth?.profile?.id) return;
 
         const mainPersonId = getMainPersonId();
+
+        // Validate that a client is linked
+        if (isVisita) {
+            const needsBuyer = punta === 'compradora' || punta === 'ambas';
+            const needsSeller = punta === 'vendedora' || punta === 'ambas';
+            if ((needsBuyer && !buyerPersonId) || (needsSeller && !sellerPersonId)) {
+                setShowValidation(true);
+                toast.error('Debes vincular un cliente para registrar la actividad');
+                return;
+            }
+        } else if (!mainPersonId) {
+            setShowValidation(true);
+            toast.error('Debes vincular un cliente para registrar la actividad');
+            return;
+        }
+        setShowValidation(false);
 
         const visitMetadata = isVisita ? {
             punta,
@@ -295,27 +313,33 @@ export function ActivityDialog({
             {/* Person Selectors based on punta */}
             {(punta === 'compradora' || punta === 'ambas') && (
                 <div className="space-y-2">
-                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
-                        <User className="w-3 h-3" /> Cliente Comprador
+                    <Label className={`text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5 ${showValidation && !buyerPersonId ? 'text-rose-400' : 'text-white/60'}`}>
+                        <User className="w-3 h-3" /> Cliente Comprador <span className="text-rose-400">*</span>
                     </Label>
                     <PersonSelector
                         value={buyerPersonId}
-                        onChange={(id) => setBuyerPersonId(id)}
+                        onChange={(id) => { setBuyerPersonId(id); setShowValidation(false); }}
                         placeholder="Buscar comprador..."
                     />
+                    {showValidation && !buyerPersonId && (
+                        <p className="text-rose-400 text-xs">Debes seleccionar un cliente comprador</p>
+                    )}
                 </div>
             )}
 
             {(punta === 'vendedora' || punta === 'ambas') && (
                 <div className="space-y-2">
-                    <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
-                        <User className="w-3 h-3" /> Cliente Vendedor
+                    <Label className={`text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5 ${showValidation && !sellerPersonId ? 'text-rose-400' : 'text-white/60'}`}>
+                        <User className="w-3 h-3" /> Cliente Vendedor <span className="text-rose-400">*</span>
                     </Label>
                     <PersonSelector
                         value={sellerPersonId}
-                        onChange={(id) => setSellerPersonId(id)}
+                        onChange={(id) => { setSellerPersonId(id); setShowValidation(false); }}
                         placeholder="Buscar vendedor..."
                     />
+                    {showValidation && !sellerPersonId && (
+                        <p className="text-rose-400 text-xs">Debes seleccionar un cliente vendedor</p>
+                    )}
                 </div>
             )}
 
@@ -470,12 +494,17 @@ export function ActivityDialog({
                                 /* ── Standard form (other activity types) ── */
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-white/60 text-[11px] uppercase tracking-wider font-bold">Cliente</Label>
+                                        <Label className={`text-[11px] uppercase tracking-wider font-bold ${showValidation && !personId ? 'text-rose-400' : 'text-white/60'}`}>
+                                            Cliente <span className="text-rose-400">*</span>
+                                        </Label>
                                         <PersonSelector
                                             value={personId}
-                                            onChange={(id) => setPersonId(id)}
+                                            onChange={(id) => { setPersonId(id); setShowValidation(false); }}
                                             placeholder="Buscar o crear cliente..."
                                         />
+                                        {showValidation && !personId && (
+                                            <p className="text-rose-400 text-xs">Debes seleccionar un cliente</p>
+                                        )}
                                     </div>
                                 </div>
                             )}

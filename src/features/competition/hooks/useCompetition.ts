@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     getCompetitionDataAction,
     addTeamMemberAction,
@@ -22,6 +22,7 @@ export const AVAILABLE_AGENTS_KEY = 'competition-available-agents';
 /**
  * Fetches and caches the full competition dataset.
  * Refetches every 5 min (read-only, no rush).
+ * Uses keepPreviousData so the UI stays visible while new data loads.
  */
 export function useCompetition(startDate?: string, endDate?: string) {
     return useQuery<CompetitionData | null>({
@@ -33,6 +34,7 @@ export function useCompetition(startDate?: string, endDate?: string) {
         },
         staleTime: 1000 * 60 * 5,      // 5 min
         refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     });
 }
 

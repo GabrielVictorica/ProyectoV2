@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Filter, Loader2, AlertCircle, CalendarRange } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,15 +16,29 @@ import { AgentRankingTable } from './AgentRankingTable';
 import { WeeklyMatchCard } from './WeeklyMatchCard';
 import { TeamManagement } from './TeamManagement';
 
+// ─── Debounce hook ───────────────────────────────────────────────
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
 export function CompetitionDashboard() {
     const [startDate, setStartDate] = useState(COMPETITION_START_DATE);
     const [endDate, setEndDate] = useState(COMPETITION_END_DATE);
     const [showFilters, setShowFilters] = useState(false);
 
+    // Debounce dates so query only fires after 500ms of inactivity
+    const debouncedStart = useDebounce(startDate, 500);
+    const debouncedEnd = useDebounce(endDate, 500);
+
     const { data: auth } = useAuth();
     const isGod = auth?.role === 'god';
 
-    const { data, isLoading, error } = useCompetition(startDate, endDate);
+    const { data, isLoading, isFetching, error } = useCompetition(debouncedStart, debouncedEnd);
 
     // Current week's MVP (last week in results)
     const currentWeekMvp = useMemo(() => {
@@ -59,7 +73,8 @@ export function CompetitionDashboard() {
         );
     }, [data]);
 
-    if (isLoading) {
+    // Only show full-page spinner on initial load (no data yet)
+    if (isLoading && !data) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="text-center">
@@ -88,7 +103,7 @@ export function CompetitionDashboard() {
     const doradoWinning = (dorado?.totalPoints || 0) > (negro?.totalPoints || 0);
 
     return (
-        <div className="space-y-6 pb-10">
+        <div className={cn('space-y-6 pb-10 transition-opacity duration-200', isFetching && 'opacity-70')}>
             {/* ── Header ───────────────────────────────────────────── */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
