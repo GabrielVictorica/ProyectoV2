@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { WeeklyDataMap } from '../hooks/useWeeklyActivities';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Plus } from 'lucide-react';
+import { Plus, Info } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -21,15 +21,15 @@ interface WeeklyGridProps {
 }
 
 const ROWS = [
-    { id: 'reunion_verde', label: 'Reunión Verde', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
-    { id: 'pre_listing', label: 'Pre-Listing', color: 'text-violet-400', bgColor: 'bg-violet-500/10' },
-    { id: 'pre_buying', label: 'Pre-Buying', color: 'text-fuchsia-400', bgColor: 'bg-fuchsia-500/10' },
-    { id: 'acm', label: 'ACM', color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
-    { id: 'captacion', label: 'Captación', color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
-    { id: 'visita', label: 'Visita', color: 'text-rose-400', bgColor: 'bg-rose-500/10' },
-    { id: 'reserva', label: 'Reserva', color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', isVirtual: true },
-    { id: 'cierre', label: 'Cierre', color: 'text-indigo-400', bgColor: 'bg-indigo-500/10', isVirtual: true },
-    { id: 'referido', label: 'Referido', color: 'text-orange-400', bgColor: 'bg-orange-500/10' },
+    { id: 'reunion_verde', label: 'Reunión Verde', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', description: 'Reunión de prospección o primer contacto con un potencial cliente (comprador o vendedor).' },
+    { id: 'pre_listing', label: 'Pre-Listing', color: 'text-violet-400', bgColor: 'bg-violet-500/10', description: 'Reunión de filtro con cliente vendedor para evaluar la venta de una propiedad (NURC).' },
+    { id: 'pre_buying', label: 'Pre-Buying', color: 'text-fuchsia-400', bgColor: 'bg-fuchsia-500/10', description: 'Reunión de filtro con cliente comprador para definir búsqueda (NURC).' },
+    { id: 'acm', label: 'ACM', color: 'text-blue-400', bgColor: 'bg-blue-500/10', description: 'Reunión de devolución de tasación.' },
+    { id: 'captacion', label: 'Captación', color: 'text-amber-400', bgColor: 'bg-amber-500/10', description: 'Reunión para firmar autorización de venta (exclusiva o no exclusiva).' },
+    { id: 'visita', label: 'Visita', color: 'text-rose-400', bgColor: 'bg-rose-500/10', description: 'Muestra de propiedades con cliente comprador o vendedor.' },
+    { id: 'reserva', label: 'Reserva', color: 'text-cyan-400', bgColor: 'bg-cyan-500/10', isVirtual: true, description: 'Reunión de reserva de una propiedad.' },
+    { id: 'cierre', label: 'Cierre', color: 'text-indigo-400', bgColor: 'bg-indigo-500/10', isVirtual: true, description: 'Firma de boleto o escritura (lo que suceda primero).' },
+    { id: 'referido', label: 'Referido', color: 'text-orange-400', bgColor: 'bg-orange-500/10', description: 'Contacto referido por un cliente existente.' },
 ];
 
 export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridProps) {
@@ -106,9 +106,20 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                 <td className="p-6 border-r border-white/[0.04]">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-1.5 h-1.5 rounded-full ${row.color} shadow-[0_0_8px] shadow-current opacity-60`} />
-                                        <span className="font-medium text-white/80 group-hover:text-white transition-colors">
-                                            {row.label}
-                                        </span>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="font-medium text-white/80 group-hover:text-white transition-colors cursor-help flex items-center gap-1.5">
+                                                    {row.label}
+                                                    <Info className="w-3 h-3 text-white/20 group-hover:text-white/40 transition-colors" />
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent
+                                                side="right"
+                                                className="bg-[#09090b] border border-white/10 text-white/80 text-xs px-3 py-2 max-w-[250px] shadow-2xl z-[9999]"
+                                            >
+                                                {row.description}
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
                                 </td>
                                 {days.map((day, dIdx) => {
