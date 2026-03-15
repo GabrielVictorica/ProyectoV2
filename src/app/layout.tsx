@@ -4,6 +4,8 @@ import "./globals.css";
 import { QueryProvider } from "@/lib/react-query/provider";
 import { AuroraBackground } from "@/components/ui/AuroraBackground";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,6 +32,8 @@ export default function RootLayout({
           </div>
           <Toaster position="top-right" richColors theme="dark" />
         </QueryProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
