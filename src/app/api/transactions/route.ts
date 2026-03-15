@@ -327,6 +327,7 @@ export async function POST(request: NextRequest) {
                 date: txDate,
                 time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
                 notes: activityNotes,
+                transaction_id: data.id
             });
 
         return NextResponse.json({ success: true, data });
@@ -533,17 +534,24 @@ export async function PUT(request: NextRequest) {
         if (currentTx.status === 'pending' && updates.status === 'completed') {
             await (adminClient as any)
                 .from('activities')
-                .insert({
-                    organization_id: updateData.organization_id || currentTx.organization_id,
-                    agent_id: updateData.agent_id || currentTx.agent_id,
-                    property_id: updateData.property_id || currentTx.property_id || null,
-                    client_id: null,
-                    type: 'cierre',
+                .update({
                     status: 'completed',
                     date: txDate,
                     time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
                     notes: `Evolución de Reserva a Cierre Final. Operación: ${updateData.custom_property_title || currentTx.custom_property_title || 'Propiedad'}`,
-                });
+                })
+                .eq('transaction_id', id);
+        } else {
+            // Sincronizar fecha de la actividad vinculada si cambia la de la transacción
+            // Si la nueva fecha es distinta a la actual o el status cambió, actualizamos
+            if (updates.transaction_date && updates.transaction_date !== currentTx.transaction_date) {
+               await (adminClient as any)
+                    .from('activities')
+                    .update({
+                        date: updates.transaction_date,
+                    })
+                    .eq('transaction_id', id);
+            }
         }
 
         return NextResponse.json({ success: true, data });
@@ -597,6 +605,12 @@ export async function DELETE(request: NextRequest) {
             .eq('id', id);
 
         if (error) throw error;
+
+        // Limpiar la actividad vinculada al borrar la transacción por completo
+        await (adminClient as any)
+            .from('activities')
+            .delete()
+            .eq('transaction_id', id);
 
         return NextResponse.json({ success: true });
     } catch (err) {

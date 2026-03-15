@@ -1,0 +1,2 @@
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_activities_transaction_id ON activities(transaction_id);

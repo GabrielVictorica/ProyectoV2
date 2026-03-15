@@ -27,6 +27,7 @@ export type Database = {
           property_id: string | null
           status: string
           time: string | null
+          transaction_id: string | null
           type: string
           updated_at: string | null
           visit_metadata: Json | null
@@ -43,6 +44,7 @@ export type Database = {
           property_id?: string | null
           status?: string
           time?: string | null
+          transaction_id?: string | null
           type: string
           updated_at?: string | null
           visit_metadata?: Json | null
@@ -59,11 +61,19 @@ export type Database = {
           property_id?: string | null
           status?: string
           time?: string | null
+          transaction_id?: string | null
           type?: string
           updated_at?: string | null
           visit_metadata?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "activities_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "activities_agent_id_fkey"
             columns: ["agent_id"]
