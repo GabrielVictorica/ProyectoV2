@@ -92,36 +92,40 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
             });
 
             (transactions as any[])?.forEach(trans => {
+                const rawProp = trans.properties || trans.property;
+                let propertyTitle = null;
+
+                if (Array.isArray(rawProp) && rawProp.length > 0) {
+                    propertyTitle = rawProp[0].title;
+                } else if (rawProp && typeof rawProp === 'object') {
+                    propertyTitle = (rawProp as any).title;
+                }
+
+                if (!propertyTitle && trans.custom_property_title) {
+                    propertyTitle = trans.custom_property_title;
+                }
+
+                if (!propertyTitle) {
+                    propertyTitle = trans.buyer_name ? `Venta a ${trans.buyer_name}` : 'Operación sin título';
+                }
+
+                const enhancedTrans = {
+                    ...trans,
+                    property: { title: propertyTitle }
+                };
+
+                // 1. Añadir a la fila de RESERVA (basado en transaction_date)
+                // Se muestran todas (pendientes, completadas o canceladas) como registro de actividad realizada
                 if (map[trans.transaction_date]) {
-                    const rawProp = trans.properties || trans.property;
-                    let propertyTitle = null;
+                    map[trans.transaction_date].reservaCount += 1;
+                    map[trans.transaction_date].transactions.push({ ...enhancedTrans, _gridRowType: 'reserva' });
+                }
 
-                    if (Array.isArray(rawProp) && rawProp.length > 0) {
-                        propertyTitle = rawProp[0].title;
-                    } else if (rawProp && typeof rawProp === 'object') {
-                        propertyTitle = (rawProp as any).title;
-                    }
-
-                    if (!propertyTitle && trans.custom_property_title) {
-                        propertyTitle = trans.custom_property_title;
-                    }
-
-                    if (!propertyTitle) {
-                        propertyTitle = trans.buyer_name ? `Venta a ${trans.buyer_name}` : 'Operación sin título';
-                    }
-
-                    const enhancedTrans = {
-                        ...trans,
-                        property: { title: propertyTitle }
-                    };
-
-                    map[trans.transaction_date].transactionCount += 1;
-                    if (trans.status === 'pending') {
-                        map[trans.transaction_date].reservaCount += 1;
-                    } else {
-                        map[trans.transaction_date].cierreCount += 1;
-                    }
-                    map[trans.transaction_date].transactions.push(enhancedTrans);
+                // 2. Añadir a la fila de CIERRE (basado en closing_date)
+                // Solo si está completada y tiene fecha de cierre
+                if (trans.status === 'completed' && trans.closing_date && map[trans.closing_date]) {
+                    map[trans.closing_date].cierreCount += 1;
+                    map[trans.closing_date].transactions.push({ ...enhancedTrans, _gridRowType: 'cierre' });
                 }
             });
 

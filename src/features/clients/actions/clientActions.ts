@@ -12,7 +12,13 @@ import { applyPrivacyPolicy, type UserProfile } from '../utils/privacy';
  * Centraliza la lógica para que funcione igual en "Mis Clientes" y "Red".
  */
 function applyFiltersToQuery(query: any, filters: any) {
-    if (filters?.statusFilter && filters.statusFilter.length > 0) {
+    // isCritical and statusFilter are mutually exclusive on the 'status' column.
+    // When isCritical is active, it handles status internally (forces 'active').
+    if (filters?.isCritical) {
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        query = query.eq('status', 'active');
+        query = query.or(`last_interaction_at.lte.${fourteenDaysAgo},and(last_interaction_at.is.null,created_at.lte.${fourteenDaysAgo})`);
+    } else if (filters?.statusFilter && filters.statusFilter.length > 0) {
         query = query.in('status', filters.statusFilter);
     }
 
@@ -25,13 +31,10 @@ function applyFiltersToQuery(query: any, filters: any) {
     }
 
     if (filters?.budgetMin) {
-        // La búsqueda del cliente dice "puedo pagar hasta X". 
-        // Si el filtro de Presupuesto Mínimo es 500k, queremos búsquedas cuya capacidad MÁXIMA sea al menos 500k.
         query = query.gte('budget_max', filters.budgetMin);
     }
 
     if (filters?.budgetMax) {
-        // Si el filtro de Presupuesto Máximo es 100k, queremos búsquedas cuya capacidad MÍNIMA sea inferior a 100k.
         query = query.lte('budget_min', filters.budgetMax);
     }
 
@@ -315,6 +318,7 @@ export async function getClientsAction(
         bedrooms?: string[];
         statusFilter?: string[];
         tags?: string[];
+        isCritical?: boolean;
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {
     try {
@@ -404,6 +408,7 @@ export async function getNetworkClientsAction(
         bedrooms?: string[];
         statusFilter?: string[];
         tags?: string[];
+        isCritical?: boolean;
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {
     try {
@@ -577,5 +582,107 @@ export async function checkPersonHasSearchAction(
     } catch (err) {
         console.error('Error checking person search:', err);
         return { success: false, error: 'Error al verificar búsquedas' };
+    }
+}
+
+/**
+ * Obtiene las métricas globales para las tarjetas del Dashboard ignorando la paginación.
+ */
+export async function getClientDashboardStatsAction(
+    scope: 'personal' | 'office' | 'network' | 'global',
+    organizationId?: string,
+    agentId?: string
+): Promise<ActionResult<{
+    totalActive: number;
+    totalClosed: number;
+    criticalCount: number;
+    attentionRate: number;
+    healthyCount: number;
+}>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const profile = await getCurrentUserProfile(supabase, user.id);
+        if (!profile) return { success: false, error: 'Perfil de usuario no encontrado' };
+
+        const isGod = profile.role === 'god';
+        const isParent = profile.role === 'parent';
+        const isChild = !isGod && !isParent;
+
+        let query;
+
+        // Determinar qué tabla/vista consultar según el scope
+        if (scope === 'network') {
+            if (isGod) {
+                query = (supabase.from('clients' as any) as any).select('id, status, last_interaction_at, created_at').neq('agent_id', user.id);
+            } else if (isParent) {
+                query = (supabase.from('view_anonymous_clients' as any) as any).select('id, status, last_interaction_at, created_at').neq('organization_id', profile.organization_id || '');
+            } else {
+                query = (supabase.from('view_anonymous_clients' as any) as any).select('id, status, last_interaction_at, created_at').neq('agent_id', user.id);
+            }
+        } else {
+            query = (supabase.from('clients' as any) as any).select('id, status, last_interaction_at, created_at');
+
+            // Filtros de visibilidad
+            if (isChild || scope === 'personal') {
+                query = query.eq('agent_id', user.id);
+            } else if (scope === 'office') {
+                if (agentId && agentId !== 'all') {
+                    query = query.eq('agent_id', agentId);
+                } else {
+                    // Si office pero no se filtró por agente, restringir a su org (God puede ver todo de la org que seleccionó)
+                    query = query.eq('organization_id', organizationId || profile.organization_id || '');
+                }
+            } else if (scope === 'global' && isGod) {
+                if (organizationId && organizationId !== 'all') query = query.eq('organization_id', organizationId);
+                if (agentId && agentId !== 'all') query = query.eq('agent_id', agentId);
+            }
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        // Calcular métricas
+        let totalActive = 0;
+        let totalClosed = 0;
+        let criticalCount = 0;
+        let healthyCount = 0;
+
+        const now = Date.now();
+
+        (data || []).forEach((client: any) => {
+            if (client.status === 'active') {
+                totalActive++;
+
+                const lastDate = client.last_interaction_at || client.created_at;
+                const daysSince = lastDate ? (now - new Date(lastDate).getTime()) / 86400000 : 0;
+
+                if (daysSince > 14) {
+                    criticalCount++;
+                } else if (daysSince <= 7) {
+                    healthyCount++;
+                }
+            } else if (client.status === 'closed') {
+                totalClosed++;
+            }
+        });
+
+        const attentionRate = totalActive > 0 ? Math.round((healthyCount / totalActive) * 100) : 0;
+
+        return {
+            success: true,
+            data: {
+                totalActive,
+                totalClosed,
+                criticalCount,
+                attentionRate,
+                healthyCount
+            }
+        };
+    } catch (err) {
+        console.error('Error in getClientDashboardStatsAction:', err);
+        return { success: false, error: 'Error calculando estadísticas' };
     }
 }

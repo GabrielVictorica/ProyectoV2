@@ -27,7 +27,8 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
 
     let salesQuery = supabase
         .from('transactions')
-        .select('actual_price, gross_commission, agent_id, profiles(first_name, last_name)');
+        .select('actual_price, gross_commission, agent_id, profiles(first_name, last_name)')
+        .neq('status', 'cancelled');
 
     if (isParent && orgId) {
         propertiesQuery = propertiesQuery.eq('organization_id', orgId);

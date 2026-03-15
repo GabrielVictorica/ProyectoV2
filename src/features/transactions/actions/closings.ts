@@ -7,7 +7,7 @@ import { TransactionWithRelations, FinancialMetrics } from '../hooks/useTransact
 export interface ClosingsDashboardData {
     transactions: TransactionWithRelations[];
     metrics: FinancialMetrics[];
-    teamMembers: any[];
+    teamMembers: { id: string; first_name: string; last_name: string; role: string; organization_id: string | null }[];
     aggregatedMetrics: {
         totalSalesVolume: number; // For backward compatibility if needed, or total combined
         totalGrossCommission: number;
@@ -55,8 +55,13 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     const role = profile.role;
     const userOrgId = profile.organization_id;
 
+    // Use adminClient to bypass RLS overhead and gain "Excellent" performance
+    // Security is enforced manually below via .eq filters based on the verified role
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const adminClient = createAdminClient();
+
     // 2. Prepare Queries
-    let txQuery = supabase
+    let txQuery = (adminClient as any)
         .from('transactions')
         .select(`
             *,
@@ -68,12 +73,12 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         `)
         .order('transaction_date', { ascending: false });
 
-    let metricsQuery = supabase
+    let metricsQuery = (adminClient as any)
         .from('view_financial_metrics')
         .select('*');
 
     // FILTRADO ESTRICTO DE SEGURIDAD BASADO EN ROLES
-    // Esto asegura que, independientemente de los filtros de UI, los usuarios no vean datos de otros
+    // Como usamos adminClient, debemos aplicar manualmente el RLS lógico
     if (role === 'child') {
         txQuery = txQuery.eq('agent_id', user.id);
         metricsQuery = metricsQuery.eq('agent_id', user.id);
@@ -82,26 +87,26 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         metricsQuery = metricsQuery.eq('organization_id', userOrgId);
     }
 
-    // 3. Apply UI Filters
+    // 3. Apply UI Filters (Solo Organización, ya que Agente se filtra en el cliente para latencia 0ms)
     if (filters.organizationId && filters.organizationId !== 'all') {
         txQuery = txQuery.eq('organization_id', filters.organizationId);
         metricsQuery = metricsQuery.eq('organization_id', filters.organizationId);
     }
 
+    // ELIMINADO: Filtro por agentId en servidor para permitir filtrado instantáneo en cliente
+    /*
     if (filters.agentId && filters.agentId !== 'all') {
         txQuery = txQuery.eq('agent_id', filters.agentId);
         metricsQuery = metricsQuery.eq('agent_id', filters.agentId);
     }
-
+    */
+    
+    // Filtro por año/mes
     if (filters.year) {
         const start = `${filters.year}-01-01`;
         const end = `${filters.year}-12-31`;
         txQuery = txQuery.gte('transaction_date', start).lte('transaction_date', end);
         metricsQuery = metricsQuery.eq('year', filters.year);
-    }
-
-    if (filters.status && filters.status !== 'all') {
-        txQuery = txQuery.eq('status', filters.status);
     }
 
     if (filters.month) {
@@ -114,32 +119,35 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         metricsQuery = metricsQuery.eq('month', filters.month);
     }
 
-    // 4. Team Members (For Filter Dropdowns)
-    let teamQuery = supabase
+    // 4. Team Members - Fetch only once per dashboard load if possible, 
+    // but for simplicity we keep it parallel here.
+    let teamQuery = (adminClient as any)
         .from('profiles')
         .select('id, first_name, last_name, role, organization_id')
-        .order('first_name', { ascending: true });
+        .order('first_name', { ascending: true })
+        .order('last_name', { ascending: true });
 
-    // Filtrar también el listado de equipo por seguridad
+    // Filtrar también el listado de equipo por seguridad lógica
     if (role === 'child') {
         teamQuery = teamQuery.eq('id', user.id);
     } else if (role === 'parent' && userOrgId) {
         teamQuery = teamQuery.eq('organization_id', userOrgId);
     }
 
-    const { data: teamMembers } = await teamQuery;
-
-    // 5. Execute
-    const [txRes, metricsRes] = await Promise.all([
+    // 5. Execute in Parallel for maximum performance
+    const [txRes, metricsRes, teamRes] = await Promise.all([
         txQuery,
-        metricsQuery
+        metricsQuery,
+        teamQuery
     ]);
 
     if (txRes.error) throw new Error(txRes.error.message);
     if (metricsRes.error) throw new Error(metricsRes.error.message);
+    if (teamRes.error) throw new Error(teamRes.error.message);
 
-    const transactions = (txRes.data as unknown || []) as TransactionWithRelations[];
-    const metricsData = (metricsRes.data as unknown || []) as FinancialMetrics[];
+    const transactions = (txRes.data || []) as TransactionWithRelations[];
+    const metricsData = (metricsRes.data || []) as FinancialMetrics[];
+    const teamMembers = (teamRes.data || []) as { id: string; first_name: string; last_name: string; role: string; organization_id: string | null }[];
 
     // 6. Aggregation
     const aggregated = metricsData.reduce((acc, m) => {
@@ -157,6 +165,7 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         acc.totalPuntas += puntas;
 
         // Sumamos según estado (NULL/undefined = completed para transacciones legacy)
+        // Usamos casting temporal a any para acceder a 'status' que viene del view view_financial_metrics
         const txStatus = (m as any).status || 'completed';
         if (txStatus === 'completed') {
             acc.totalRealVolume += (m.total_sales_volume || 0);

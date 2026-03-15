@@ -87,7 +87,8 @@ export async function getTeamStatsAction(): Promise<TeamMemberStats[]> {
         const { data: sales, error: salesError } = await adminClient
             .from('transactions')
             .select('agent_id, actual_price')
-            .in('agent_id', memberIds);
+            .in('agent_id', memberIds)
+            .neq('status', 'cancelled');
 
         if (salesError) console.error('Error fetching sales stats:', salesError);
 
@@ -135,7 +136,8 @@ export async function getTeamStatsAction(): Promise<TeamMemberStats[]> {
         const { data: sales } = await supabase
             .from('transactions')
             .select('agent_id, actual_price')
-            .in('agent_id', memberIds);
+            .in('agent_id', memberIds)
+            .neq('status', 'cancelled');
 
         const propMap: Record<string, number> = {};
         (props || []).forEach((p: any) => {

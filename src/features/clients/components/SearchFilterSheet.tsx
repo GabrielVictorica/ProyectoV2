@@ -69,16 +69,18 @@ export interface SearchFilters {
     budgetMax: number | null;
     bedrooms: string[];
     tags: string[];
+    isCritical?: boolean;
 }
 
 export const defaultSearchFilters: SearchFilters = {
-    status: [],
+    status: ['active'],
     propertyTypes: [],
     paymentMethods: [],
     budgetMin: null,
     budgetMax: null,
     bedrooms: [],
     tags: [],
+    isCritical: false,
 };
 
 interface SearchFilterSheetProps {

@@ -286,10 +286,9 @@ export async function getWeeklyDataAction(
                 .lte('date', endDate),
             adminClient
                 .from('transactions' as any)
-                .select('id, status, transaction_date, buyer_name, seller_name, buyer_person_id, seller_person_id, actual_price, notes, property_id, custom_property_title, property:properties(title)')
+                .select('id, status, transaction_date, closing_date, buyer_name, seller_name, buyer_person_id, seller_person_id, actual_price, notes, property_id, custom_property_title, property:properties(title)')
                 .eq('agent_id', agentId)
-                .gte('transaction_date', startDate)
-                .lte('transaction_date', endDate)
+                .or(`and(transaction_date.gte.${startDate},transaction_date.lte.${endDate}),and(closing_date.gte.${startDate},closing_date.lte.${endDate})`)
         ]);
 
         if (activitiesResult.error) throw activitiesResult.error;

@@ -232,50 +232,6 @@ export function useFinancialMetrics(filters?: TransactionFilters) {
     });
 }
 
-/**
- * Hook para obtener suma total de métricas (útil para KPIs)
- */
-export function useAggregatedMetrics(filters?: TransactionFilters) {
-    const { data: metrics, ...rest } = useFinancialMetrics(filters);
-
-    const aggregated = metrics?.reduce(
-        (acc, m) => {
-            const puntas = (m.single_sided_count || 0) + ((m.double_sided_count || 0) * 2);
-            return {
-                totalSalesVolume: acc.totalSalesVolume + (m.total_sales_volume || 0),
-                totalGrossCommission: acc.totalGrossCommission + (m.total_gross_commission || 0),
-                totalNetIncome: acc.totalNetIncome + (m.total_net_income || 0),
-                totalMasterIncome: acc.totalMasterIncome + (m.total_master_income || 0),
-                totalOfficeIncome: acc.totalOfficeIncome + (m.total_office_income || 0),
-                closedDealsCount: acc.closedDealsCount + (m.closed_deals_count || 0),
-                doubleSidedCount: acc.doubleSidedCount + (m.double_sided_count || 0),
-                singleSidedCount: acc.singleSidedCount + (m.single_sided_count || 0),
-                totalPuntas: acc.totalPuntas + puntas,
-            };
-        },
-        {
-            totalSalesVolume: 0,
-            totalGrossCommission: 0,
-            totalNetIncome: 0,
-            totalMasterIncome: 0,
-            totalOfficeIncome: 0,
-            closedDealsCount: 0,
-            doubleSidedCount: 0,
-            singleSidedCount: 0,
-            totalPuntas: 0,
-        }
-    );
-
-    const averageTicket = aggregated && aggregated.closedDealsCount > 0
-        ? aggregated.totalSalesVolume / aggregated.closedDealsCount
-        : 0;
-
-    return {
-        data: aggregated ? { ...aggregated, averageTicket } : null,
-        metrics,
-        ...rest,
-    };
-}
 
 /**
  * Hook para crear una nueva transacción

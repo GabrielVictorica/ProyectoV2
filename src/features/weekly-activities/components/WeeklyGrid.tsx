@@ -163,7 +163,7 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                             {row.isVirtual ? (
                                                                 <div className="space-y-3">
                                                                     {(cellData?.transactions || [])
-                                                                        .filter(trans => row.id === 'reserva' ? trans.status === 'pending' : trans.status !== 'pending')
+                                        .filter(trans => row.id === 'reserva' ? trans._gridRowType === 'reserva' : trans._gridRowType === 'cierre')
                                                                         .map((trans, tIdx) => (
                                                                             <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
                                                                                 <div className="flex justify-between items-start gap-2">

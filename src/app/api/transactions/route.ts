@@ -244,13 +244,50 @@ export async function POST(request: NextRequest) {
         // Auto-update last_interaction_at for linked persons and their clients
         const txDate = transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
         const personIdsToUpdate = [buyer_person_id, seller_person_id].filter(Boolean);
+        
+        // Determinar estado de CRM: Solo 'reserva' o 'cierre' (si es caída, no forzamos cambio de estado)
+        const newRelationshipStatus = status === 'pending' ? 'reserva' : (status === 'cancelled' ? null : 'cierre');
 
         for (const personId of personIdsToUpdate) {
-            // Update person's last_interaction_at
+            // Obtener estado actual para el historial
+            const { data: currentPerson } = await (adminClient as any)
+                .from('persons')
+                .select('relationship_status')
+                .eq('id', personId)
+                .single();
+
+            const oldStatus = currentPerson?.relationship_status;
+
+            // Update person's last_interaction_at AND relationship_status (if applicable)
+            const personUpdateData: Record<string, any> = { 
+                last_interaction_at: txDate, 
+                updated_at: new Date().toISOString() 
+            };
+            if (newRelationshipStatus) {
+                personUpdateData.relationship_status = newRelationshipStatus;
+            }
+
             await (adminClient as any)
                 .from('persons')
-                .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
+                .update(personUpdateData)
                 .eq('id', personId);
+
+            // Registrar en historial el cambio de estado atómico (solo si cambió y no es nulo)
+            if (newRelationshipStatus && oldStatus !== newRelationshipStatus) {
+                await (adminClient as any).from('person_history').insert({
+                    person_id: personId,
+                    agent_id: finalAgentId,
+                    event_type: 'lifecycle_change',
+                    field_name: 'relationship_status',
+                    old_value: oldStatus,
+                    new_value: newRelationshipStatus,
+                    metadata: { 
+                        action: status === 'pending' ? 'transaction_reservation' : 'transaction_closure',
+                        transaction_id: data.id,
+                        price: parseFloat(actual_price)
+                    }
+                });
+            }
 
             // Solo cerrar búsquedas si es un cierre final (no reserva)
             if (status !== 'pending') {
@@ -427,14 +464,52 @@ export async function PUT(request: NextRequest) {
             updates.seller_person_id || currentTx.seller_person_id
         ].filter(Boolean);
 
+        const finalStatus = updates.status || currentTx.status;
+        // Si es 'cancelled' no forzamos 'perdido', simplemente mantenemos el estado actual del CRM (prospect/reserva/etc)
+        const newRelationshipStatus = finalStatus === 'pending' ? 'reserva' : (finalStatus === 'cancelled' ? null : 'cierre');
+
         for (const personId of personIdsToUpdate) {
+            // Obtener estado actual para el historial
+            const { data: currentPerson } = await (adminClient as any)
+                .from('persons')
+                .select('relationship_status')
+                .eq('id', personId)
+                .single();
+
+            const oldStatus = currentPerson?.relationship_status;
+
+            // Update person's last_interaction_at AND relationship_status (if applicable)
+            const personUpdateData: Record<string, any> = { 
+                last_interaction_at: txDate, 
+                updated_at: new Date().toISOString() 
+            };
+            if (newRelationshipStatus) {
+                personUpdateData.relationship_status = newRelationshipStatus;
+            }
+
             await (adminClient as any)
                 .from('persons')
-                .update({ last_interaction_at: txDate, updated_at: new Date().toISOString() })
+                .update(personUpdateData)
                 .eq('id', personId);
 
+            // Registrar en historial el cambio de estado atómico (solo si cambió y no es nulo)
+            if (newRelationshipStatus && oldStatus !== newRelationshipStatus) {
+                await (adminClient as any).from('person_history').insert({
+                    person_id: personId,
+                    agent_id: updates.agent_id || currentTx.agent_id,
+                    event_type: 'lifecycle_change',
+                    field_name: 'relationship_status',
+                    old_value: oldStatus,
+                    new_value: newRelationshipStatus,
+                    metadata: { 
+                        action: 'transaction_update',
+                        transaction_id: id,
+                        new_transaction_status: finalStatus
+                    }
+                });
+            }
+
             // Solo cerrar búsquedas si el status final es completed
-            const finalStatus = updates.status || currentTx.status;
             if (finalStatus === 'completed') {
                 await (adminClient as any)
                     .from('person_searches')

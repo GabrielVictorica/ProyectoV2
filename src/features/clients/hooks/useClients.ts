@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import type { Client, AnonymousClient, ClientWithAgent } from '../types';
 import {
@@ -11,6 +11,7 @@ import {
     getNetworkClientsAction,
     addClientInteractionAction,
     getClientInteractionsAction,
+    getClientDashboardStatsAction,
 } from '../actions/clientActions';
 import { getExistingSearchTagsAction } from '@/features/crm/actions/personActions';
 import { usePermissions } from '@/features/auth/hooks/useAuth';
@@ -79,6 +80,7 @@ export interface ClientFilters {
     bedrooms?: string[];
     statusFilter?: string[];
     tags?: string[];
+    isCritical?: boolean;
 }
 
 /**
@@ -103,6 +105,7 @@ export function useClients(filters?: ClientFilters) {
                     bedrooms: filters.bedrooms,
                     statusFilter: filters.statusFilter,
                     tags: filters.tags,
+                    isCritical: filters.isCritical,
                 });
                 if (!actionResult.success) throw new Error(actionResult.error);
                 return actionResult.data!;
@@ -122,7 +125,8 @@ export function useClients(filters?: ClientFilters) {
 
             return actionResult.data!;
         },
-        staleTime: 5 * 60 * 1000,
+        staleTime: 30 * 1000,
+        placeholderData: keepPreviousData,
         enabled: filters?.enabled ?? true,
     });
 }
@@ -230,5 +234,24 @@ export function useSearchTags() {
             return result.data;
         },
         staleTime: 5 * 60 * 1000,
+    });
+}
+
+/**
+ * Hook para obtener las métricas globales para las tarjetas del Dashboard.
+ */
+export function useClientDashboardStats(
+    scope: 'personal' | 'office' | 'network' | 'global',
+    organizationId?: string,
+    agentId?: string
+) {
+    return useQuery({
+        queryKey: [...clientKeys.all, 'dashboardStats', scope, organizationId, agentId],
+        queryFn: async () => {
+            const result = await getClientDashboardStatsAction(scope, organizationId, agentId);
+            if (!result.success) throw new Error(result.error);
+            return result.data!;
+        },
+        staleTime: 5 * 60 * 1000, // 5 min de caché para evitar requests masivos
     });
 }

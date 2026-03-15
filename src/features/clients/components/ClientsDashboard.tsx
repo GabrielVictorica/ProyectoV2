@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { useClients } from '../hooks/useClients';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import {
     Plus, Users, Mail, Phone, MapPin,
     Search, Filter, ShieldCheck, UserCheck,
     Calculator, Tag as TagIcon, Building2,
-    ChevronLeft, ChevronRight, DollarSign, Activity, CheckCircle2, Clock, TrendingUp
+    ChevronLeft, ChevronRight, DollarSign, Activity, CheckCircle2, Clock, TrendingUp, AlertTriangle, ArrowUpDown
 } from 'lucide-react';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
 import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
@@ -49,9 +49,43 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDeleteClient, useUpdateClient, clientKeys, useSearchTags } from '../hooks/useClients';
+import { useDeleteClient, useUpdateClient, clientKeys, useSearchTags, useClientDashboardStats } from '../hooks/useClients';
 import { useQueryClient } from '@tanstack/react-query';
 import { MoreVertical, Edit2, Trash2, Ban, Archive, CheckCircle } from 'lucide-react';
+
+// Animated counter component
+function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+    const [display, setDisplay] = useState(0);
+    const prevRef = useRef(0);
+    useEffect(() => {
+        const start = prevRef.current;
+        const diff = value - start;
+        if (diff === 0) return;
+        const duration = 400;
+        const startTime = performance.now();
+        const step = (now: number) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            // ease-out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.round(start + diff * eased));
+            if (progress < 1) requestAnimationFrame(step);
+            else prevRef.current = value;
+        };
+        requestAnimationFrame(step);
+    }, [value]);
+    return <span className={className}>{display}</span>;
+}
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debounced;
+}
 
 export function ClientsDashboard() {
     const { auth: user, isLoading: isLoadingPermissions } = usePermissions();
@@ -70,6 +104,7 @@ export function ClientsDashboard() {
     }, [isLoadingPermissions, isGod, isParent, user]);
 
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 300);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | undefined>(undefined);
 
@@ -83,6 +118,8 @@ export function ClientsDashboard() {
     // Advanced Filters
     const [advancedFilters, setAdvancedFilters] = useState<SearchFilters>(defaultSearchFilters);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [sortBy, setSortBy] = useState<'urgent' | 'recent' | 'budget'>('urgent');
+    const [activeCard, setActiveCard] = useState<'critical' | 'active' | 'closed' | null>(null);
     const { data: propertyTypes } = usePropertyTypes();
     const { data: availableTags } = useSearchTags();
 
@@ -115,7 +152,7 @@ export function ClientsDashboard() {
     // Definimos qué parámetros enviar al hook según la pestaña activa
     const queryFilters = {
         scope: activeTab,
-        search: search,
+        search: debouncedSearch,
         page: page,
         limit: PAGE_SIZE,
         organizationId: undefined as string | undefined,
@@ -133,23 +170,56 @@ export function ClientsDashboard() {
         queryFilters.organizationId = selectedOrg;
     }
 
-    // Merge advanced filters
+    // Merge advanced filters — activeCard takes priority over advancedFilters.status
+    const derivedStatusFilter = activeCard === 'active' ? ['active']
+        : activeCard === 'closed' ? ['closed']
+            : activeCard === 'critical' ? undefined // isCritical handles status internally
+                : advancedFilters.status.length > 0 ? advancedFilters.status : undefined;
+
     const mergedFilters = {
         ...queryFilters,
-        statusFilter: advancedFilters.status.length > 0 ? advancedFilters.status : undefined,
+        statusFilter: derivedStatusFilter,
         propertyTypes: advancedFilters.propertyTypes.length > 0 ? advancedFilters.propertyTypes : undefined,
         paymentMethods: advancedFilters.paymentMethods.length > 0 ? advancedFilters.paymentMethods : undefined,
         budgetMin: advancedFilters.budgetMin,
         budgetMax: advancedFilters.budgetMax,
         bedrooms: advancedFilters.bedrooms.length > 0 ? advancedFilters.bedrooms : undefined,
         tags: advancedFilters.tags.length > 0 ? advancedFilters.tags : undefined,
+        isCritical: activeCard === 'critical',
     };
 
     const { data, isLoading: isLoadingClients } = useClients(mergedFilters as any);
 
-    const clients = data?.clients || [];
+    // Fetch Global Stats for cards
+    const { data: globalStats, isLoading: isLoadingStats } = useClientDashboardStats(
+        activeTab,
+        selectedOrg === 'all' ? undefined : selectedOrg,
+        selectedAgentId === 'all' ? undefined : selectedAgentId
+    );
+
+    const rawClients = data?.clients || [];
     const totalClients = data?.total || 0;
     const totalPages = Math.ceil(totalClients / PAGE_SIZE);
+
+    const clients = useMemo(() => {
+        let sorted = [...rawClients];
+        if (sortBy === 'urgent') {
+            sorted.sort((a: any, b: any) => {
+                const dateA = new Date(a.last_interaction_at || a.created_at).getTime();
+                const dateB = new Date(b.last_interaction_at || b.created_at).getTime();
+                return dateA - dateB; // Más viejas / desatendidas primero
+            });
+        } else if (sortBy === 'recent') {
+            sorted.sort((a: any, b: any) => {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return dateB - dateA; // Más recientes primero
+            });
+        } else if (sortBy === 'budget') {
+            sorted.sort((a: any, b: any) => (b.budget_max || 0) - (a.budget_max || 0)); // Mayor presupuesto primero
+        }
+        return sorted;
+    }, [rawClients, sortBy]);
 
     // Estado de carga compuesto
     const isLoading = isLoadingPermissions || isLoadingClients;
@@ -277,6 +347,20 @@ export function ClientsDashboard() {
                     <div className="flex items-center gap-4">
                         {/* Filtros */}
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+                            {/* Ordenamiento */}
+                            <>
+                                <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value as any)}
+                                    className="bg-slate-900/50 border border-slate-800 text-[11px] text-white px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-500/50 max-w-[150px] cursor-pointer"
+                                >
+                                    <option value="urgent">Más urgentes</option>
+                                    <option value="recent">Más recientes</option>
+                                    <option value="budget">Mayor presu.</option>
+                                </select>
+                            </>
+
                             {/* Filtro de Organización: Para GOD (siempre) y para Red (Todos) */}
                             {(isGod || activeTab === 'network') && (
                                 <>
@@ -340,12 +424,12 @@ export function ClientsDashboard() {
                     >
                         <div className="min-h-[400px] space-y-6">
                             {/* Summary Cards */}
-                            {!isLoading && clients.length > 0 && (() => {
-                                const activeCount = clients.filter((c: any) => c.status === 'active').length;
-                                const closedCount = clients.filter((c: any) => c.status === 'closed').length;
-                                const budgets = clients.filter((c: any) => c.budget_max > 0);
-                                const minBudget = budgets.length > 0 ? Math.min(...budgets.map((c: any) => c.budget_min)) : 0;
-                                const maxBudget = budgets.length > 0 ? Math.max(...budgets.map((c: any) => c.budget_max)) : 0;
+                            {(!isLoading && !isLoadingStats && clients.length > 0) && (() => {
+                                const activeCount = globalStats?.totalActive || 0;
+                                const closedCount = globalStats?.totalClosed || 0;
+                                const criticalCount = globalStats?.criticalCount || 0;
+                                const attentionRate = globalStats?.attentionRate || 0;
+
                                 const lastActivity = clients.reduce((latest: string, c: any) => {
                                     const d = c.created_at || '';
                                     return d > latest ? d : latest;
@@ -353,55 +437,143 @@ export function ClientsDashboard() {
                                 const daysSince = lastActivity ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / 86400000) : -1;
 
                                 return (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                                    <>
+                                        <motion.div
+                                            className="grid grid-cols-2 md:grid-cols-5 gap-3"
+                                            initial="hidden"
+                                            animate="visible"
+                                            variants={{
+                                                hidden: {},
+                                                visible: { transition: { staggerChildren: 0.06 } }
+                                            }}
+                                        >
+                                            {/* Tarjeta de Búsquedas Críticas (Abandonadas) */}
+                                            <motion.div
+                                                title="Búsquedas activas sin seguimiento por más de 14 días"
+                                                animate={criticalCount > 0 && activeCard !== 'critical' ? { scale: [1, 1.02, 1], boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 15px rgba(239,68,68,0.3)', '0 0 0px rgba(239,68,68,0)'] } : {}}
+                                                transition={{ duration: 2, repeat: Infinity }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => {
+                                                    if (criticalCount > 0) {
+                                                        setActiveCard(prev => prev === 'critical' ? null : 'critical');
+                                                        setSortBy('urgent');
+                                                        setPage(1);
+                                                    }
+                                                }}
+                                                className={`p-4 rounded-xl border transition-all ${criticalCount > 0 ? 'bg-red-500/10 cursor-pointer hover:bg-red-500/20' : 'bg-slate-800/10 border-slate-700/30'} ${activeCard === 'critical' ? 'border-red-500 ring-1 ring-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-red-500/30'}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${criticalCount > 0 ? (activeCard === 'critical' ? 'bg-red-500/30' : 'bg-red-500/20') : 'bg-slate-700/50'}`}>
+                                                        <AlertTriangle className={`w-3.5 h-3.5 ${criticalCount > 0 ? 'text-red-400' : 'text-slate-500'}`} />
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${criticalCount > 0 ? 'text-red-400/80' : 'text-slate-500'}`}>Críticas</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-emerald-400/70 uppercase tracking-wider">Activas</span>
-                                            </div>
-                                            <span className="text-2xl font-black text-emerald-300">{activeCount}</span>
-                                        </div>
-                                        <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                                                <AnimatedNumber value={criticalCount} className={`text-2xl font-black ${criticalCount > 0 ? 'text-red-400' : 'text-slate-500'}`} />
+                                            </motion.div>
+
+                                            <motion.div
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => {
+                                                    setActiveCard(prev => prev === 'active' ? null : 'active');
+                                                    setPage(1);
+                                                }}
+                                                className={`p-4 rounded-xl border cursor-pointer transition-all ${activeCard === 'active' ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10 hover:border-emerald-500/30'}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${activeCard === 'active' ? 'bg-emerald-500/20' : 'bg-emerald-500/10'}`}>
+                                                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider">Activas</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider">Cerradas</span>
-                                            </div>
-                                            <span className="text-2xl font-black text-blue-300">{closedCount}</span>
-                                        </div>
-                                        <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="h-7 w-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                                                    <DollarSign className="w-3.5 h-3.5 text-violet-400" />
+                                                <AnimatedNumber value={activeCount} className="text-2xl font-black text-emerald-300" />
+                                            </motion.div>
+                                            <motion.div
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => {
+                                                    setActiveCard(prev => prev === 'closed' ? null : 'closed');
+                                                    setPage(1);
+                                                }}
+                                                className={`p-4 rounded-xl border cursor-pointer transition-all ${activeCard === 'closed' ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-blue-500/5 border-blue-500/10 hover:bg-blue-500/10 hover:border-blue-500/30'}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${activeCard === 'closed' ? 'bg-blue-500/20' : 'bg-blue-500/10'}`}>
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-blue-400/80 uppercase tracking-wider">Cerradas</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-violet-400/70 uppercase tracking-wider">Rango USD</span>
-                                            </div>
-                                            <span className="text-lg font-black text-violet-300">
-                                                {minBudget > 0 ? `${(minBudget / 1000).toFixed(0)}k - ${(maxBudget / 1000).toFixed(0)}k` : '—'}
-                                            </span>
-                                        </div>
-                                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                                                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                                                <AnimatedNumber value={closedCount} className="text-2xl font-black text-blue-300" />
+                                            </motion.div>
+                                            <motion.div
+                                                whileHover={{ scale: 1.02 }}
+                                                className="p-4 rounded-xl border bg-slate-800/10 border-slate-700/30"
+                                            >
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${attentionRate > 80 ? 'bg-emerald-500/10' : attentionRate > 50 ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
+                                                        <Activity className={`w-3.5 h-3.5 ${attentionRate > 80 ? 'text-emerald-400' : attentionRate > 50 ? 'text-amber-400' : 'text-red-400'}`} />
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${attentionRate > 80 ? 'text-emerald-400/80' : attentionRate > 50 ? 'text-amber-400/80' : 'text-red-400/80'}`}>Tasa Atención</span>
                                                 </div>
-                                                <span className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider">Última</span>
+                                                <span className={`text-2xl font-black ${attentionRate > 80 ? 'text-emerald-300' : attentionRate > 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                                                    {attentionRate}%
+                                                </span>
+                                            </motion.div>
+                                            <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-amber-400/70 uppercase tracking-wider">Última</span>
+                                                </div>
+                                                <span className="text-lg font-black text-amber-300">
+                                                    {daysSince === 0 ? 'Hoy' : daysSince === 1 ? 'Ayer' : daysSince > 0 ? `Hace ${daysSince}d` : '—'}
+                                                </span>
                                             </div>
-                                            <span className="text-lg font-black text-amber-300">
-                                                {daysSince === 0 ? 'Hoy' : daysSince === 1 ? 'Ayer' : daysSince > 0 ? `Hace ${daysSince}d` : '—'}
-                                            </span>
-                                        </div>
-                                    </div>
+                                        </motion.div>
+
+                                        {/* Filter chip indicator */}
+                                        <AnimatePresence>
+                                            {activeCard && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10, height: 0 }}
+                                                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                                    exit={{ opacity: 0, y: -10, height: 0 }}
+                                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                    className="flex items-center gap-2 mt-2"
+                                                >
+                                                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${activeCard === 'critical' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                                                        activeCard === 'active' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                                            'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                                                        }`}>
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                                                        Filtrando por: {activeCard === 'critical' ? 'Críticas' : activeCard === 'active' ? 'Activas' : 'Cerradas'}
+                                                        <button
+                                                            onClick={() => setActiveCard(null)}
+                                                            className="ml-1 hover:text-white transition-colors"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-500">
+                                                        Mostrando {totalClients} resultados
+                                                    </span>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </>
                                 );
                             })()}
                             {isLoading ? (
                                 <div className="space-y-4">
-                                    <div className="h-12 bg-slate-800/20 animate-pulse rounded-xl" />
+                                    <div className="h-12 rounded-xl overflow-hidden relative bg-slate-800/20">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-700/10 to-transparent animate-[shimmer_1.5s_infinite]" style={{ backgroundSize: '200% 100%' }} />
+                                    </div>
                                     {Array(5).fill(0).map((_, i) => (
-                                        <div key={i} className="h-16 bg-slate-800/10 animate-pulse rounded-xl" />
+                                        <div key={i} className="h-16 rounded-xl overflow-hidden relative bg-slate-800/10">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-700/10 to-transparent animate-[shimmer_1.5s_infinite]" style={{ backgroundSize: '200% 100%', animationDelay: `${i * 0.1}s` }} />
+                                        </div>
                                     ))}
                                 </div>
                             ) : clients.length === 0 ? (

@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useClosingsDashboard, closingsKeys } from '../hooks/useClosings';
 import { useDeleteTransaction } from '../hooks/useTransactions'; // Mantener delete legacy
 import { CloseTransactionDialog } from './CloseTransactionDialog';
+import { ReservationActionMenu } from './ReservationActionMenu';
 import { formatCurrency } from '@/lib/formatters';
 import { Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
@@ -69,18 +70,18 @@ export function ClosingsPage() {
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [selectedAgent, setSelectedAgent] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'completed'>('all');
+    const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'completed' | 'cancelled'>('all');
 
-    const filters = {
+    // FILTROS: Solo year, month y orgId disparan re-fetch. agentId es local para 0ms latency.
+    const queryFilters = {
         year: selectedYear,
         month: selectedMonth,
         organizationId: selectedOrg !== 'all' ? selectedOrg : undefined,
-        agentId: selectedAgent !== 'all' ? selectedAgent : undefined,
     };
 
     // NUEVO HOOK UNIFICADO (Reemplaza useTransactions, useAggregatedMetrics, useOrganizations, useTeamMembers)
     // Se habilita solo cuando tenemos auth para evitar llamadas sin token
-    const { data: dashboardData, isLoading: isLoadingDashboard, refetch, error: dashboardError, isError } = useClosingsDashboard(filters, auth?.id);
+    const { data: dashboardData, isLoading: isLoadingDashboard, isFetching, refetch, error: dashboardError, isError } = useClosingsDashboard(queryFilters, auth?.id);
 
     // Error feedback
     if (isError) {
@@ -158,6 +159,11 @@ export function ClosingsPage() {
         loadOrganizations();
     }, [role, organizations.length]);
 
+    // Ordenar organizaciones alfabéticamente
+    const sortedOrgs = useMemo(() => {
+        return [...organizations].sort((a, b) => a.name.localeCompare(b.name));
+    }, [organizations]);
+
 
     const filteredTransactions = useMemo(() => {
         if (!transactions) return [];
@@ -170,11 +176,73 @@ export function ClosingsPage() {
                 propertyTitle.includes(searchLower) ||
                 agentName.includes(searchLower);
 
-            const matchesTab = selectedTab === 'all' || tx.status === selectedTab;
+            // Filtro local de estado (Instant Tabs)
+            const txStatus = tx.status || 'completed'; // null = completed para legacy
+            const matchesTab = selectedTab === 'all' || txStatus === selectedTab;
 
-            return matchesSearch && matchesTab;
+            // Filtro local de agente (0ms latency)
+            const matchesAgent = selectedAgent === 'all' || tx.agent_id === selectedAgent;
+
+            return matchesSearch && matchesTab && matchesAgent;
         });
-    }, [transactions, searchQuery, selectedTab]);
+    }, [transactions, searchQuery, selectedTab, selectedAgent]);
+
+    // Calcular métricas agregadas en el cliente para el set filtrado (Instantáneo)
+    const activeMetrics = useMemo(() => {
+        if (!filteredTransactions) return {
+            totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
+            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+        };
+
+        return filteredTransactions.reduce((acc, tx) => {
+            const status = tx.status || 'completed';
+            
+            // Solo sumamos al volumen y comisiones si no es caída (o según lógica específica)
+            if (status !== 'cancelled') {
+                acc.totalSalesVolume += Number(tx.actual_price || 0);
+                acc.totalGrossCommission += Number(tx.gross_commission || 0);
+                acc.totalNetIncome += Number(tx.net_commission || 0);
+                acc.totalMasterIncome += Number(tx.master_commission_amount || 0);
+                acc.totalOfficeIncome += Number(tx.office_commission_amount || 0);
+                
+                if (status === 'completed') {
+                    acc.closedDealsCount += 1;
+                    acc.totalPuntas += (tx.sides || 1);
+                    if (tx.sides === 2) acc.doubleSidedCount += 1;
+                    else acc.singleSidedCount += 1;
+                }
+            }
+            return acc;
+        }, {
+            totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
+            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+        });
+    }, [filteredTransactions]);
+
+    const activeAverageTicket = activeMetrics.closedDealsCount > 0 
+        ? activeMetrics.totalSalesVolume / activeMetrics.closedDealsCount 
+        : 0;
+
+    const breakdownMetrics = useMemo(() => {
+        if (!transactions) return { realVolume: 0, projectedVolume: 0, realCommission: 0, projectedCommission: 0 };
+        
+        // El desglose por tipo (Cierres vs Reservas) se calcula del set visible del agente si está seleccionado
+        const relevantTxs = selectedAgent === 'all' 
+            ? transactions 
+            : transactions.filter(t => t.agent_id === selectedAgent);
+
+        return relevantTxs.reduce((acc, tx) => {
+            const status = tx.status || 'completed';
+            if (status === 'completed') {
+                acc.realVolume += Number(tx.actual_price || 0);
+                acc.realCommission += Number(tx.gross_commission || 0);
+            } else if (status === 'pending') {
+                acc.projectedVolume += Number(tx.actual_price || 0);
+                acc.projectedCommission += Number(tx.gross_commission || 0);
+            }
+            return acc;
+        }, { realVolume: 0, projectedVolume: 0, realCommission: 0, projectedCommission: 0 });
+    }, [transactions, selectedAgent]);
 
     const handleRefresh = () => {
         // Invalidar la nueva query unificada
@@ -297,23 +365,17 @@ export function ClosingsPage() {
                             value={selectedOrg}
                             onValueChange={(v) => {
                                 setSelectedOrg(v);
-                                setSelectedAgent('all'); // Reset agente al cambiar org
+                                setSelectedAgent('all'); // Reset agente al cambiar oficina
                             }}
                         >
                             <SelectTrigger className="w-[180px] bg-slate-800 border-slate-700 text-white">
-                                <Building2 className="h-4 w-4 mr-2" />
-                                <SelectValue placeholder="Inmobiliaria" />
+                                <Building2 className="h-4 w-4 mr-2 text-blue-400" />
+                                <SelectValue placeholder="Todas las Inmo" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-800 border-slate-700">
-                                <SelectItem value="all" className="text-white hover:bg-slate-700">
-                                    Todas las Inmobiliarias
-                                </SelectItem>
-                                {organizations?.map((org) => (
-                                    <SelectItem
-                                        key={org.id}
-                                        value={org.id}
-                                        className="text-white hover:bg-slate-700"
-                                    >
+                                <SelectItem value="all" className="text-white hover:bg-slate-700">Todas las Inmo</SelectItem>
+                                {sortedOrgs.map((org) => (
+                                    <SelectItem key={org.id} value={org.id} className="text-white hover:bg-slate-700">
                                         {org.name}
                                     </SelectItem>
                                 ))}
@@ -398,12 +460,12 @@ export function ClosingsPage() {
                     <SummaryCard
                         title="Volumen de Ventas"
                         icon={<DollarSign className="h-5 w-5" />}
-                        mainValue={formatCurrency((metrics?.totalRealVolume || 0) + (metrics?.totalProjectedVolume || 0))}
+                        mainValue={formatCurrency(activeMetrics.totalSalesVolume)}
                         loading={isLoading}
                         color="blue"
                         details={[
-                            { label: 'Cerrado', value: formatCurrency(metrics?.totalRealVolume || 0), color: 'emerald' },
-                            { label: 'Reservado', value: formatCurrency(metrics?.totalProjectedVolume || 0), color: 'amber' },
+                            { label: 'Cerrado', value: formatCurrency(breakdownMetrics.realVolume), color: 'emerald' as const },
+                            { label: 'Reservado', value: formatCurrency(breakdownMetrics.projectedVolume), color: 'amber' as const },
                         ]}
                     />
                 </motion.div>
@@ -415,19 +477,19 @@ export function ClosingsPage() {
                         icon={<BarChart3 className="h-5 w-5" />}
                         mainValue={formatCurrency(
                             role === 'child'
-                                ? (metrics?.totalNetIncome || 0)
-                                : (metrics?.totalRealCommission || 0) + (metrics?.totalProjectedCommission || 0)
+                                ? activeMetrics.totalNetIncome
+                                : activeMetrics.totalGrossCommission
                         )}
                         loading={isLoading}
                         color="green"
                         details={
                             role === 'child'
                                 ? [
-                                    { label: 'Neto facturado', value: formatCurrency(metrics?.totalNetIncome || 0), color: 'emerald' },
+                                    { label: 'Neto facturado', value: formatCurrency(activeMetrics.totalNetIncome), color: 'emerald' as const },
                                 ]
                                 : [
-                                    { label: 'Facturado', value: formatCurrency(metrics?.totalRealCommission || 0), color: 'emerald' },
-                                    { label: 'Proyectado', value: formatCurrency(metrics?.totalProjectedCommission || 0), color: 'amber' },
+                                    { label: 'Facturado', value: formatCurrency(breakdownMetrics.realCommission), color: 'emerald' as const },
+                                    { label: 'Proyectado', value: formatCurrency(breakdownMetrics.projectedCommission), color: 'amber' as const },
                                 ]
                         }
                     />
@@ -438,14 +500,14 @@ export function ClosingsPage() {
                     <SummaryCard
                         title="Operaciones"
                         icon={<Handshake className="h-5 w-5" />}
-                        mainValue={`${metrics?.closedDealsCount || 0}`}
-                        mainSuffix={`· ${metrics?.totalPuntas || 0} puntas`}
+                        mainValue={`${activeMetrics.closedDealsCount}`}
+                        mainSuffix={`· ${activeMetrics.totalPuntas} puntas`}
                         loading={isLoading}
                         color="purple"
                         details={[
-                            { label: 'Cierres', value: String(transactions.filter(t => (t.status || 'completed') === 'completed').length), color: 'emerald' },
-                            { label: 'Reservas', value: String(transactions.filter(t => t.status === 'pending').length), color: 'amber' },
-                            { label: 'Ticket Prom.', value: formatCurrency(metrics?.averageTicket || 0), color: 'slate' },
+                            { label: 'Cierres', value: String(filteredTransactions.filter(t => (t.status || 'completed') === 'completed' && (selectedTab === 'all' || selectedTab === 'completed')).length), color: 'emerald' as const },
+                            { label: 'Reservas', value: String(filteredTransactions.filter(t => t.status === 'pending' && (selectedTab === 'all' || selectedTab === 'pending')).length), color: 'amber' as const },
+                            { label: 'Ticket Prom.', value: formatCurrency(activeAverageTicket), color: 'slate' as const },
                         ]}
                     />
                 </motion.div>
@@ -456,180 +518,208 @@ export function ClosingsPage() {
                         <SummaryCard
                             title="Desglose Financiero"
                             icon={<Shield className="h-5 w-5" />}
-                            mainValue={formatCurrency(metrics?.totalGrossCommission || 0)}
+                            mainValue={formatCurrency(activeMetrics.totalGrossCommission)}
                             mainSuffix="bruto"
                             loading={isLoading}
                             color="yellow"
                             details={[
-                                ...(role === 'god' ? [{ label: 'Royalty', value: formatCurrency(metrics?.totalMasterIncome || 0), color: 'purple' as const }] : []),
-                                { label: 'Oficina', value: formatCurrency(metrics?.totalOfficeIncome || 0), color: 'blue' as const },
-                                { label: 'Agentes', value: formatCurrency(metrics?.totalNetIncome || 0), color: 'emerald' as const },
+                                ...(role === 'god' ? [{ label: 'Royalty', value: formatCurrency(activeMetrics.totalMasterIncome), color: 'purple' as const }] : []),
+                                { label: 'Oficina', value: formatCurrency(activeMetrics.totalOfficeIncome), color: 'blue' as const },
+                                { label: 'Agentes', value: formatCurrency(activeMetrics.totalNetIncome), color: 'emerald' as const },
                             ]}
                         />
                     </motion.div>
                 )}
             </div>
 
-
             {/* Transactions Table */}
             <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden shadow-2xl">
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <CardTitle className="text-white flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-purple-400" />
+                        <BarChart3 className="h-5 w-5 text-indigo-400" />
                         Historial de Operaciones
                     </CardTitle>
-                    <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as any)} className="w-full sm:w-auto">
-                        <TabsList className="bg-slate-800/50 border-slate-700">
-                            <TabsTrigger value="all" className="data-[state=active]:bg-slate-700 text-slate-400 data-[state=active]:text-white data-[state=active]:shadow-xl transition-all">Todas ({transactions.length})</TabsTrigger>
-                            <TabsTrigger value="pending" className="data-[state=active]:bg-amber-500/20 text-amber-500/70 data-[state=active]:text-amber-400 data-[state=active]:shadow-lg shadow-amber-500/20 transition-all">Reservas ({transactions.filter(t => t.status === 'pending').length})</TabsTrigger>
-                            <TabsTrigger value="completed" className="data-[state=active]:bg-emerald-500/20 text-emerald-500/70 data-[state=active]:text-emerald-400 data-[state=active]:shadow-lg shadow-emerald-500/20 transition-all">Cierres ({transactions.filter(t => (t.status || 'completed') === 'completed').length})</TabsTrigger>
+                    <Tabs
+                        value={selectedTab}
+                        onValueChange={(v) => setSelectedTab(v as any)}
+                        className="w-full sm:w-auto"
+                    >
+                        <TabsList className="bg-slate-900 border border-slate-800 p-1">
+                            <TabsTrigger value="all" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs">
+                                Todas ({transactions.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="pending" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-amber-400">
+                                Reservas ({transactions.filter(t => t.status === 'pending').length})
+                            </TabsTrigger>
+                            <TabsTrigger value="completed" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-emerald-400">
+                                Cierres ({transactions.filter(t => (t.status === 'completed' || !t.status)).length})
+                            </TabsTrigger>
+                            <TabsTrigger value="cancelled" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-red-400">
+                                Caídas ({transactions.filter(t => t.status === 'cancelled').length})
+                            </TabsTrigger>
                         </TabsList>
                     </Tabs>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-20">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                        </div>
-                    ) : transactions && transactions.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="border-slate-800 bg-slate-800/50">
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Fecha</TableHead>
-                                        {isGodOrParent && (
-                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Agente</TableHead>
-                                        )}
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Propiedad</TableHead>
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Estado</TableHead>
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Precio</TableHead>
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Puntas</TableHead>
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Bruta</TableHead>
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Neto Agente</TableHead>
-                                        {role === 'god' && (
-                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Master (Dios)</TableHead>
-                                        )}
-                                        {isGodOrParent && (
-                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Oficina</TableHead>
-                                        )}
-                                        <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredTransactions.map((tx) => (
-                                        <TableRow
-                                            key={tx.id}
-                                            className="border-slate-800/50 hover:bg-slate-700/30 font-mono text-xs transition-colors"
-                                        >
-                                            <TableCell className="text-slate-400">
-                                                {format(new Date(tx.transaction_date), 'dd/MM/yyyy')}
-                                            </TableCell>
+                    <motion.div
+                        initial={{ opacity: 1 }}
+                        animate={{ opacity: isFetching ? 0.8 : 1 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {isLoadingDashboard ? (
+                            <div className="flex items-center justify-center py-20">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                            </div>
+                        ) : filteredTransactions.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-slate-800 bg-slate-800/50">
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Fecha</TableHead>
                                             {isGodOrParent && (
-                                                <TableCell className="text-white">
-                                                    {tx.agent?.first_name} {tx.agent?.last_name}
-                                                </TableCell>
+                                                <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Agente</TableHead>
                                             )}
-                                            <TableCell className="text-white font-sans max-w-[200px] truncate">
-                                                {tx.property?.title || tx.custom_property_title || (
-                                                    <span className="text-slate-500 italic">Sin propiedad</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                {tx.status === 'pending' ? (
-                                                    <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">Reserva</Badge>
-                                                ) : tx.status === 'cancelled' ? (
-                                                    <Badge variant="outline" className="border-red-500/50 text-red-500 bg-red-500/10">Caída</Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="border-emerald-500/50 text-emerald-500 bg-emerald-500/10">Cierre Final</Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-white">
-                                                {formatCurrency(tx.actual_price)}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="outline" className="border-slate-700 text-slate-400 font-mono bg-slate-800/50">
-                                                    {tx.sides}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right text-yellow-400/80 font-bold">
-                                                {formatCurrency(tx.gross_commission)}
-                                            </TableCell>
-                                            <TableCell className="text-right text-green-400/80">
-                                                {formatCurrency(tx.net_commission)}
-                                            </TableCell>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Propiedad</TableHead>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Estado</TableHead>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Precio</TableHead>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-center">Puntas</TableHead>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Bruta</TableHead>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Neto Agente</TableHead>
                                             {role === 'god' && (
-                                                <TableCell className="text-right text-purple-400/80">
-                                                    {formatCurrency(tx.master_commission_amount || 0)}
-                                                </TableCell>
+                                                <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Master (Dios)</TableHead>
                                             )}
                                             {isGodOrParent && (
-                                                <TableCell className="text-right text-blue-400/80">
-                                                    {formatCurrency(tx.office_commission_amount || 0)}
-                                                </TableCell>
+                                                <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Oficina</TableHead>
                                             )}
-                                            <TableCell className="text-right">
-                                                {(() => {
-                                                    const canManage = role === 'god' ||
-                                                        (role === 'parent' && tx.organization_id === auth?.organizationId) ||
-                                                        (role === 'child' && tx.agent_id === auth?.id);
-
-                                                    if (!canManage) return null;
-
-                                                    return (
-                                                        <div className="flex justify-end gap-1">
-                                                            <CloseTransactionDialog transaction={tx} onSuccess={handleRefresh} />
-
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-400/10">
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>¿Eliminar esta operación?</AlertDialogTitle>
-                                                                        <AlertDialogDescription className="text-slate-400">
-                                                                            Esta acción no se puede deshacer. Los KPIs se actualizarán automáticamente.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700">Cancelar</AlertDialogCancel>
-                                                                        <AlertDialogAction
-                                                                            onClick={() => handleDelete(tx.id)}
-                                                                            className="bg-red-600 hover:bg-red-700 text-white"
-                                                                        >
-                                                                            Eliminar
-                                                                        </AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </TableCell>
+                                            <TableHead className="text-slate-400 font-bold uppercase text-[10px] tracking-wider text-right">Acciones</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : (
-                        <div className="py-20 text-center">
-                            <Handshake className="h-12 w-12 text-slate-800 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-slate-500">No se encontraron transacciones</h3>
-                            <p className="text-slate-400 mb-4">
-                                Registra tu primera operación
-                            </p>
-                            <CloseTransactionDialog
-                                onSuccess={handleRefresh}
-                                trigger={
-                                    <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Registrar Operación
-                                    </Button>
-                                }
-                            />
-                        </div>
-                    )}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredTransactions.map((tx) => (
+                                            <TableRow
+                                                key={tx.id}
+                                                className="border-slate-800/50 hover:bg-slate-700/30 font-mono text-xs transition-colors"
+                                            >
+                                                <TableCell className="text-slate-400">
+                                                    {format(new Date(tx.transaction_date), 'dd/MM/yyyy')}
+                                                </TableCell>
+                                                {isGodOrParent && (
+                                                    <TableCell className="text-white">
+                                                        {tx.agent?.first_name} {tx.agent?.last_name}
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="text-white font-sans max-w-[200px] truncate">
+                                                    {tx.property?.title || tx.custom_property_title || (
+                                                        <span className="text-slate-500 italic">Sin propiedad</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    {tx.status === 'pending' ? (
+                                                        <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">Reserva</Badge>
+                                                    ) : tx.status === 'cancelled' ? (
+                                                        <Badge variant="outline" className="border-red-500/50 text-red-500 bg-red-500/10">Caída</Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="border-emerald-500/50 text-emerald-500 bg-emerald-500/10">Cierre Final</Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-white">
+                                                    {formatCurrency(tx.actual_price)}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Badge variant="outline" className="border-slate-700 text-slate-400 font-mono bg-slate-800/50">
+                                                        {tx.sides}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right text-yellow-400/80 font-bold">
+                                                    {formatCurrency(tx.gross_commission)}
+                                                </TableCell>
+                                                <TableCell className="text-right text-green-400/80">
+                                                    {formatCurrency(tx.net_commission)}
+                                                </TableCell>
+                                                {role === 'god' && (
+                                                    <TableCell className="text-right text-purple-400/80">
+                                                        {formatCurrency(tx.master_commission_amount || 0)}
+                                                    </TableCell>
+                                                )}
+                                                {isGodOrParent && (
+                                                    <TableCell className="text-right text-blue-400/80">
+                                                        {formatCurrency(tx.office_commission_amount || 0)}
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="text-right">
+                                                    {(() => {
+                                                        const canManage = role === 'god' ||
+                                                            (role === 'parent' && tx.organization_id === auth?.organizationId) ||
+                                                            (role === 'child' && tx.agent_id === auth?.id);
+
+                                                        if (!canManage) return null;
+
+                                                        return (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <ReservationActionMenu
+                                                                    transaction={tx}
+                                                                />
+                                                                <CloseTransactionDialog
+                                                                    transaction={tx}
+                                                                    onSuccess={handleRefresh}
+                                                                    trigger={
+                                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white hover:bg-slate-800">
+                                                                            <Pencil className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    }
+                                                                />
+                                                                <AlertDialog>
+                                                                    <AlertDialogTrigger asChild>
+                                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-900/20">
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </AlertDialogTrigger>
+                                                                    <AlertDialogContent className="bg-slate-900 border-slate-800">
+                                                                        <AlertDialogHeader>
+                                                                            <AlertDialogTitle>¿Eliminar esta operación?</AlertDialogTitle>
+                                                                            <AlertDialogDescription className="text-slate-400">
+                                                                                Esta acción no se puede deshacer. Los KPIs se actualizarán automáticamente.
+                                                                            </AlertDialogDescription>
+                                                                        </AlertDialogHeader>
+                                                                        <AlertDialogFooter>
+                                                                            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700">Cancelar</AlertDialogCancel>
+                                                                            <AlertDialogAction
+                                                                                onClick={() => handleDelete(tx.id)}
+                                                                                className="bg-red-600 hover:bg-red-700 text-white"
+                                                                            >
+                                                                                Eliminar
+                                                                            </AlertDialogAction>
+                                                                        </AlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        ) : (
+                            <div className="py-20 text-center">
+                                <Handshake className="h-12 w-12 text-slate-800 mx-auto mb-4" />
+                                <h3 className="text-lg font-medium text-slate-500">No se encontraron transacciones</h3>
+                                <p className="text-slate-400 mb-4">
+                                    Registra tu primera operación
+                                </p>
+                                <CloseTransactionDialog
+                                    onSuccess={handleRefresh}
+                                    trigger={
+                                        <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Registrar Operación
+                                        </Button>
+                                    }
+                                />
+                            </div>
+                        )}
+                    </motion.div>
                 </CardContent>
             </Card>
         </motion.div>
