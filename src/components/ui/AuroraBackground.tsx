@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion, useSpring } from 'framer-motion';
+import { motion, useSpring, useTransform } from 'framer-motion';
 
 /**
  * OrbitalBackground - Interactive gradient background
@@ -14,6 +14,10 @@ export function AuroraBackground() {
     // Smooth, physics-based springs for the mouse follower
     const mouseX = useSpring(0, { stiffness: 50, damping: 20 });
     const mouseY = useSpring(0, { stiffness: 50, damping: 20 });
+    
+    // Transform raw spring values into CSS calc strings
+    const smoothHoverX = useTransform(mouseX, m => `calc(${m}% - 0px)`);
+    const smoothHoverY = useTransform(mouseY, m => `calc(${m}% - 0px)`);
 
     useEffect(() => {
         setMounted(true);
@@ -87,8 +91,8 @@ export function AuroraBackground() {
                     background: 'radial-gradient(circle, rgba(236,72,153,0.8), rgba(0,0,0,0))',
                     left: '-20vw', // offset to center on pointer
                     top: '-20vw',
-                    x: motion.template`calc(${mouseX}% - 0px)`,
-                    y: motion.template`calc(${mouseY}% - 0px)`,
+                    x: smoothHoverX,
+                    y: smoothHoverY,
                 }}
             />
             
