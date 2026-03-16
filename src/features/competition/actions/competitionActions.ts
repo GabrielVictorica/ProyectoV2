@@ -178,7 +178,7 @@ export async function getCompetitionDataAction(
                 .lte('date', endDate),
             adminClient
                 .from('transactions' as any)
-                .select('agent_id, sides, gross_commission, transaction_date, status')
+                .select('agent_id, sides, gross_commission, transaction_date, closing_date, status')
                 .in('agent_id', agentIds)
                 .gte('transaction_date', startDate)
                 .lte('transaction_date', endDate)
@@ -349,6 +349,10 @@ export async function getCompetitionDataAction(
             const weekTransactions = transactions.filter(
                 (t: any) => t.transaction_date >= monday && t.transaction_date <= sunday
             );
+            // Cierres: completed transactions where closing_date falls in this week
+            const weekCierres = transactions.filter(
+                (t: any) => t.status === 'completed' && t.closing_date && t.closing_date >= monday && t.closing_date <= sunday
+            );
             const weekContacts = newContacts.filter((c: any) => {
                 const d = c.created_at?.split('T')[0];
                 return d >= monday && d <= sunday;
@@ -410,9 +414,10 @@ export async function getCompetitionDataAction(
                 // ── Semana Perfecta check ──
                 const objectives = objectivesMap[agentId];
                 if (objectives && objectives.weeklyPlPb > 0) {
-                    // Green meetings = all activities except referidos + ambas extra + transactions
+                    // Green meetings = all activities except referidos + ambas extra + reservas + cierres
                     const totalNonReferido = aa.filter((a: any) => a.type !== 'referido').length;
-                    const greenMeetingsCount = totalNonReferido + weekAmbasCount + at.length;
+                    const weekAgentCierres = weekCierres.filter((t: any) => t.agent_id === agentId).length;
+                    const greenMeetingsCount = totalNonReferido + weekAmbasCount + at.length + weekAgentCierres;
 
                     const plCount = countByType['pre_listing'] || 0;
                     const pbCount = countByType['pre_buying'] || 0;

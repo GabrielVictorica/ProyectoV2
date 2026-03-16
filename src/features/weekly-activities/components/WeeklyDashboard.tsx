@@ -68,8 +68,9 @@ export function WeeklyDashboard() {
         let plCount = 0;
 
         Object.values(weeklyData).forEach(day => {
-            // Add transactions (Reservas) to the total count
+            // Add transactions (Reservas + Cierres) to the total count
             greenCount += (day.reservaCount || 0);
+            greenCount += (day.cierreCount || 0);
 
             day.activities.forEach(act => {
                 // Sum all activities except referrals
