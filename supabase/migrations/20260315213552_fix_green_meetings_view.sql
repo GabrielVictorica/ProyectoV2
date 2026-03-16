@@ -1,8 +1,5 @@
--- Final version: Green meetings count includes:
--- 1. All activities except referidos
--- 2. Visitas ambas count as 2 (extra +1)
--- 3. Reservas (by transaction_date)
--- 4. Cierres from OTHER weeks (by closing_date, avoiding double count with same-week reservas)
+-- Final: Green meetings = activities (excl referidos) + visitas ambas extra + reservas + cierres
+-- Cierres count regardless of whether the reservation was the same week or not
 CREATE OR REPLACE VIEW view_agent_progress AS
 WITH agent_stats AS (
     SELECT transactions.agent_id,
@@ -40,14 +37,13 @@ WITH agent_stats AS (
     FROM transactions
     WHERE transactions.transaction_date >= date_trunc('week'::text, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date::timestamp with time zone)
     GROUP BY transactions.agent_id
-), cierre_only_stats_weekly AS (
+), cierre_stats_weekly AS (
     SELECT transactions.agent_id,
-        count(*)::integer AS weekly_cierres_extra
+        count(*)::integer AS weekly_cierres
     FROM transactions
     WHERE transactions.status = 'completed'
       AND transactions.closing_date IS NOT NULL
       AND transactions.closing_date >= date_trunc('week'::text, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date::timestamp with time zone)
-      AND (transactions.transaction_date < date_trunc('week'::text, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date::timestamp with time zone))
     GROUP BY transactions.agent_id
 )
 SELECT obj.id AS objective_id,
@@ -95,7 +91,7 @@ SELECT obj.id AS objective_id,
         WHEN EXTRACT(doy FROM (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date) > 0::numeric THEN COALESCE(stats.actual_gross_income, 0::numeric) / EXTRACT(doy FROM (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date) * 365.0
         ELSE 0::numeric
     END AS run_rate_projection,
-    COALESCE(act_stats.weekly_green_activities, 0) + COALESCE(ts_weekly.weekly_reservas, 0) + COALESCE(cierre_extra.weekly_cierres_extra, 0) AS weekly_green_meetings_count,
+    COALESCE(act_stats.weekly_green_activities, 0) + COALESCE(ts_weekly.weekly_reservas, 0) + COALESCE(cierre_stats.weekly_cierres, 0) AS weekly_green_meetings_count,
     COALESCE(act_stats.weekly_critical, 0) AS weekly_critical_activities_count,
     ( SELECT count(*)::integer AS count
            FROM activities a
@@ -105,4 +101,4 @@ FROM agent_objectives obj
     LEFT JOIN agent_stats stats ON obj.agent_id = stats.agent_id AND obj.year::numeric = stats.year::numeric
     LEFT JOIN activity_stats act_stats ON obj.agent_id = act_stats.agent_id
     LEFT JOIN transaction_stats_weekly ts_weekly ON obj.agent_id = ts_weekly.agent_id
-    LEFT JOIN cierre_only_stats_weekly cierre_extra ON obj.agent_id = cierre_extra.agent_id;
+    LEFT JOIN cierre_stats_weekly cierre_stats ON obj.agent_id = cierre_stats.agent_id;
