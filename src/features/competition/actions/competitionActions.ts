@@ -172,7 +172,7 @@ export async function getCompetitionDataAction(
                 .in('id', agentIds),
             adminClient
                 .from('activities' as any)
-                .select('agent_id, type, date, person_id')
+                .select('agent_id, type, date, person_id, visit_metadata')
                 .in('agent_id', agentIds)
                 .gte('date', startDate)
                 .lte('date', endDate),
@@ -277,6 +277,12 @@ export async function getCompetitionDataAction(
                 countByType[a.type] = (countByType[a.type] || 0) + 1;
             }
 
+            // Count visitas ambas (double-sided visits count as 2)
+            const visitaAmbasCount = agentActivities.filter(
+                (a: any) => a.type === 'visita' && a.visit_metadata?.punta === 'ambas'
+            ).length;
+            const effectiveVisitaCount = (countByType['visita'] || 0) + visitaAmbasCount;
+
             // Count transactions
             const agentTransactions = transactions.filter((t: any) => t.agent_id === agentId);
             const totalPuntas = agentTransactions.reduce((sum: number, t: any) => sum + (Number(t.sides) || 1), 0);
@@ -296,7 +302,7 @@ export async function getCompetitionDataAction(
                 pre_buying: (countByType['pre_buying'] || 0) * POINTS_TABLE.pre_buying,
                 reunion_verde: (countByType['reunion_verde'] || 0) * POINTS_TABLE.reunion_verde,
                 acm: (countByType['acm'] || 0) * POINTS_TABLE.acm,
-                visita: (countByType['visita'] || 0) * POINTS_TABLE.visita,
+                visita: effectiveVisitaCount * POINTS_TABLE.visita,
                 nuevo_contacto: contactCount * POINTS_TABLE.nuevo_contacto,
                 nueva_busqueda: searchCount * POINTS_TABLE.nueva_busqueda,
                 referido_bonus: refBonusCount * REFERIDO_BONUS,
@@ -318,7 +324,7 @@ export async function getCompetitionDataAction(
                     pre_buying: countByType['pre_buying'] || 0,
                     reunion_verde: countByType['reunion_verde'] || 0,
                     acm: countByType['acm'] || 0,
-                    visita: countByType['visita'] || 0,
+                    visita: effectiveVisitaCount,
                     referido: countByType['referido'] || 0,
                     nuevo_contacto: contactCount,
                     nueva_busqueda: searchCount,
@@ -367,6 +373,12 @@ export async function getCompetitionDataAction(
                     countByType[a.type] = (countByType[a.type] || 0) + 1;
                 }
 
+                // Count visitas ambas for this week (double-sided = 2)
+                const weekAmbasCount = aa.filter(
+                    (a: any) => a.type === 'visita' && a.visit_metadata?.punta === 'ambas'
+                ).length;
+                const weekEffectiveVisitas = (countByType['visita'] || 0) + weekAmbasCount;
+
                 const puntas = at.reduce((sum: number, t: any) => sum + (Number(t.sides) || 1), 0);
 
                 // Week referido bonus: award it only in the week where the FIRST qualifying activity occurred
@@ -385,7 +397,7 @@ export async function getCompetitionDataAction(
                     (countByType['pre_buying'] || 0) * POINTS_TABLE.pre_buying +
                     (countByType['reunion_verde'] || 0) * POINTS_TABLE.reunion_verde +
                     (countByType['acm'] || 0) * POINTS_TABLE.acm +
-                    (countByType['visita'] || 0) * POINTS_TABLE.visita +
+                    weekEffectiveVisitas * POINTS_TABLE.visita +
                     ac.length * POINTS_TABLE.nuevo_contacto +
                     as_.length * POINTS_TABLE.nueva_busqueda +
                     weekRefBonus;
@@ -398,14 +410,17 @@ export async function getCompetitionDataAction(
                 // ── Semana Perfecta check ──
                 const objectives = objectivesMap[agentId];
                 if (objectives && objectives.weeklyPlPb > 0) {
-                    const rvCount = countByType['reunion_verde'] || 0;
+                    // Green meetings = all activities except referidos + ambas extra + transactions
+                    const totalNonReferido = aa.filter((a: any) => a.type !== 'referido').length;
+                    const greenMeetingsCount = totalNonReferido + weekAmbasCount + at.length;
+
                     const plCount = countByType['pre_listing'] || 0;
                     const pbCount = countByType['pre_buying'] || 0;
                     const refCount = countByType['referido'] || 0;
                     const criticalCount = plCount + pbCount;
 
                     const isPerfect =
-                        rvCount >= PERFECT_WEEK_FIXED_CRITERIA.reunion_verde &&
+                        greenMeetingsCount >= PERFECT_WEEK_FIXED_CRITERIA.reunion_verde &&
                         criticalCount >= objectives.weeklyPlPb &&
                         plCount >= objectives.weeklyPl &&
                         refCount >= PERFECT_WEEK_FIXED_CRITERIA.referido;
