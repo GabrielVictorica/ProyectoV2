@@ -1,5 +1,8 @@
--- Update view_agent_progress to include cierres (completed transactions by closing_date)
--- and visitas ambas counting as 2 in the weekly green meetings count
+-- Final version: Green meetings count includes:
+-- 1. All activities except referidos
+-- 2. Visitas ambas count as 2 (extra +1)
+-- 3. Reservas (by transaction_date)
+-- 4. Cierres from OTHER weeks (by closing_date, avoiding double count with same-week reservas)
 CREATE OR REPLACE VIEW view_agent_progress AS
 WITH agent_stats AS (
     SELECT transactions.agent_id,
@@ -38,8 +41,6 @@ WITH agent_stats AS (
     WHERE transactions.transaction_date >= date_trunc('week'::text, (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date::timestamp with time zone)
     GROUP BY transactions.agent_id
 ), cierre_only_stats_weekly AS (
-    -- Cierres where closing_date is in the current week but transaction_date is NOT
-    -- (to avoid double counting transactions already counted as reservas)
     SELECT transactions.agent_id,
         count(*)::integer AS weekly_cierres_extra
     FROM transactions

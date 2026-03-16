@@ -181,8 +181,7 @@ export async function getCompetitionDataAction(
                 .select('agent_id, sides, gross_commission, transaction_date, closing_date, status')
                 .in('agent_id', agentIds)
                 .gte('transaction_date', startDate)
-                .lte('transaction_date', endDate)
-                .neq('status', 'cancelled'),
+                .lte('transaction_date', endDate),
             adminClient
                 .from('persons' as any)
                 .select('agent_id, created_at')

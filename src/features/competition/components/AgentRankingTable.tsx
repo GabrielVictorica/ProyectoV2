@@ -27,7 +27,7 @@ const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
     acm: { label: 'ACM', color: 'text-blue-400' },
     captacion: { label: 'Captación', color: 'text-amber-400' },
     visita: { label: 'Visita', color: 'text-rose-400' },
-    cierre: { label: 'Cierre', color: 'text-indigo-400' },
+    cierre: { label: 'Reserva', color: 'text-indigo-400' },
     nuevo_contacto: { label: 'Contacto', color: 'text-cyan-400' },
     nueva_busqueda: { label: 'Búsqueda', color: 'text-teal-400' },
     referido_bonus: { label: 'Referido', color: 'text-orange-400' },
