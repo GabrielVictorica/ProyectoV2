@@ -114,18 +114,23 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
                     property: { title: propertyTitle }
                 };
 
+                // Ensure the dates are mapped using the first 10 characters (YYYY-MM-DD)
+                // Since Postgres date fields might come back with time components depending on how they were fetched.
+                const txDateStr = trans.transaction_date ? trans.transaction_date.substring(0, 10) : null;
+                const closingDateStr = trans.closing_date ? trans.closing_date.substring(0, 10) : null;
+
                 // 1. Añadir a la fila de RESERVA (basado en transaction_date)
                 // Se muestran todas (pendientes, completadas o canceladas) como registro de actividad realizada
-                if (map[trans.transaction_date]) {
-                    map[trans.transaction_date].reservaCount += 1;
-                    map[trans.transaction_date].transactions.push({ ...enhancedTrans, _gridRowType: 'reserva' });
+                if (txDateStr && map[txDateStr]) {
+                    map[txDateStr].reservaCount += 1;
+                    map[txDateStr].transactions.push({ ...enhancedTrans, _gridRowType: 'reserva' });
                 }
 
                 // 2. Añadir a la fila de CIERRE (basado en closing_date)
                 // Solo si está completada y tiene fecha de cierre
-                if (trans.status === 'completed' && trans.closing_date && map[trans.closing_date]) {
-                    map[trans.closing_date].cierreCount += 1;
-                    map[trans.closing_date].transactions.push({ ...enhancedTrans, _gridRowType: 'cierre' });
+                if (trans.status === 'completed' && closingDateStr && map[closingDateStr]) {
+                    map[closingDateStr].cierreCount += 1;
+                    map[closingDateStr].transactions.push({ ...enhancedTrans, _gridRowType: 'cierre' });
                 }
             });
 

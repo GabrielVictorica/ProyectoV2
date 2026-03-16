@@ -167,34 +167,20 @@ export async function closeReservationAction(
 
         if (updateError) throw updateError;
 
-        // 5. Crear o actualizar actividad de cierre automática. 
+        // 5. Crear nueva actividad de cierre automática (manteniendo la reserva o actividades previas intactas). 
         const personId = tx.buyer_person_id || tx.seller_person_id;
         if (personId) {
-            const { data: existingActivities } = await adminClient
-                .from('activities')
-                .select('id')
-                .eq('transaction_id', transactionId);
-
-            if (existingActivities && existingActivities.length > 0) {
-                await adminClient.from('activities').update({
-                    status: 'completed',
-                    date: data.closingDate,
-                    time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
-                    notes: `Cierre de reserva finalizado. Monto final: ${data.actualPrice}`
-                }).eq('transaction_id', transactionId);
-            } else {
-                await adminClient.from('activities').insert({
-                    organization_id: tx.organization_id,
-                    agent_id: tx.agent_id,
-                    type: 'cierre', // Consistente con route.ts
-                    date: data.closingDate,
-                    time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
-                    status: 'completed',
-                    notes: `Cierre de reserva finalizado. Monto final: ${data.actualPrice}`,
-                    person_id: personId,
-                    transaction_id: transactionId
-                });
-            }
+            await adminClient.from('activities').insert({
+                organization_id: tx.organization_id,
+                agent_id: tx.agent_id,
+                type: 'cierre',
+                date: data.closingDate,
+                time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
+                status: 'completed',
+                notes: `Cierre de reserva finalizado. Monto final: ${data.actualPrice}`,
+                person_id: personId,
+                transaction_id: transactionId
+            });
         }
 
         // 6. Actualizar CRM a 'cierre' y cerrar búsquedas

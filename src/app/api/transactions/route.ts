@@ -204,13 +204,18 @@ export async function POST(request: NextRequest) {
             if (p) finalSellerName = `${p.first_name} ${p.last_name}`.trim();
         }
 
+        const finalStatus = status || 'completed';
+        const finalTxDate = transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+        const finalClosingDate = finalStatus === 'completed' ? finalTxDate : null;
+
         const { data, error } = await (adminClient as any)
             .from('transactions')
             .insert({
                 organization_id: orgId,
                 property_id: property_id || null,
                 agent_id: finalAgentId,
-                transaction_date: transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
+                transaction_date: finalTxDate,
+                closing_date: finalClosingDate,
                 actual_price: parseFloat(actual_price),
                 sides: parseInt(sides),
                 commission_percentage: parseFloat(commission_percentage),
@@ -228,7 +233,7 @@ export async function POST(request: NextRequest) {
                 seller_person_id: seller_person_id || null,
                 notes: notes || null,
                 custom_property_title: custom_property_title || null,
-                status: status || 'completed',
+                status: finalStatus,
             })
             .select(`
                 *,
@@ -242,11 +247,11 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
 
         // Auto-update last_interaction_at for linked persons and their clients
-        const txDate = transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+        const txDate = finalTxDate;
         const personIdsToUpdate = [buyer_person_id, seller_person_id].filter(Boolean);
         
         // Determinar estado de CRM: Solo 'reserva' o 'cierre' (si es caída, no forzamos cambio de estado)
-        const newRelationshipStatus = status === 'pending' ? 'reserva' : (status === 'cancelled' ? null : 'cierre');
+        const newRelationshipStatus = finalStatus === 'pending' ? 'reserva' : (finalStatus === 'cancelled' ? null : 'cierre');
 
         for (const personId of personIdsToUpdate) {
             // Obtener estado actual para el historial
@@ -311,8 +316,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Auto-generate activity (usar 'cierre' como tipo para ambos estados)
-        const activityNotes = status === 'pending'
+        // Auto-generate activity
+        const activityType = finalStatus === 'pending' ? 'reserva' : 'cierre';
+        const activityNotes = finalStatus === 'pending'
             ? `Reserva registrada desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`
             : `Cierre efectivo registrado desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`;
         await (adminClient as any)
@@ -322,7 +328,7 @@ export async function POST(request: NextRequest) {
                 agent_id: finalAgentId,
                 property_id: property_id || null,
                 client_id: null,
-                type: 'cierre',
+                type: activityType,
                 status: 'completed',
                 date: txDate,
                 time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
@@ -357,7 +363,7 @@ export async function PUT(request: NextRequest) {
         // Obtener transacción actual para verificar permisos (Incluimos campos críticos para recálculo)
         const { data: currentTx } = await (adminClient as any)
             .from('transactions')
-            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage, buyer_person_id, seller_person_id, transaction_date, sides, property_id, status, custom_property_title')
+            .select('agent_id, organization_id, actual_price, commission_percentage, agent_split_percentage, buyer_person_id, seller_person_id, transaction_date, closing_date, sides, property_id, status, custom_property_title')
             .eq('id', id)
             .single();
 
@@ -382,7 +388,7 @@ export async function PUT(request: NextRequest) {
 
         // Copiar campos actualizables
         const allowedFields = [
-            'transaction_date', 'actual_price', 'sides',
+            'transaction_date', 'closing_date', 'actual_price', 'sides',
             'commission_percentage', 'agent_split_percentage',
             'buyer_name', 'seller_name', 'buyer_id', 'seller_id',
             'buyer_person_id', 'seller_person_id',
@@ -441,6 +447,13 @@ export async function PUT(request: NextRequest) {
                 .eq('id', updateData.seller_person_id)
                 .single();
             if (p) updateData.seller_name = `${p.first_name} ${p.last_name}`.trim();
+        }
+
+        // Auto-set closing_date when transitioning from pending to completed
+        if (currentTx.status === 'pending' && updates.status === 'completed') {
+            if (!updateData.closing_date) {
+                updateData.closing_date = updates.transaction_date || currentTx.transaction_date;
+            }
         }
 
         const { data, error } = await (adminClient as any)
@@ -532,25 +545,59 @@ export async function PUT(request: NextRequest) {
         }
 
         if (currentTx.status === 'pending' && updates.status === 'completed') {
+            // Generar o actualizar actividad de cierre, MANTENIENDO la de reserva.
             await (adminClient as any)
                 .from('activities')
-                .update({
+                .insert({
+                    organization_id: txData.organization_id || updates.organization_id,
+                    agent_id: txData.agent_id || updates.agent_id,
+                    type: 'cierre',
                     status: 'completed',
-                    date: txDate,
+                    date: updateData.closing_date,
                     time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
                     notes: `Evolución de Reserva a Cierre Final. Operación: ${updateData.custom_property_title || currentTx.custom_property_title || 'Propiedad'}`,
-                })
-                .eq('transaction_id', id);
+                    transaction_id: id,
+                    property_id: txData.property_id || updates.property_id || null,
+                    // Vincular primary client (buyer if exists, else seller) to activity
+                    person_id: updateData.buyer_person_id || updateData.seller_person_id || currentTx.buyer_person_id || currentTx.seller_person_id || null
+                });
         } else {
             // Sincronizar fecha de la actividad vinculada si cambia la de la transacción
             // Si la nueva fecha es distinta a la actual o el status cambió, actualizamos
             if (updates.transaction_date && updates.transaction_date !== currentTx.transaction_date) {
-               await (adminClient as any)
+                // If it evaluates as pending, we update the `reserva` activity date
+                if (currentTx.status === 'pending' && updates.status !== 'completed') {
+                   // Only update the 'reserva' activity
+                   await (adminClient as any)
+                        .from('activities')
+                        .update({
+                            date: updates.transaction_date,
+                        })
+                        .eq('transaction_id', id)
+                        .eq('type', 'reserva');
+                } else if (currentTx.status === 'completed') {
+                    // Update both 'reserva' and 'cierre' if transaction date changed,
+                    // but wait! If it's a completed transaction, we should change closing_date not transaction_date typically,
+                    // but if they do change transaction_date, let's update ONLY 'cierre' if there wasn't a 'reserva'.
+                   // Actually, if updates.transaction_date changes, we only update the 'reserva' one if they had a reserva.
+                   await (adminClient as any)
+                        .from('activities')
+                        .update({
+                            date: updates.transaction_date,
+                        })
+                        .eq('transaction_id', id)
+                        .in('type', ['reserva', 'cierre']); // Just a blanket date update, although closing_date is now separate.
+                }
+            }
+            if (updates.closing_date && updates.closing_date !== currentTx.closing_date) {
+                // Update closing date on the cierre activity
+                await (adminClient as any)
                     .from('activities')
                     .update({
-                        date: updates.transaction_date,
+                        date: updates.closing_date,
                     })
-                    .eq('transaction_id', id);
+                    .eq('transaction_id', id)
+                    .eq('type', 'cierre');
             }
         }
 
