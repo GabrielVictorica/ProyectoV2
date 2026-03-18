@@ -204,9 +204,11 @@ export async function POST(request: NextRequest) {
             if (p) finalSellerName = `${p.first_name} ${p.last_name}`.trim();
         }
 
-        const finalStatus = status || 'completed';
+        // HARDENED: All new transactions must be created as 'pending' (reserva).
+        // Closures are handled via closeReservationAction, NOT via direct creation.
+        const finalStatus = 'pending';
         const finalTxDate = transaction_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
-        const finalClosingDate = finalStatus === 'completed' ? finalTxDate : null;
+        const finalClosingDate = null; // No closing date for new reservations
 
         const { data, error } = await (adminClient as any)
             .from('transactions')

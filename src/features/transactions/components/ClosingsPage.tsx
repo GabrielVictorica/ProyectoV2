@@ -658,15 +658,7 @@ export function ClosingsPage() {
                                                             <div className="flex items-center justify-end gap-1">
                                                                 <ReservationActionMenu
                                                                     transaction={tx}
-                                                                />
-                                                                <CloseTransactionDialog
-                                                                    transaction={tx}
-                                                                    onSuccess={handleRefresh}
-                                                                    trigger={
-                                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white hover:bg-slate-800">
-                                                                            <Pencil className="h-3.5 w-3.5" />
-                                                                        </Button>
-                                                                    }
+                                                                    onRefresh={handleRefresh}
                                                                 />
                                                                 <AlertDialog>
                                                                     <AlertDialogTrigger asChild>
@@ -706,14 +698,14 @@ export function ClosingsPage() {
                                 <Handshake className="h-12 w-12 text-slate-800 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-slate-500">No se encontraron transacciones</h3>
                                 <p className="text-slate-400 mb-4">
-                                    Registra tu primera operación
+                                    Registra tu primera reserva
                                 </p>
                                 <CloseTransactionDialog
                                     onSuccess={handleRefresh}
                                     trigger={
                                         <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
                                             <Plus className="mr-2 h-4 w-4" />
-                                            Registrar Operación
+                                            Registrar Reserva
                                         </Button>
                                     }
                                 />

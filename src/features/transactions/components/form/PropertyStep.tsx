@@ -230,94 +230,29 @@ export const PropertyStep: React.FC<PropertyStepProps> = ({
                 />
             )}
 
-            {/* Estado: Reserva o Cierre Final */}
-            <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                    <FormItem className="space-y-3 pt-2">
-                        <FormLabel className="text-slate-200">Tipo de Registro *</FormLabel>
-                        <FormControl>
-                            <div className={`grid grid-cols-1 ${(!transaction) ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-3`}>
-                                <label
-                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all ${field.value === 'pending'
-                                        ? 'bg-amber-500/20 border-amber-500 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                                        }`}
-                                >
-                                    <div className="flex h-5 items-center">
-                                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${field.value === 'pending' ? 'border-amber-400' : 'border-slate-500'
-                                            }`}>
-                                            {field.value === 'pending' && <div className="h-2 w-2 rounded-full bg-amber-400" />}
-                                        </div>
-                                        <input
-                                            type="radio"
-                                            className="sr-only"
-                                            onChange={() => field.onChange('pending')}
-                                            checked={field.value === 'pending'}
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium leading-none">Reserva</p>
-                                        <p className="text-[10px] text-slate-400">Operación pendiente de cierre.</p>
-                                    </div>
-                                </label>
-
-                                <label
-                                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all ${field.value === 'completed'
-                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                                        : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                                        }`}
-                                >
-                                    <div className="flex h-5 items-center">
-                                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${field.value === 'completed' ? 'border-emerald-400' : 'border-slate-500'
-                                            }`}>
-                                            {field.value === 'completed' && <div className="h-2 w-2 rounded-full bg-emerald-400" />}
-                                        </div>
-                                        <input
-                                            type="radio"
-                                            className="sr-only"
-                                            onChange={() => field.onChange('completed')}
-                                            checked={field.value === 'completed'}
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium leading-none">Cierre Final</p>
-                                        <p className="text-[10px] text-slate-400">Operación concretada.</p>
-                                    </div>
-                                </label>
-
-                                {(!transaction || transaction?.status === 'pending' || transaction?.status === 'cancelled') && (
-                                    <label
-                                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all ${field.value === 'cancelled'
-                                            ? 'bg-red-500/20 border-red-500 text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
-                                            : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                                            } ${!transaction ? 'hidden' : ''}`}
-                                    >
-                                        <div className="flex h-5 items-center">
-                                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${field.value === 'cancelled' ? 'border-red-400' : 'border-slate-500'
-                                                }`}>
-                                                {field.value === 'cancelled' && <div className="h-2 w-2 rounded-full bg-red-400" />}
-                                            </div>
-                                            <input
-                                                type="radio"
-                                                className="sr-only"
-                                                onChange={() => field.onChange('cancelled')}
-                                                checked={field.value === 'cancelled'}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm font-medium leading-none">Baja</p>
-                                            <p className="text-[10px] text-slate-400">Operación caída.</p>
-                                        </div>
-                                    </label>
-                                )}
-                            </div>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+            {/* Estado: Solo lectura en edición, oculto en creación (siempre pending) */}
+            {transaction && (
+                <div className="space-y-2 pt-2">
+                    <p className="text-sm font-medium text-slate-200">Estado Actual</p>
+                    <div className={`inline-flex items-center gap-2 rounded-lg border px-4 py-3 ${
+                        transaction.status === 'pending'
+                            ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                            : transaction.status === 'cancelled'
+                                ? 'bg-red-500/20 border-red-500/50 text-red-300'
+                                : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                    }`}>
+                        {transaction.status === 'pending' && <Check className="h-4 w-4" />}
+                        {transaction.status === 'completed' && <CheckCircle2 className="h-4 w-4" />}
+                        {transaction.status === 'cancelled' && <XCircle className="h-4 w-4" />}
+                        <span className="text-sm font-medium">
+                            {transaction.status === 'pending' ? 'Reserva' : transaction.status === 'cancelled' ? 'Caída' : 'Cierre Final'}
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                        El estado se gestiona desde el menú de acciones (⋮) de la tabla.
+                    </p>
+                </div>
+            )}
         </div>
     );
 };

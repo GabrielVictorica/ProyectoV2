@@ -10,6 +10,7 @@ import { usePermissions } from '@/features/auth/hooks/useAuth';
 import { Search, UserPlus, X, Check, User, Phone, Mail, Loader2, Sparkles, History, UserPlus2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 
 interface PersonSelectorProps {
     value: string | null;
@@ -22,11 +23,8 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
     const { isGod, isParent } = usePermissions();
     const showAgentInfo = isGod || isParent;
     const [search, setSearch] = useState('');
-    const [allPersons, setAllPersons] = useState<Person[]>([]);
-    const [hasLoadedAll, setHasLoadedAll] = useState(false);
     const [results, setResults] = useState<Person[]>([]);
     const [recentPersons, setRecentPersons] = useState<Person[]>([]);
-    const [loading, setLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -41,38 +39,27 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         fetchRecent();
     }, []);
 
-    // Cargar TODAS las personas para búsqueda local instantánea
-    useEffect(() => {
-        const fetchAll = async () => {
-            if (isOpen && !hasLoadedAll && !loading) {
-                setLoading(true);
-                const res = await getPersonsAction(); // Trae activos por defecto
-                if (res.success) {
-                    setAllPersons(res.data || []);
-                    setHasLoadedAll(true);
-                }
-                setLoading(false);
-            }
-        };
-        fetchAll();
-    }, [isOpen, hasLoadedAll]);
+    // Se eliminó la precarga de todas las personas para optimizar la performance.
 
     // Resolver ID a Persona si viene por prop
+    const { data: resolvedPerson, isFetching: isResolving } = useQuery({
+        queryKey: ['person', value],
+        queryFn: async () => {
+             if (!value) return null;
+             const res = await getPersonByIdAction(value);
+             return res.success && res.data ? res.data : null;
+        },
+        enabled: !!value && (!selectedPerson || selectedPerson.id !== value),
+        staleTime: 5 * 60 * 1000,
+    });
+
     useEffect(() => {
-        const resolvePerson = async () => {
-            if (value && (!selectedPerson || selectedPerson.id !== value)) {
-                setLoading(true);
-                const res = await getPersonByIdAction(value);
-                if (res.success && res.data) {
-                    setSelectedPerson(res.data);
-                }
-                setLoading(false);
-            } else if (!value) {
-                setSelectedPerson(null);
-            }
-        };
-        resolvePerson();
-    }, [value]);
+        if (resolvedPerson) {
+            setSelectedPerson(resolvedPerson);
+        } else if (!value) {
+            setSelectedPerson(null);
+        }
+    }, [resolvedPerson, value]);
 
     // Cerrar al hacer clic afuera
     useEffect(() => {
@@ -85,23 +72,36 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Búsqueda LOCAL (Instantánea)
+    // Estado derivado para el debounce de la entrada
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
     useEffect(() => {
-        if (search.length < 2) {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Búsqueda en el servidor Cacheada por React Query
+    const { data: searchResults, isFetching: isSearching } = useQuery({
+        queryKey: ['persons', 'search', debouncedSearch],
+        queryFn: async () => {
+            if (debouncedSearch.length < 2) return [];
+            const res = await searchPersonsAction(debouncedSearch.toLowerCase());
+            return res.success ? (res.data || []) : [];
+        },
+        enabled: debouncedSearch.length >= 2,
+        staleTime: 5 * 60 * 1000, // Caché de 5 minutos, la respuesta será instantánea (0ms) al volver a escribir algo ya buscado
+    });
+
+    useEffect(() => {
+        if (debouncedSearch.length < 2) {
             setResults([]);
-            return;
+        } else if (searchResults) {
+            setResults(searchResults);
         }
-
-        const query = search.toLowerCase();
-        const filtered = allPersons.filter(p =>
-            p.first_name.toLowerCase().includes(query) ||
-            p.last_name.toLowerCase().includes(query) ||
-            (p.email && p.email.toLowerCase().includes(query)) ||
-            (p.phone && p.phone.toLowerCase().includes(query))
-        );
-
-        setResults(filtered.slice(0, 10)); // Limitar a 10 resultados para la UI
-    }, [search, allPersons]);
+    }, [searchResults, debouncedSearch]);
+    
+    // Unificar los estados de carga
+    const loading = isResolving || isSearching;
 
     const handleSelect = (person: Person) => {
         setSelectedPerson(person);

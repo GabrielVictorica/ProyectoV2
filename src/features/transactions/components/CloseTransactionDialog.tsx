@@ -129,10 +129,12 @@ interface Props {
     transaction?: TransactionWithRelations;
     onSuccess?: () => void;
     trigger?: React.ReactNode;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
-export function CloseTransactionDialog({ propertyId, transaction, onSuccess, trigger }: Props) {
-    const [open, setOpen] = useState(false);
+export function CloseTransactionDialog({ propertyId, transaction, onSuccess, trigger, defaultOpen = false, onOpenChange: externalOnOpenChange }: Props) {
+    const [open, setOpen] = useState(defaultOpen);
     const [step, setStep] = useState(1);
     const TOTAL_STEPS = 3;
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -183,7 +185,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
         defaultValues: {
             property_id: transaction ? (transaction.property_id ?? 'manual') : (propertyId || ''),
             custom_property_title: transaction?.custom_property_title || '',
-            status: (transaction as any)?.status || 'completed',
+            status: (transaction as any)?.status || 'pending',
             actual_price: transaction?.actual_price || 0,
             sides: transaction?.sides || 1,
             my_side: 'buyer' as const,
@@ -358,8 +360,9 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 seller_person_id: data.seller_person_id || null,
                 custom_property_title: data.property_id === 'manual' ? data.custom_property_title : null,
                 notes: data.notes || null,
-                status: data.status,
-                cancellation_reason: data.status === 'cancelled' ? data.cancellation_reason : null,
+                // En creación siempre pending; en edición mantener status actual (no se cambia desde aquí)
+                status: isEditing ? transaction.status : 'pending',
+                cancellation_reason: null,
             };
 
             if (isEditing) {
@@ -370,7 +373,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 toast.success('Operación actualizada con éxito');
             } else {
                 await addTransaction(input as any);
-                toast.success(data.status === 'pending' ? 'Reserva registrada con éxito' : 'Operación cerrada con éxito');
+                toast.success('Reserva registrada con éxito');
 
                 // Preguntar si desea actualizar el estado de los clientes a "Cierre"
                 const linkedPersons = [
@@ -383,7 +386,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                     id: person.id!,
                     name: person.name,
                     date: data.transaction_date,
-                    targetStatus: data.status === 'pending' ? 'reserva' : 'cierre'
+                    targetStatus: 'reserva'
                 }));
 
                 if (updates.length > 0) {
@@ -404,7 +407,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 buyer_person_id: null,
                 seller_person_id: null,
                 custom_property_title: '',
-                status: 'completed',
+                status: 'pending',
                 notes: '',
                 organization_id: profile?.organization_id || '',
                 agent_id: auth?.id || '',
@@ -439,6 +442,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             setShowCloseConfirm(true);
         } else {
             setOpen(false);
+            externalOnOpenChange?.(false);
             setStep(1);
         }
     };
@@ -458,12 +462,13 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             buyer_person_id: null,
             seller_person_id: null,
             custom_property_title: '',
-            status: 'completed',
+            status: 'pending',
             notes: '',
             organization_id: profile?.organization_id || '',
             agent_id: auth?.id || '',
         });
         setOpen(false);
+        externalOnOpenChange?.(false);
         setStep(1);
         setBuyerHasSearch(null);
         setSellerHasSearch(null);
@@ -474,6 +479,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             <Dialog open={open} onOpenChange={(newOpen) => {
                 if (newOpen) {
                     setOpen(true);
+                    externalOnOpenChange?.(true);
                 } else {
                     handleRequestClose();
                 }
@@ -482,7 +488,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                     {trigger || (!isEditing ? (
                         <Button className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700">
                             <Plus className="mr-2 h-4 w-4" />
-                            Nueva Operación
+                            Nueva Reserva
                         </Button>
                     ) : (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-800">
@@ -498,10 +504,10 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                     <DialogHeader>
                         <DialogTitle className="text-white flex items-center gap-2">
                             <Handshake className="h-5 w-5 text-green-400" />
-                            {isEditing ? 'Editar Operación' : 'Registrar Operación'}
+                            {isEditing ? 'Editar Operación' : 'Registrar Reserva'}
                         </DialogTitle>
                         <DialogDescription className="text-slate-400">
-                            {isEditing ? 'Modifica los datos de la operación' : 'Registra una nueva reserva o cierre efectivo'}
+                            {isEditing ? 'Modifica los datos de la operación (sin cambiar el estado)' : 'Registra una nueva reserva de propiedad'}
                         </DialogDescription>
                     </DialogHeader>
 

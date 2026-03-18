@@ -167,9 +167,9 @@ export async function closeReservationAction(
 
         if (updateError) throw updateError;
 
-        // 5. Crear nueva actividad de cierre automática (manteniendo la reserva o actividades previas intactas). 
-        const personId = tx.buyer_person_id || tx.seller_person_id;
-        if (personId) {
+        // 5. Crear nueva actividad de cierre automática para CADA persona vinculada
+        const personIds = [tx.buyer_person_id, tx.seller_person_id].filter(Boolean) as string[];
+        for (const pid of personIds) {
             await adminClient.from('activities').insert({
                 organization_id: tx.organization_id,
                 agent_id: tx.agent_id,
@@ -178,13 +178,12 @@ export async function closeReservationAction(
                 time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
                 status: 'completed',
                 notes: `Cierre de reserva finalizado. Monto final: ${data.actualPrice}`,
-                person_id: personId,
+                person_id: pid,
                 transaction_id: transactionId
             });
         }
 
         // 6. Actualizar CRM a 'cierre' y cerrar búsquedas
-        const personIds = [tx.buyer_person_id, tx.seller_person_id].filter(Boolean) as string[];
         for (const pid of personIds) {
             await adminClient
                 .from('persons')
