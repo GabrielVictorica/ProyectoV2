@@ -15,7 +15,8 @@ export type ActionResult<T = any> = {
  */
 export async function cancelReservationAction(
     transactionId: string,
-    reason: string
+    reason: string,
+    searchStatus?: 'active' | 'closed'
 ): Promise<ActionResult> {
     try {
         const supabase = await createClient();
@@ -87,6 +88,41 @@ export async function cancelReservationAction(
                     reason: reason 
                 }
             });
+
+            // Opcional: Actualizar estado de la búsqueda si es el comprador y se especificó un nuevo estado
+            if (pid === tx.buyer_person_id && searchStatus) {
+                if (searchStatus === 'closed') {
+                    const { data: searchData } = await adminClient
+                        .from('person_searches')
+                        .select('id, notes')
+                        .eq('person_id', pid)
+                        .eq('status', 'active')
+                        .eq('search_type', 'buyer')
+                        .single();
+
+                    if (searchData) {
+                        const newNote = `[Búsqueda perdida tras caída de operación ${transactionId} - Motivo: ${reason}]`;
+                        const updatedNotes = searchData.notes ? `${searchData.notes}\n${newNote}` : newNote;
+
+                        await adminClient
+                            .from('person_searches')
+                            .update({
+                                status: 'closed',
+                                notes: updatedNotes,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', searchData.id);
+                    }
+                } else {
+                    await adminClient
+                        .from('person_searches')
+                        .update({
+                            status: searchStatus,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('person_id', pid);
+                }
+            }
         }
 
         // 4. Actualizar actividad vinculada para reflejar la caída
@@ -194,15 +230,31 @@ export async function closeReservationAction(
                 })
                 .eq('id', pid);
 
-            // Cerrar búsquedas activas (Consistente con route.ts)
-            await adminClient
-                .from('person_searches')
-                .update({
-                    last_interaction_at: data.closingDate,
-                    updated_at: new Date().toISOString(),
-                    status: 'closed'
-                })
-                .eq('person_id', pid);
+            // Cerrar búsqueda activa SOLAMENTE si es del comprador
+            if (pid === tx.buyer_person_id) {
+                const { data: searchData } = await adminClient
+                    .from('person_searches')
+                    .select('id, notes')
+                    .eq('person_id', pid)
+                    .eq('status', 'active')
+                    .eq('search_type', 'buyer')
+                    .single();
+
+                if (searchData) {
+                    const newNote = `[Cerrada automáticamente al cerrar la operación ${transactionId}]`;
+                    const updatedNotes = searchData.notes ? `${searchData.notes}\n${newNote}` : newNote;
+
+                    await adminClient
+                        .from('person_searches')
+                        .update({
+                            last_interaction_at: data.closingDate,
+                            updated_at: new Date().toISOString(),
+                            status: 'closed',
+                            notes: updatedNotes
+                        })
+                        .eq('id', searchData.id);
+                }
+            }
 
             await adminClient.from('person_history').insert({
                 person_id: pid,

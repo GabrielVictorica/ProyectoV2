@@ -30,10 +30,6 @@ interface PartiesStepProps {
     watchMySide: 'buyer' | 'seller' | undefined;
     watchBuyerPersonId: string | null | undefined;
     watchSellerPersonId: string | null | undefined;
-    isCheckingBuyer: boolean;
-    isCheckingSeller: boolean;
-    buyerHasSearch: boolean | null;
-    sellerHasSearch: boolean | null;
     showBuyerSearchForm: boolean;
     setShowBuyerSearchForm: (show: boolean) => void;
     showSellerSearchForm: boolean;
@@ -53,10 +49,6 @@ export const PartiesStep: React.FC<PartiesStepProps> = ({
     watchMySide,
     watchBuyerPersonId,
     watchSellerPersonId,
-    isCheckingBuyer,
-    isCheckingSeller,
-    buyerHasSearch,
-    sellerHasSearch,
     showBuyerSearchForm,
     setShowBuyerSearchForm,
     showSellerSearchForm,
@@ -136,22 +128,6 @@ export const PartiesStep: React.FC<PartiesStepProps> = ({
                                                         placeholder="Buscar comprador en CRM..."
                                                     />
                                                 </FormControl>
-                                                {isCheckingBuyer && <p className="text-[10px] text-slate-500 animate-pulse">Verificando búsqueda...</p>}
-                                                {!isCheckingBuyer && buyerHasSearch === false && watchBuyerPersonId && (
-                                                    <Alert variant="destructive" className="mt-2 bg-red-500/10 border-red-500/20 py-2">
-                                                        <AlertDescription className="text-[11px] flex items-center justify-between gap-2">
-                                                            <span>Este cliente no tiene una búsqueda activa.</span>
-                                                            <Button
-                                                                type="button"
-                                                                variant="link"
-                                                                className="h-auto p-0 text-red-400 font-bold"
-                                                                onClick={() => setShowBuyerSearchForm(true)}
-                                                            >
-                                                                Crear Búsqueda
-                                                            </Button>
-                                                        </AlertDescription>
-                                                    </Alert>
-                                                )}
                                                 <FormMessage />
                                             </FormItem>
                                         )}
@@ -228,7 +204,6 @@ export const PartiesStep: React.FC<PartiesStepProps> = ({
                                                         placeholder="Buscar vendedor en CRM..."
                                                     />
                                                 </FormControl>
-                                                {isCheckingSeller && <p className="text-[10px] text-slate-500 animate-pulse">Verificando propiedad...</p>}
                                                 <FormMessage />
                                             </FormItem>
                                         )}

@@ -147,6 +147,7 @@ export interface Person {
     next_action_at: string | null;
     tags: string[];
     observations: string | null;
+    is_vip: boolean;
 
     created_at: string;
     updated_at: string;

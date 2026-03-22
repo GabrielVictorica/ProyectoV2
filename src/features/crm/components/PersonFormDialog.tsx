@@ -45,6 +45,10 @@ const SOURCES = [
 
 const TAG_GROUPS: MultiSelectOptionGroup[] = [
     {
+        label: 'Vínculo / Origen',
+        options: ['Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro']
+    },
+    {
         label: 'Perfil',
         options: ['Inversor', 'Desarrollador', 'VIP', 'Requiere Atención', 'Embajador']
     },
@@ -92,7 +96,7 @@ import { personSchema } from '../schemas/personSchema';
 import { toast } from 'sonner';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, Mail, User, Briefcase, Heart, Shield, Users, MessageSquare, Settings, Calendar, Hash, MapPin, Tag, Clock, Star, UserCheck } from 'lucide-react';
+import { Phone, Mail, User, Briefcase, Heart, Shield, Users, MessageSquare, Settings, Calendar, Hash, MapPin, Tag, Clock, Star, UserCheck, Crown } from 'lucide-react';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { DateMaskedInput } from '@/components/ui/date-masked-input';
 import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
@@ -125,6 +129,7 @@ const personFormSchema = z.object({
     nextActionAt: z.string().default(''),
     tags: z.string().default(''),
     agentId: z.string().default(''),
+    isVip: z.boolean().default(false),
 });
 
 type PersonFormValues = z.infer<typeof personFormSchema>;
@@ -209,6 +214,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
             nextActionAt: person?.next_action_at ? new Date(person.next_action_at).toISOString().split('T')[0] : (initialData?.nextActionAt || ''),
             tags: person?.tags?.join(', ') || initialData?.tags || '',
             agentId: person?.agent_id || initialData?.agentId || '',
+            isVip: person?.is_vip || initialData?.isVip || false,
         },
     });
 
@@ -246,6 +252,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                 nextActionAt: person?.next_action_at ? new Date(person.next_action_at).toISOString().split('T')[0] : (initialData?.nextActionAt || ''),
                 tags: person?.tags?.join(', ') || initialData?.tags || '',
                 agentId: person?.agent_id || initialData?.agentId || '',
+                isVip: person?.is_vip || initialData?.isVip || false,
             });
             setShowDiscardWarning(false);
         }
@@ -542,30 +549,88 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                                         <Briefcase className="w-4 h-4 text-blue-400" /> Contexto de Negocio
                                                     </h3>
                                                     <div className="flex flex-col gap-5">
-                                                        <FormField control={form.control} name="contactType" render={({ field }) => (
-                                                            <FormItem>
-                                                                <FormLabel className={labelClass}>Tipo de Relación</FormLabel>
-                                                                <FormControl>
-                                                                    <SmartMultiSelect
-                                                                        groups={[
-                                                                            {
-                                                                                label: "Negocio Principal",
-                                                                                options: ["comprador", "vendedor", "inquilino", "otro"]
-                                                                            },
-                                                                            {
-                                                                                label: "Relación Personal",
-                                                                                options: ["cliente", "amigo", "familiar", "conocido", "socio", "colega", "referente"]
-                                                                            }
-                                                                        ]}
-                                                                        selected={field.value}
-                                                                        onChange={field.onChange}
-                                                                        title="Seleccionar roles"
-                                                                        placeholder="Buscar rol..."
-                                                                        icon={Tag}
-                                                                        className={inputClass}
-                                                                    />
+                                                        <FormField control={form.control} name="contactType" render={({ field }) => {
+                                                            const isBuyer = field.value.includes('comprador');
+                                                            const isSeller = field.value.includes('vendedor');
+                                                            const isBoth = isBuyer && isSeller;
+                                                            const activeValue = isBoth ? 'ambos' : isBuyer ? 'comprador' : isSeller ? 'vendedor' : '';
+
+                                                            return (
+                                                                <FormItem>
+                                                                    <FormLabel className={labelClass}>Rol Comercial <span className="text-rose-400">*</span></FormLabel>
+                                                                    <div className="grid grid-cols-3 gap-2 mt-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => field.onChange(['comprador'])}
+                                                                            className={cn(
+                                                                                "h-12 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all",
+                                                                                activeValue === 'comprador'
+                                                                                    ? "bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-[0_0_15px_-3px_rgba(59,130,246,0.2)]"
+                                                                                    : "bg-white/[0.02] border-white/[0.08] text-white/40 hover:border-white/20"
+                                                                            )}
+                                                                        >
+                                                                            <span className="text-xs font-bold uppercase tracking-wider">Comprador</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => field.onChange(['vendedor'])}
+                                                                            className={cn(
+                                                                                "h-12 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all",
+                                                                                activeValue === 'vendedor'
+                                                                                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_-3px_rgba(16,185,129,0.2)]"
+                                                                                    : "bg-white/[0.02] border-white/[0.08] text-white/40 hover:border-white/20"
+                                                                            )}
+                                                                        >
+                                                                            <span className="text-xs font-bold uppercase tracking-wider">Vendedor</span>
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => field.onChange(['comprador', 'vendedor'])}
+                                                                            className={cn(
+                                                                                "h-12 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all",
+                                                                                activeValue === 'ambos'
+                                                                                    ? "bg-violet-500/20 border-violet-500/50 text-violet-400 shadow-[0_0_15px_-3px_rgba(139,92,246,0.2)]"
+                                                                                    : "bg-white/[0.02] border-white/[0.08] text-white/40 hover:border-white/20"
+                                                                            )}
+                                                                        >
+                                                                            <span className="text-xs font-bold uppercase tracking-wider">Ambos</span>
+                                                                        </button>
+                                                                    </div>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            );
+                                                        }} />
+
+                                                        <FormField control={form.control} name="isVip" render={({ field }) => (
+                                                            <FormItem className="flex flex-row items-center justify-between rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-transparent p-4 shadow-sm relative overflow-hidden">
+                                                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                                                                <div className="space-y-0.5 relative z-10">
+                                                                    <FormLabel className="text-sm font-bold text-amber-500 flex items-center gap-2">
+                                                                        <Crown className="w-5 h-5 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" /> Cliente VIP / Alta Prioridad
+                                                                    </FormLabel>
+                                                                    <div className="text-xs text-white/50">
+                                                                        Prioridad alta. Destacar visualmente.
+                                                                    </div>
+                                                                </div>
+                                                                <FormControl className="relative z-10">
+                                                                    <button
+                                                                        type="button"
+                                                                        role="switch"
+                                                                        aria-checked={field.value}
+                                                                        onClick={() => field.onChange(!field.value)}
+                                                                        className={cn(
+                                                                            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]",
+                                                                            field.value ? "bg-amber-500 shadow-[0_0_15px_-3px_rgba(245,158,11,0.4)]" : "bg-white/[0.1]"
+                                                                        )}
+                                                                    >
+                                                                        <span
+                                                                            className={cn(
+                                                                                "pointer-events-none block h-5 w-5 rounded-full shadow-lg ring-0 transition-transform",
+                                                                                field.value ? "translate-x-5 bg-white" : "translate-x-0 bg-white/50"
+                                                                            )}
+                                                                        />
+                                                                    </button>
                                                                 </FormControl>
-                                                                <FormMessage />
                                                             </FormItem>
                                                         )} />
 
@@ -667,6 +732,28 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                                                 </FormItem>
                                                             )} />
                                                         )}
+                                                        <FormField control={form.control} name="tags" render={({ field }) => {
+                                                            // Transformar el string separado por comas a un array para el componente
+                                                            const currentTags = typeof field.value === 'string' 
+                                                                ? field.value.split(',').map(t => t.trim()).filter(Boolean)
+                                                                : Array.isArray(field.value) ? field.value : [];
+
+                                                            return (
+                                                                <FormItem>
+                                                                    <FormLabel className={labelClass}>Etiquetas / Segmentación</FormLabel>
+                                                                    <FormControl>
+                                                                        <SmartMultiSelect
+                                                                            groups={TAG_GROUPS}
+                                                                            selected={currentTags}
+                                                                            onChange={(newTags) => field.onChange(newTags.join(', '))}
+                                                                            placeholder="Categorizar contacto..."
+                                                                            icon={Tag}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <p className="text-[10px] text-white/30 italic">Podes elegir varias categorías (Ej: Amigo + Inversor).</p>
+                                                                </FormItem>
+                                                            );
+                                                        }} />
                                                     </div>
                                                 </div>
                                             </TabAnimation>

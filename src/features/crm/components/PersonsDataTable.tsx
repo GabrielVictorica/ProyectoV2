@@ -34,7 +34,8 @@ import {
     PenTool,
     Star,
     ArrowUpRight,
-    Trash2
+    Trash2,
+    Crown
 } from 'lucide-react';
 import {
     AlertDialog,
@@ -132,12 +133,20 @@ export function PersonsDataTable({ persons, isLoading, onEdit, onAddNote, onView
                                         {person.first_name[0]}{person.last_name[0]}
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                        <span
-                                            className="font-bold text-sm text-white group-hover:text-violet-400 transition-colors cursor-pointer truncate"
-                                            onClick={() => onView?.(person)}
-                                        >
-                                            {person.first_name} {person.last_name}
-                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span
+                                                className={cn(
+                                                    "font-bold text-sm transition-colors cursor-pointer truncate",
+                                                    person.is_vip ? "text-amber-400 group-hover:text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.2)]" : "text-white group-hover:text-violet-400"
+                                                )}
+                                                onClick={() => onView?.(person)}
+                                            >
+                                                {person.first_name} {person.last_name}
+                                            </span>
+                                            {person.is_vip && (
+                                                <Crown className="w-4 h-4 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                             {(Array.isArray(person.contact_type) ? person.contact_type : [person.contact_type]).filter(Boolean).map((role) => (
                                                 <Badge key={role} variant="outline" className="h-4 px-1.5 text-[8px] bg-white/[0.02] border-white/[0.08] text-white/40 font-medium capitalize whitespace-nowrap">

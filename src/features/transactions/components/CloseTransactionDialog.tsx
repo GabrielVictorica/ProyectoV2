@@ -138,10 +138,6 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     const [step, setStep] = useState(1);
     const TOTAL_STEPS = 3;
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-    const [buyerHasSearch, setBuyerHasSearch] = useState<boolean | null>(null);
-    const [sellerHasSearch, setSellerHasSearch] = useState<boolean | null>(null);
-    const [isCheckingBuyer, setIsCheckingBuyer] = useState(false);
-    const [isCheckingSeller, setIsCheckingSeller] = useState(false);
     const [showBuyerSearchForm, setShowBuyerSearchForm] = useState(false);
     const [showSellerSearchForm, setShowSellerSearchForm] = useState(false);
 
@@ -245,8 +241,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     // Resetear estados de verificación de búsqueda al abrir el diálogo
     useEffect(() => {
         if (open && !transaction) {
-            setBuyerHasSearch(null);
-            setSellerHasSearch(null);
+            // (Opcional) clear state
         }
     }, [open, transaction]);
 
@@ -263,10 +258,8 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             // When switching to 1 punta, clear the opposite side
             if (watchMySide === 'buyer') {
                 form.setValue('seller_person_id', null);
-                setSellerHasSearch(null);
             } else {
                 form.setValue('buyer_person_id', null);
-                setBuyerHasSearch(null);
             }
         }
     }, [watchSides, watchMySide, form]);
@@ -274,40 +267,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     const watchBuyerPersonId = form.watch('buyer_person_id');
     const watchSellerPersonId = form.watch('seller_person_id');
 
-    // Check search existence for buyer
-    useEffect(() => {
-        async function checkBuyer() {
-            if (!watchBuyerPersonId) {
-                setBuyerHasSearch(null);
-                return;
-            }
-            setIsCheckingBuyer(true);
-            const result = await checkPersonHasSearchAction(watchBuyerPersonId, 'buyer');
-            if (result.success) {
-                setBuyerHasSearch(result.data?.hasSearch ?? false);
-            }
-            setIsCheckingBuyer(false);
-        }
-        checkBuyer();
-    }, [watchBuyerPersonId]);
 
-    // Check search existence for seller
-    useEffect(() => {
-        async function checkSeller() {
-            if (!watchSellerPersonId) {
-                setSellerHasSearch(null);
-                return;
-            }
-            setIsCheckingSeller(true);
-            const result = await checkPersonHasSearchAction(watchSellerPersonId, 'seller');
-            if (result.success) {
-                // Optimization: We still track if it has a search, but we don't block the form anymore based on your requirement
-                setSellerHasSearch(result.data?.hasSearch ?? false);
-            }
-            setIsCheckingSeller(false);
-        }
-        checkSeller();
-    }, [watchSellerPersonId]);
 
     // Cálculos en tiempo real
     const calculations = useMemo(() => {
@@ -337,12 +297,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     }, [watchPrice, watchCommissionPercent, watchSplitPercent, watchSides, profile, watchOrgId, organizations]);
 
     const onSubmit = async (data: FormData) => {
-        // Bloqueo preventivo: si representamos al comprador y no tiene búsqueda, no dejamos avanzar
-        const isBuyerRepresented = watchSides === 2 || watchMySide === 'buyer';
-        if (isBuyerRepresented && buyerHasSearch === false) {
-            toast.error('No se puede cerrar la operación: El comprador debe tener una búsqueda activa.');
-            return;
-        }
+
 
         try {
             const input = {
@@ -468,10 +423,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             agent_id: auth?.id || '',
         });
         setOpen(false);
-        externalOnOpenChange?.(false);
         setStep(1);
-        setBuyerHasSearch(null);
-        setSellerHasSearch(null);
     };
 
     return (
@@ -577,10 +529,6 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                             watchMySide={watchMySide}
                                             watchBuyerPersonId={watchBuyerPersonId}
                                             watchSellerPersonId={watchSellerPersonId}
-                                            isCheckingBuyer={isCheckingBuyer}
-                                            isCheckingSeller={isCheckingSeller}
-                                            buyerHasSearch={buyerHasSearch}
-                                            sellerHasSearch={sellerHasSearch}
                                             showBuyerSearchForm={showBuyerSearchForm}
                                             setShowBuyerSearchForm={setShowBuyerSearchForm}
                                             showSellerSearchForm={showSellerSearchForm}
@@ -632,7 +580,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                         <Button
                                             type="button"
                                             onClick={() => form.handleSubmit(onSubmit as any)()}
-                                            disabled={isAdding || isUpdating || isCheckingBuyer || isCheckingSeller || (buyerHasSearch === false && (watchSides === 2 || watchMySide === 'buyer'))}
+                                            disabled={isAdding || isUpdating}
                                             className="bg-gradient-to-r from-green-500 to-emerald-600"
                                         >
                                             {isAdding || isUpdating ? (

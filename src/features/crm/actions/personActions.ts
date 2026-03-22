@@ -136,6 +136,7 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
                 next_action_at: validatedData.nextActionAt || null,
                 tags: normalizeTags(validatedData.tags),
                 observations: validatedData.observations || null,
+                is_vip: validatedData.isVip,
             } as any)
             .select()
             .single();
@@ -203,6 +204,7 @@ export async function updatePersonAction(id: string, formData: Partial<z.infer<t
         if (formData.lastInteractionAt !== undefined) dbData.last_interaction_at = formData.lastInteractionAt || null;
         if (formData.tags) dbData.tags = normalizeTags(formData.tags);
         if (formData.observations !== undefined) dbData.observations = formData.observations || null;
+        if (formData.isVip !== undefined) dbData.is_vip = formData.isVip;
         if (formData.agentId) dbData.agent_id = formData.agentId;
 
         const { data, error } = await (supabase as any)
@@ -237,10 +239,19 @@ export async function updatePersonAction(id: string, formData: Partial<z.infer<t
         }
 
         // Registrar evento de edición general si hubo cambios y no son solo estados
-        const genericFields = ['firstName', 'lastName', 'email', 'phone', 'dniCuil', 'birthday', 'occupationCompany', 'familyComposition', 'tags', 'observations'];
-        const hasGenericChanges = genericFields.some(field => (formData as any)[field] !== undefined);
+        const genericFieldsWithoutObservations = ['firstName', 'lastName', 'email', 'phone', 'dniCuil', 'birthday', 'occupationCompany', 'familyComposition', 'tags', 'isVip'];
+        const hasObservations = formData.observations !== undefined;
+        const hasOtherGenericChanges = genericFieldsWithoutObservations.some(field => (formData as any)[field] !== undefined);
 
-        if (hasGenericChanges && !formData.relationshipStatus && !formData.lifecycleStatus) {
+        if (hasObservations && !hasOtherGenericChanges && !formData.relationshipStatus && !formData.lifecycleStatus) {
+            // Solo se agregaron observaciones/notas
+            await recordPersonEvent({
+                personId: id,
+                eventType: 'note_added',
+                agentId: user.id
+            });
+        } else if ((hasOtherGenericChanges || hasObservations) && !formData.relationshipStatus && !formData.lifecycleStatus) {
+            // Hubo cambios en perfil o cambios mixtos
             await recordPersonEvent({
                 personId: id,
                 eventType: 'edit',
@@ -306,6 +317,7 @@ export async function getPersonsAction(filters: {
     source?: string[];
     referredById?: string[];
     lifecycleStatus?: LifecycleStatus[];
+    isVip?: boolean;
 } = {}): Promise<ActionResult<Person[]>> {
     try {
         const supabase = await createClient();
@@ -380,9 +392,8 @@ export async function getPersonsAction(filters: {
             query = query.in('influence_level', filters.influenceLevel);
         }
 
-        // Tipo de Contacto (Array de strings)
         if (filters.contactType && filters.contactType.length > 0) {
-            query = query.in('contact_type', filters.contactType);
+            query = query.overlaps('contact_type', filters.contactType);
         }
 
         // Fuente (Array de strings)
@@ -410,6 +421,11 @@ export async function getPersonsAction(filters: {
             } else if (filters.healthScore === 'sin_contacto') {
                 query = query.is('last_interaction_at', null);
             }
+        }
+
+        // VIP
+        if (filters.isVip) {
+            query = query.eq('is_vip', true);
         }
 
         const { data, error } = await query;

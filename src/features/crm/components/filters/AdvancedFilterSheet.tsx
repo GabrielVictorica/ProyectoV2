@@ -35,14 +35,6 @@ import { LIFECYCLE_STATUSES } from '../../constants/lifecycleStatuses';
 const CONTACT_TYPE_OPTIONS = [
     { label: 'Comprador', value: 'comprador' },
     { label: 'Vendedor', value: 'vendedor' },
-    { label: 'Inquilino', value: 'inquilino' },
-    { label: 'Colega', value: 'colega' },
-    { label: 'Referente', value: 'referente' },
-    { label: 'Familiar', value: 'familiar' },
-    { label: 'Amigo', value: 'amigo' },
-    { label: 'Conocido', value: 'conocido' },
-    { label: 'Socio', value: 'socio' },
-    { label: 'Otro', value: 'otro' },
 ];
 
 const HEALTH_OPTIONS = [

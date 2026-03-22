@@ -32,6 +32,7 @@ export const personSchema = z.object({
         z.string().transform(s => s ? s.split(',').map(t => t.trim()).filter(Boolean) : [])
     ]).default([]),
     observations: z.string().optional().nullable(),
+    isVip: z.boolean().default(false),
 
     organizationId: z.string().uuid().optional().nullable(),
     agentId: z.string().uuid().optional().or(z.literal('')).nullable(),

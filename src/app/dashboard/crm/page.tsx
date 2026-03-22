@@ -29,7 +29,8 @@ export default function RelationshipsPage() {
         source: [] as string[],
         referredById: [] as string[],
         lifecycleStatus: [] as string[],
-        organizationId: 'all'
+        organizationId: 'all',
+        isVip: false
     });
 
     const { persons, agents, availableTags, availableSources, isLoading, refetch } = useCRM({
@@ -43,7 +44,8 @@ export default function RelationshipsPage() {
         source: filters.source,
         referredById: filters.referredById,
         lifecycleStatus: filters.lifecycleStatus as any,
-        organizationId: filters.organizationId
+        organizationId: filters.organizationId,
+        isVip: filters.isVip
     });
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);

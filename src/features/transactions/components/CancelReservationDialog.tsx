@@ -12,11 +12,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { XCircle, Loader2, AlertTriangle, Search } from 'lucide-react';
 import { cancelReservationAction } from '../actions/reservationActions';
 import { toast } from 'sonner';
 import { TransactionWithRelations } from '../hooks/useTransactions';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface CancelReservationDialogProps {
     transaction: TransactionWithRelations;
@@ -33,6 +40,7 @@ export function CancelReservationDialog({
 }: CancelReservationDialogProps) {
     const queryClient = useQueryClient();
     const [reason, setReason] = useState('');
+    const [closeSearch, setCloseSearch] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async () => {
@@ -43,7 +51,12 @@ export function CancelReservationDialog({
 
         setIsSubmitting(true);
         try {
-            const result = await cancelReservationAction(transaction.id, reason.trim());
+            // Pasamos el estado de búsqueda seleccionado al dar de baja
+            const result = await cancelReservationAction(
+                transaction.id, 
+                reason.trim(),
+                transaction.buyer_person_id ? (closeSearch ? 'closed' : 'active') : undefined
+            );
 
             if (!result.success) throw new Error(result.error || 'Error al dar de baja');
 
@@ -99,6 +112,29 @@ export function CancelReservationDialog({
                         placeholder="Ej: El comprador se echó atrás, no consiguió financiamiento..."
                     />
                 </div>
+
+                {/* Status of the buyer's search */}
+                {transaction.buyer_person_id && (
+                    <div className="space-y-3 p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                        <div className="flex flex-row items-start space-x-3">
+                            <input
+                                type="checkbox"
+                                id="closeSearch"
+                                checked={closeSearch}
+                                onChange={(e) => setCloseSearch(e.target.checked)}
+                                className="mt-1 h-4 w-4 flex-shrink-0 cursor-pointer rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500 focus:ring-offset-slate-900"
+                            />
+                            <div className="space-y-1 leading-none">
+                                <Label htmlFor="closeSearch" className="text-slate-200 font-medium cursor-pointer">
+                                    ¿Dar por terminada y perdida la búsqueda del comprador?
+                                </Label>
+                                <p className="text-[11px] text-slate-500">
+                                    Si marcás esta opción, la búsqueda de {transaction.buyer_name || 'este cliente'} se cerrará indicando que fue pérdida por caída de operación. De lo contrario, seguirá Activa para buscar otra propiedad.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <DialogFooter className="gap-2">
                     <Button

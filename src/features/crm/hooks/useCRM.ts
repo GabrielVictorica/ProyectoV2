@@ -36,6 +36,7 @@ export function useCRM(filters: {
     source?: string[];
     referredById?: string[];
     lifecycleStatus?: LifecycleStatus[];
+    isVip?: boolean;
 } = {}) {
     const queryClient = useQueryClient();
 

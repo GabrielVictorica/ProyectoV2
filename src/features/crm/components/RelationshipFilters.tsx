@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { Search, X, SlidersHorizontal, Filter, Building2, Users } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Filter, Building2, Users, Crown } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdvancedFilterSheet } from "./filters/AdvancedFilterSheet";
@@ -21,6 +21,7 @@ interface RelationshipFiltersProps {
         referredById: string[];
         lifecycleStatus: string[];
         organizationId: string;
+        isVip: boolean;
     };
     setFilters: (filters: any) => void;
     agents?: { id: string, first_name: string, last_name: string, organization_id?: string }[];
@@ -147,10 +148,50 @@ export function RelationshipFilters({
                         </div>
                     )}
 
+                    {/* Quick Filters */}
+                    <div className="flex bg-[#09090b] border border-white/[0.08] rounded-xl p-1 gap-1 items-center ml-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFilters({ ...filters, isVip: !filters.isVip })}
+                            className={cn('h-8 px-3 rounded-lg text-xs font-medium transition-all', filters.isVip ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30' : 'text-white/60 hover:text-white hover:bg-white/5')}
+                        >
+                            <Crown className="w-3.5 h-3.5 mr-1.5" />
+                            VIP
+                        </Button>
+                        <div className="w-[1px] h-4 bg-white/[0.08] mx-1" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const newTypes = filters.contactType.includes('comprador') 
+                                    ? filters.contactType.filter((t: string) => t !== 'comprador')
+                                    : [...filters.contactType, 'comprador'];
+                                setFilters({ ...filters, contactType: newTypes });
+                            }}
+                            className={cn('h-8 px-3 rounded-lg text-xs font-medium transition-all', filters.contactType.includes('comprador') ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'text-white/60 hover:text-white hover:bg-white/5')}
+                        >
+                            Comprador
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const newTypes = filters.contactType.includes('vendedor') 
+                                    ? filters.contactType.filter((t: string) => t !== 'vendedor')
+                                    : [...filters.contactType, 'vendedor'];
+                                setFilters({ ...filters, contactType: newTypes });
+                            }}
+                            className={cn('h-8 px-3 rounded-lg text-xs font-medium transition-all', filters.contactType.includes('vendedor') ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'text-white/60 hover:text-white hover:bg-white/5')}
+                        >
+                            Vendedor
+                        </Button>
+                    </div>
+
                     <Button
                         variant="outline"
                         onClick={() => setIsSheetOpen(true)}
-                        className="h-10 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white gap-2 ml-auto lg:ml-0"
+                        className="h-10 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white gap-2 ml-auto lg:ml-2"
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         Filtros
