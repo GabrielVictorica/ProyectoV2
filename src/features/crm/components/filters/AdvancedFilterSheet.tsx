@@ -279,10 +279,9 @@ export function AdvancedFilterSheet({
                                     {filters.source.map(s => (
                                         <Badge key={s} variant="outline" className="border-white/20 text-white/80 gap-1 pl-2">
                                             {s}
-                                            <X
-                                                className="w-3 h-3 cursor-pointer hover:text-white"
-                                                onClick={() => toggleFilter('source', s)}
-                                            />
+                                            <button type="button" onClick={() => toggleFilter('source', s)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                                            </button>
                                         </Badge>
                                     ))}
                                 </div>

@@ -69,11 +69,13 @@ export function RelationshipFilters({
         (filters.organizationId !== 'all' ? 1 : 0);
 
     const clearFilter = (key: string, value: any) => {
-        if (Array.isArray((filters as any)[key])) {
+        if (key === 'agentId') {
+            setFilters({ ...filters, agentId: role === 'child' ? ['me'] : ['all'] });
+        } else if (Array.isArray((filters as any)[key])) {
             const current = (filters as any)[key] as any[];
             setFilters({ ...filters, [key]: current.filter(item => item !== value) });
         } else {
-            const defaultValue = key === 'organizationId' ? 'all' : (key === 'agentId' ? (role === 'child' ? ['me'] : ['all']) : 'all');
+            const defaultValue = key === 'organizationId' ? 'all' : 'all';
             setFilters({ ...filters, [key]: defaultValue });
         }
     };
@@ -212,49 +214,65 @@ export function RelationshipFilters({
                     {filters.relationshipStatus.map(status => (
                         <Badge key={status} variant="secondary" className="bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap gap-1 pr-1">
                             {getStatusLabel(status)}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('relationshipStatus', status)} />
+                            <button type="button" onClick={() => clearFilter('relationshipStatus', status)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     ))}
                     {filters.vinculo.map(v => (
                         <Badge key={v} variant="secondary" className="bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap gap-1 pr-1">
                             {v}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('vinculo', v)} />
+                            <button type="button" onClick={() => clearFilter('vinculo', v)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     ))}
                     {filters.influenceLevel.map(level => (
                         <Badge key={level} variant="secondary" className="bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap gap-1 pr-1">
                             {level === 4 ? 'A' : level === 3 ? 'B' : level === 2 ? 'C' : 'D'}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('influenceLevel', level)} />
+                            <button type="button" onClick={() => clearFilter('influenceLevel', level)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     ))}
                     {filters.contactType.map(type => (
                         <Badge key={type} variant="secondary" className="bg-white/5 text-white/70 border border-white/10 whitespace-nowrap gap-1 pr-1">
                             {type}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('contactType', type)} />
+                            <button type="button" onClick={() => clearFilter('contactType', type)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     ))}
                     {filters.source.map(source => (
                         <Badge key={source} variant="secondary" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap gap-1 pr-1">
                             {source}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('source', source)} />
+                            <button type="button" onClick={() => clearFilter('source', source)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     ))}
                     {filters.healthScore !== 'all' && (
                         <Badge variant="secondary" className="bg-red-500/10 text-red-400 border border-red-500/20 whitespace-nowrap gap-1 pr-1">
                             Salud: {filters.healthScore}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('healthScore', 'all')} />
+                            <button type="button" onClick={() => clearFilter('healthScore', 'all')} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     )}
                     {filters.organizationId !== 'all' && (
                         <Badge variant="secondary" className="bg-white/5 text-white/70 border border-white/10 whitespace-nowrap gap-1 pr-1">
                             Org: {organizations.find(o => o.id === filters.organizationId)?.name || '...'}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('organizationId', 'all')} />
+                            <button type="button" onClick={() => clearFilter('organizationId', 'all')} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     )}
                     {filters.agentId.length > 0 && !filters.agentId.includes('all') && !filters.agentId.includes('me') && (
                         <Badge variant="secondary" className="bg-white/5 text-white/70 border border-white/10 whitespace-nowrap gap-1 pr-1">
                             Agente: {agents.find(a => a.id === filters.agentId[0]) ? `${agents.find(a => a.id === filters.agentId[0])?.first_name} ${agents.find(a => a.id === filters.agentId[0])?.last_name}` : '...'}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('agentId', 'all')} />
+                            <button type="button" onClick={() => clearFilter('agentId', 'all')} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10 transition-colors">
+                                <X className="w-3 h-3 cursor-pointer hover:text-white" />
+                            </button>
                         </Badge>
                     )
                     }
