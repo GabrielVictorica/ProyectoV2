@@ -10,8 +10,12 @@ import {
     REFERIDO_QUALIFYING_TYPES,
     PERFECT_WEEK_BONUS,
     PERFECT_WEEK_FIXED_CRITERIA,
+    BUSQUEDA_NEW_SCORING_DATE,
+    BUSQUEDA_OLD_POINTS,
+    NURC_SCORING,
     type TeamId,
 } from '../constants';
+import { parseNURC } from '@/features/clients/utils/clientUtils';
 
 // Note: TeamId is intentionally NOT re-exported from this 'use server' file.
 // Next.js transforms all exports in 'use server' files into async server action references,
@@ -42,6 +46,7 @@ export interface AgentScore {
         visita: number;
         nuevo_contacto: number;
         nueva_busqueda: number;
+        nurc_bonus: number;
         referido_bonus: number;
         perfect_weeks: number;
     };
@@ -190,7 +195,7 @@ export async function getCompetitionDataAction(
                 .lte('created_at', endDate + 'T23:59:59-03:00'),
             adminClient
                 .from('person_searches' as any)
-                .select('agent_id, created_at')
+                .select('agent_id, created_at, motivation')
                 .in('agent_id', agentIds)
                 .gte('created_at', startDate + 'T00:00:00-03:00')
                 .lte('created_at', endDate + 'T23:59:59-03:00'),
@@ -288,7 +293,33 @@ export async function getCompetitionDataAction(
 
             // Count new contacts and searches
             const contactCount = newContacts.filter((c: any) => c.agent_id === agentId).length;
-            const searchCount = newSearches.filter((s: any) => s.agent_id === agentId).length;
+            const agentSearches = newSearches.filter((s: any) => s.agent_id === agentId);
+
+            // Calculate búsqueda points with date cutoff + NURC bonus
+            let searchPoints = 0;
+            let nurcBonusPoints = 0;
+            for (const search of agentSearches) {
+                const searchDate = search.created_at?.split('T')[0] || '';
+                // Old searches = 1pt, new searches = 8pt
+                const basePoints = searchDate < BUSQUEDA_NEW_SCORING_DATE
+                    ? BUSQUEDA_OLD_POINTS
+                    : POINTS_TABLE.nueva_busqueda;
+                searchPoints += basePoints;
+
+                // NURC bonus only for new searches
+                if (searchDate >= BUSQUEDA_NEW_SCORING_DATE && search.motivation) {
+                    const nurc = parseNURC(search.motivation);
+                    const chars = [nurc.n.length, nurc.u.length, nurc.r.length, nurc.c.length];
+                    const allAboveMin = chars.every(c => c >= NURC_SCORING.MIN_CHARS_PER_FIELD);
+                    const avg = chars.reduce((a, b) => a + b, 0) / 4;
+
+                    if (allAboveMin) {
+                        nurcBonusPoints += avg >= NURC_SCORING.IDEAL_AVG_CHARS
+                            ? NURC_SCORING.COMPLETE_BONUS
+                            : NURC_SCORING.PARTIAL_BONUS;
+                    }
+                }
+            }
 
             // Referido bonus count
             const refBonusCount = referidoBonusByAgent[agentId] || 0;
@@ -303,7 +334,8 @@ export async function getCompetitionDataAction(
                 acm: (countByType['acm'] || 0) * POINTS_TABLE.acm,
                 visita: effectiveVisitaCount * POINTS_TABLE.visita,
                 nuevo_contacto: contactCount * POINTS_TABLE.nuevo_contacto,
-                nueva_busqueda: searchCount * POINTS_TABLE.nueva_busqueda,
+                nueva_busqueda: searchPoints,
+                nurc_bonus: nurcBonusPoints,
                 referido_bonus: refBonusCount * REFERIDO_BONUS,
                 perfect_weeks: 0, // Calculated below
             };
@@ -326,7 +358,7 @@ export async function getCompetitionDataAction(
                     visita: effectiveVisitaCount,
                     referido: countByType['referido'] || 0,
                     nuevo_contacto: contactCount,
-                    nueva_busqueda: searchCount,
+                    nueva_busqueda: agentSearches.length,
                 },
                 totalPoints,
             };
@@ -393,6 +425,29 @@ export async function getCompetitionDataAction(
                     }
                 }
 
+                // Calculate weekly search points with date cutoff + NURC bonus
+                let weekSearchPts = 0;
+                let weekNurcBonus = 0;
+                for (const search of as_) {
+                    const sDate = search.created_at?.split('T')[0] || '';
+                    const basePts = sDate < BUSQUEDA_NEW_SCORING_DATE
+                        ? BUSQUEDA_OLD_POINTS
+                        : POINTS_TABLE.nueva_busqueda;
+                    weekSearchPts += basePts;
+
+                    if (sDate >= BUSQUEDA_NEW_SCORING_DATE && search.motivation) {
+                        const nurc = parseNURC(search.motivation);
+                        const chs = [nurc.n.length, nurc.u.length, nurc.r.length, nurc.c.length];
+                        const allOk = chs.every(c => c >= NURC_SCORING.MIN_CHARS_PER_FIELD);
+                        const avgC = chs.reduce((a, b) => a + b, 0) / 4;
+                        if (allOk) {
+                            weekNurcBonus += avgC >= NURC_SCORING.IDEAL_AVG_CHARS
+                                ? NURC_SCORING.COMPLETE_BONUS
+                                : NURC_SCORING.PARTIAL_BONUS;
+                        }
+                    }
+                }
+
                 const pts =
                     (countByType['pre_listing'] || 0) * POINTS_TABLE.pre_listing +
                     puntas * POINTS_TABLE.cierre +
@@ -402,7 +457,8 @@ export async function getCompetitionDataAction(
                     (countByType['acm'] || 0) * POINTS_TABLE.acm +
                     weekEffectiveVisitas * POINTS_TABLE.visita +
                     ac.length * POINTS_TABLE.nuevo_contacto +
-                    as_.length * POINTS_TABLE.nueva_busqueda +
+                    weekSearchPts +
+                    weekNurcBonus +
                     weekRefBonus;
 
                 weekAgentPoints[agentId] = {

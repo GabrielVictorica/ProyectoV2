@@ -547,22 +547,28 @@ export async function PUT(request: NextRequest) {
         }
 
         if (currentTx.status === 'pending' && updates.status === 'completed') {
-            // Generar o actualizar actividad de cierre, MANTENIENDO la de reserva.
-            await (adminClient as any)
-                .from('activities')
-                .insert({
-                    organization_id: txData.organization_id || updates.organization_id,
-                    agent_id: txData.agent_id || updates.agent_id,
-                    type: 'cierre',
-                    status: 'completed',
-                    date: updateData.closing_date,
-                    time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
-                    notes: `Evolución de Reserva a Cierre Final. Operación: ${updateData.custom_property_title || currentTx.custom_property_title || 'Propiedad'}`,
-                    transaction_id: id,
-                    property_id: txData.property_id || updates.property_id || null,
-                    // Vincular primary client (buyer if exists, else seller) to activity
-                    person_id: updateData.buyer_person_id || updateData.seller_person_id || currentTx.buyer_person_id || currentTx.seller_person_id || null
-                });
+            // Generar actividad de cierre para CADA persona vinculada (dos puntas)
+            const closingPersonIds = [
+                updateData.buyer_person_id || currentTx.buyer_person_id,
+                updateData.seller_person_id || currentTx.seller_person_id
+            ].filter(Boolean) as string[];
+
+            for (const pid of closingPersonIds) {
+                await (adminClient as any)
+                    .from('activities')
+                    .insert({
+                        organization_id: txData.organization_id || updates.organization_id,
+                        agent_id: txData.agent_id || updates.agent_id,
+                        type: 'cierre',
+                        status: 'completed',
+                        date: updateData.closing_date,
+                        time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
+                        notes: `Evolución de Reserva a Cierre Final. Operación: ${updateData.custom_property_title || currentTx.custom_property_title || 'Propiedad'}`,
+                        transaction_id: id,
+                        property_id: txData.property_id || updates.property_id || null,
+                        person_id: pid
+                    });
+            }
         } else {
             // Sincronizar fecha de la actividad vinculada si cambia la de la transacción
             // Si la nueva fecha es distinta a la actual o el status cambió, actualizamos

@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateClient, useUpdateClient } from '../hooks/useClients';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard, Clock, Eye, Wallet, ShoppingCart, HardHat } from 'lucide-react';
+import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard, Clock, Eye, Wallet, ShoppingCart, HardHat, Landmark } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,6 +59,8 @@ const clientSchema = z.object({
     searchPropertyTypes: z.array(z.string()).default([]),
     searchBedrooms: z.array(z.string()).default([]),
     searchPaymentMethods: z.array(z.string()).default([]),
+    isMortgageEligible: z.boolean().default(false),
+    isMortgagePrequalified: z.boolean().default(false),
     organizationId: z.string().optional(),
     agentId: z.string().optional(),
     personId: z.string().min(1, 'Debes vincular una persona del CRM').uuid('ID de persona inválido'),
@@ -154,11 +156,43 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
             searchPropertyTypes: client?.search_property_types || [],
             searchBedrooms: client?.search_bedrooms || [],
             searchPaymentMethods: client?.search_payment_methods || [],
+            isMortgageEligible: client?.is_mortgage_eligible || false,
+            isMortgagePrequalified: client?.is_mortgage_prequalified || false,
             personId: client?.person_id || undefined,
         },
     });
 
     const { data: propertyTypes } = usePropertyTypes();
+
+    // ─── Lógica dinámica de dormitorios ───────────────────────────────────────
+    const RESIDENTIAL_KEYWORDS = ['casa', 'departamento', 'depto', 'ph', 'pozo'];
+
+    const selectedPropertyTypeIds = form.watch('searchPropertyTypes');
+
+    const residentialTypeNames = (selectedPropertyTypeIds || [])
+        .map(id => propertyTypes?.find(pt => pt.id === id)?.name || '')
+        .filter(name => RESIDENTIAL_KEYWORDS.some(kw => name.toLowerCase().includes(kw)));
+
+    const hasResidentialType = residentialTypeNames.length > 0;
+
+    const hasNonResidentialType = (selectedPropertyTypeIds || []).some(id => {
+        const name = propertyTypes?.find(pt => pt.id === id)?.name || '';
+        return !RESIDENTIAL_KEYWORDS.some(kw => name.toLowerCase().includes(kw));
+    });
+
+    const isMixedPropertySelection = hasResidentialType && hasNonResidentialType;
+
+    const bedroomLabel = isMixedPropertySelection
+        ? `Dormitorios (aplica a ${residentialTypeNames.join(', ')})`
+        : 'Dormitorios';
+
+    // Limpiar dormitorios cuando no hay tipos residenciales seleccionados
+    useEffect(() => {
+        if (!hasResidentialType && (form.getValues('searchBedrooms') || []).length > 0) {
+            form.setValue('searchBedrooms', []);
+        }
+    }, [hasResidentialType]); // eslint-disable-line react-hooks/exhaustive-deps
+    // ─────────────────────────────────────────────────────────────────────────
 
     const onSubmit = async (values: ClientFormValues) => {
         const loadingToast = toast.loading(isEditing ? 'Actualizando búsqueda...' : 'Registrando búsqueda...');
@@ -179,10 +213,12 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                 searchPropertyTypes: values.searchPropertyTypes,
                 searchBedrooms: values.searchBedrooms,
                 searchPaymentMethods: values.searchPaymentMethods,
+                isMortgageEligible: values.isMortgageEligible,
+                isMortgagePrequalified: values.isMortgageEligible ? values.isMortgagePrequalified : false,
                 source: values.source,
                 organizationId: values.organizationId || undefined,
                 agentId: values.agentId || undefined,
-                personId: values.personId || undefined,
+                personId: values.personId || null,
             };
 
             const result = isEditing
@@ -227,7 +263,7 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
             case 1: return ['necessity'];
             case 2: return ['urgency'];
             case 3: return ['realism'];
-            case 4: return ['capacity', 'searchPaymentMethods'];
+            case 4: return ['capacity', 'searchPaymentMethods', 'isMortgageEligible'];
             case 5: return ['budgetMin', 'budgetMax', 'preferredZones'];
             default: return [];
         }
@@ -296,38 +332,45 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                 {currentStep === 0 && (
                                     <div className="space-y-4">
                                         {/* Selector de Persona (CRM) — Obligatorio */}
-                                        <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <User className="w-5 h-5 text-purple-400" />
-                                                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Vincular con Persona (CRM)</h3>
+                                        <div className="relative rounded-2xl">
+                                            {/* Glow border via gradient */}
+                                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-600/20 via-transparent to-fuchsia-600/10 pointer-events-none" />
+                                            <div className="relative p-4 rounded-2xl border border-violet-500/20 bg-slate-950/60 backdrop-blur-sm space-y-4">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+                                                        <User className="w-4 h-4 text-violet-400" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-[11px] font-black text-white/90 uppercase tracking-[0.12em]">Vincular con Persona (CRM)</h3>
+                                                        <p className="text-[10px] text-violet-400/60">Requerido · buscar o crear</p>
+                                                    </div>
+                                                </div>
+                                                <FormField
+                                                    control={form.control}
+                                                    name="personId"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormControl>
+                                                                <PersonSelector
+                                                                    value={field.value ?? null}
+                                                                    initialPerson={(client as any)?.person}
+                                                                    onChange={(id: string | null, person?: any) => {
+                                                                        field.onChange(id);
+                                                                        if (person) {
+                                                                            form.setValue('firstName', person.first_name);
+                                                                            form.setValue('lastName', person.last_name);
+                                                                            form.setValue('email', person.email || '');
+                                                                            form.setValue('phone', person.phone || '');
+                                                                        }
+                                                                    }}
+                                                                    placeholder="Buscar o crear persona..."
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
                                             </div>
-                                            <FormField
-                                                control={form.control}
-                                                name="personId"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <PersonSelector
-                                                                value={field.value ?? null}
-                                                                onChange={(id: string | null, person?: any) => {
-                                                                    field.onChange(id);
-                                                                    if (person) {
-                                                                        form.setValue('firstName', person.first_name);
-                                                                        form.setValue('lastName', person.last_name);
-                                                                        form.setValue('email', person.email || '');
-                                                                        form.setValue('phone', person.phone || '');
-                                                                    }
-                                                                }}
-                                                                placeholder="Buscar o crear persona..."
-                                                            />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                            <p className="text-[10px] text-slate-500 italic">
-                                                Seleccioná la persona que está buscando propiedad. Si no existe, podés crearla desde aquí.
-                                            </p>
                                         </div>
 
 
@@ -441,43 +484,56 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                     )}
                                                 />
 
-                                                <FormField
-                                                    control={form.control}
-                                                    name="searchBedrooms"
-                                                    render={({ field }) => (
-                                                        <FormItem className="space-y-3">
-                                                            <FormLabel className="text-slate-300 flex items-center gap-2">
-                                                                <Building2 className="w-4 h-4 text-purple-400" /> Dormitorios
-                                                            </FormLabel>
-                                                            <div className="flex gap-2">
-                                                                {['Mono', '1', '2', '3', '4+'].map((opt) => {
-                                                                    const isSelected = field.value.includes(opt);
-                                                                    return (
-                                                                        <button
-                                                                            key={opt}
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const newValue = isSelected
-                                                                                    ? field.value.filter(i => i !== opt)
-                                                                                    : [...field.value, opt];
-                                                                                field.onChange(newValue);
-                                                                            }}
-                                                                            className={`
-                                                                            flex-1 py-3 px-2 rounded-lg border text-sm font-bold transition-all
-                                                                            ${isSelected
-                                                                                    ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500'
-                                                                                    : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}
-                                                                        `}
-                                                                        >
-                                                                            {opt === 'Mono' ? 'Mono' : `${opt} Dorm`}
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                            <FormMessage />
-                                                        </FormItem>
+                                                <AnimatePresence>
+                                                    {hasResidentialType && (
+                                                        <motion.div
+                                                            key="bedroom-selector"
+                                                            initial={{ opacity: 0, y: -8, height: 0 }}
+                                                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                                            exit={{ opacity: 0, y: -8, height: 0 }}
+                                                            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                                            style={{ overflow: 'hidden' }}
+                                                        >
+                                                            <FormField
+                                                                control={form.control}
+                                                                name="searchBedrooms"
+                                                                render={({ field }) => (
+                                                                    <FormItem className="space-y-3">
+                                                                        <FormLabel className="text-slate-300 flex items-center gap-2">
+                                                                            <Building2 className="w-4 h-4 text-purple-400" /> {bedroomLabel}
+                                                                        </FormLabel>
+                                                                        <div className="flex gap-2">
+                                                                            {['Mono', '1', '2', '3', '4+'].map((opt) => {
+                                                                                const isSelected = field.value.includes(opt);
+                                                                                return (
+                                                                                    <button
+                                                                                        key={opt}
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            const newValue = isSelected
+                                                                                                ? field.value.filter(i => i !== opt)
+                                                                                                : [...field.value, opt];
+                                                                                            field.onChange(newValue);
+                                                                                        }}
+                                                                                        className={`
+                                                                                            flex-1 py-3 px-2 rounded-lg border text-sm font-bold transition-all
+                                                                                            ${isSelected
+                                                                                                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500'
+                                                                                                : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}
+                                                                                        `}
+                                                                                    >
+                                                                                        {opt === 'Mono' ? 'Mono' : `${opt} Dorm`}
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                        <FormMessage />
+                                                                    </FormItem>
+                                                                )}
+                                                            />
+                                                        </motion.div>
                                                     )}
-                                                />
+                                                </AnimatePresence>
                                             </div>
                                         )}
                                     </div>
@@ -508,6 +564,22 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
+                                                    {(() => {
+                                                        const len = (field.value || '').length;
+                                                        const pct = Math.min(len / 50 * 100, 100);
+                                                        const color = len >= 50 ? 'bg-emerald-400' : len >= 20 ? 'bg-yellow-400' : 'bg-red-400';
+                                                        const textColor = len >= 50 ? 'text-emerald-400' : len >= 20 ? 'text-yellow-400' : 'text-red-400';
+                                                        return (
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+                                                                </div>
+                                                                <span className={`text-[10px] font-bold ${textColor}`}>
+                                                                    {len} {len >= 50 ? '🟢' : len >= 20 ? '🟡' : '🔴'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </FormItem>
                                             )}
                                         />
@@ -539,6 +611,22 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
+                                                    {(() => {
+                                                        const len = (field.value || '').length;
+                                                        const pct = Math.min(len / 50 * 100, 100);
+                                                        const color = len >= 50 ? 'bg-emerald-400' : len >= 20 ? 'bg-yellow-400' : 'bg-red-400';
+                                                        const textColor = len >= 50 ? 'text-emerald-400' : len >= 20 ? 'text-yellow-400' : 'text-red-400';
+                                                        return (
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+                                                                </div>
+                                                                <span className={`text-[10px] font-bold ${textColor}`}>
+                                                                    {len} {len >= 50 ? '🟢' : len >= 20 ? '🟡' : '🔴'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </FormItem>
                                             )}
                                         />
@@ -570,6 +658,22 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
+                                                    {(() => {
+                                                        const len = (field.value || '').length;
+                                                        const pct = Math.min(len / 50 * 100, 100);
+                                                        const color = len >= 50 ? 'bg-emerald-400' : len >= 20 ? 'bg-yellow-400' : 'bg-red-400';
+                                                        const textColor = len >= 50 ? 'text-emerald-400' : len >= 20 ? 'text-yellow-400' : 'text-red-400';
+                                                        return (
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+                                                                </div>
+                                                                <span className={`text-[10px] font-bold ${textColor}`}>
+                                                                    {len} {len >= 50 ? '🟢' : len >= 20 ? '🟡' : '🔴'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </FormItem>
                                             )}
                                         />
@@ -601,6 +705,22 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
+                                                    {(() => {
+                                                        const len = (field.value || '').length;
+                                                        const pct = Math.min(len / 50 * 100, 100);
+                                                        const color = len >= 50 ? 'bg-emerald-400' : len >= 20 ? 'bg-yellow-400' : 'bg-red-400';
+                                                        const textColor = len >= 50 ? 'text-emerald-400' : len >= 20 ? 'text-yellow-400' : 'text-red-400';
+                                                        return (
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+                                                                </div>
+                                                                <span className={`text-[10px] font-bold ${textColor}`}>
+                                                                    {len} {len >= 50 ? '🟢' : len >= 20 ? '🟡' : '🔴'}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </FormItem>
                                             )}
                                         />
@@ -650,6 +770,85 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                     </FormItem>
                                                 )}
                                             />
+                                        )}
+
+                                        {/* Apto Crédito Hipotecario */}
+                                        {form.watch('type') === 'buyer' && (
+                                            <div className="space-y-3 pt-4 animate-in fade-in slide-in-from-top-2">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="isMortgageEligible"
+                                                    render={({ field }) => (
+                                                        <FormItem className="space-y-3">
+                                                            <FormLabel className="text-slate-300 flex items-center gap-2">
+                                                                <Landmark className="w-4 h-4 text-cyan-400" /> ¿Apto Crédito Hipotecario?
+                                                            </FormLabel>
+                                                            <div className="flex gap-3">
+                                                                {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map((opt) => (
+                                                                    <button
+                                                                        key={String(opt.value)}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            field.onChange(opt.value);
+                                                                            if (!opt.value) form.setValue('isMortgagePrequalified', false);
+                                                                        }}
+                                                                        className={`
+                                                                            flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all duration-300
+                                                                            ${field.value === opt.value
+                                                                                ? 'bg-cyan-600/20 border-cyan-500 text-cyan-200 shadow-lg shadow-cyan-500/10'
+                                                                                : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'}
+                                                                        `}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <AnimatePresence>
+                                                    {form.watch('isMortgageEligible') && (
+                                                        <motion.div
+                                                            key="prequalified-selector"
+                                                            initial={{ opacity: 0, y: -8, height: 0 }}
+                                                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                                            exit={{ opacity: 0, y: -8, height: 0 }}
+                                                            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                                                            style={{ overflow: 'hidden' }}
+                                                        >
+                                                            <FormField
+                                                                control={form.control}
+                                                                name="isMortgagePrequalified"
+                                                                render={({ field }) => (
+                                                                    <FormItem className="space-y-3 pt-2">
+                                                                        <FormLabel className="text-slate-300 flex items-center gap-2">
+                                                                            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> ¿Crédito Precalificado?
+                                                                        </FormLabel>
+                                                                        <div className="flex gap-3">
+                                                                            {[{ value: true, label: 'Sí, precalificado' }, { value: false, label: 'No aún' }].map((opt) => (
+                                                                                <button
+                                                                                    key={String(opt.value)}
+                                                                                    type="button"
+                                                                                    onClick={() => field.onChange(opt.value)}
+                                                                                    className={`
+                                                                                        flex-1 py-3 px-4 rounded-xl border text-sm font-bold transition-all duration-300
+                                                                                        ${field.value === opt.value
+                                                                                            ? 'bg-emerald-600/20 border-emerald-500 text-emerald-200 shadow-lg shadow-emerald-500/10'
+                                                                                            : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'}
+                                                                                    `}
+                                                                                >
+                                                                                    {opt.label}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </FormItem>
+                                                                )}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
                                         )}
                                     </div>
                                 )}

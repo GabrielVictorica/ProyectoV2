@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo - Fondos Dinámicos | Proptech CRM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* ============================================================
+           OPTION SELECTOR - Fixed top bar
+           ============================================================ */
+        .option-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: rgba(3, 7, 18, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .option-bar h3 {
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-right: 12px;
+        }
+
+        .option-btn {
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: #94a3b8;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .option-btn:hover {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #c4b5fd;
+        }
+
+        .option-btn.active {
+            background: rgba(139, 92, 246, 0.25);
+            border-color: rgba(139, 92, 246, 0.5);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+
+        /* ============================================================
+           BACKGROUND CONTAINERS
+           ============================================================ */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            transition: opacity 0.8s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .bg-layer.active {
+            opacity: 1;
+        }
+
+        /* ============================================================
+           OPTION A: CURRENT (Aurora Blobs)
+           ============================================================ */
+        #bg-current {
+            background: #030712;
+        }
+
+        #bg-current .base-gradient {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(17,24,39,1), rgba(3,7,18,1));
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            mix-blend-mode: screen;
+            filter: blur(100px);
+        }
+
+        .blob-1 {
+            width: 60vw; height: 60vw;
+            background: radial-gradient(circle, rgba(139,92,246,0.8), transparent);
+            top: 10%; left: 10%;
+            opacity: 0.2;
+            animation: blob1 15s ease-in-out infinite;
+        }
+
+        .blob-2 {
+            width: 50vw; height: 50vw;
+            background: radial-gradient(circle, rgba(14,165,233,0.8), transparent);
+            bottom: 10%; right: 10%;
+            opacity: 0.2;
+            filter: blur(120px);
+            animation: blob2 20s ease-in-out infinite;
+        }
+
+        @keyframes blob1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, 30px) scale(1.2); }
+        }
+
+        @keyframes blob2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-60px, -40px) scale(1.3); }
+        }
+
+        .noise-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.03;
+            mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* ============================================================
+           OPTION B: MESH GRADIENT WAVES
+           ============================================================ */
+        #bg-mesh {
+            background: #030712;
+        }
+
+        .mesh-base {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 40%, rgba(139, 92, 246, 0.12) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 80% at 80% 60%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 40% at 50% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 70%);
+        }
+
+        .mesh-wave {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+        }
+
+        .mesh-wave-1 {
+            background: conic-gradient(
+                from 0deg at 50% 50%,
+                transparent 0deg,
+                rgba(139, 92, 246, 0.06) 60deg,
+                transparent 120deg,
+                rgba(14, 165, 233, 0.04) 180deg,
+                transparent 240deg,
+                rgba(139, 92, 246, 0.05) 300deg,
+                transparent 360deg
+            );
+            animation: meshRotate1 40s linear infinite;
+        }
+
+        .mesh-wave-2 {
+            background: conic-gradient(
+                from 180deg at 50% 50%,
+                transparent 0deg,
+                rgba(16, 185, 129, 0.04) 90deg,
+                transparent 180deg,
+                rgba(139, 92, 246, 0.03) 270deg,
+                transparent 360deg
+            );
+            animation: meshRotate2 55s linear infinite reverse;
+        }
+
+        .mesh-lines {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            animation: gridShift 20s linear infinite;
+        }
+
+        .mesh-glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            mix-blend-mode: screen;
+        }
+
+        .mesh-glow-1 {
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent 70%);
+            top: 20%; left: 30%;
+            opacity: 0.15;
+            animation: meshFloat1 25s ease-in-out infinite;
+        }
+
+        .mesh-glow-2 {
+            width: 350px; height: 350px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.4), transparent 70%);
+            bottom: 15%; right: 20%;
+            opacity: 0.12;
+            animation: meshFloat2 30s ease-in-out infinite;
+        }
+
+        .mesh-glow-3 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.3), transparent 70%);
+            top: 60%; left: 10%;
+            opacity: 0.1;
+            animation: meshFloat3 35s ease-in-out infinite;
+        }
+
+        @keyframes meshRotate1 { to { transform: rotate(360deg); } }
+        @keyframes meshRotate2 { to { transform: rotate(360deg); } }
+        @keyframes gridShift { to { background-position: 60px 60px; } }
+        @keyframes meshFloat1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(80px, -40px) scale(1.1); }
+            66% { transform: translate(-30px, 60px) scale(0.9); }
+        }
+        @keyframes meshFloat2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-70px, -50px) scale(1.15); }
+        }
+        @keyframes meshFloat3 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            40% { transform: translate(50px, -30px) scale(1.05); }
+            80% { transform: translate(-40px, 40px) scale(0.95); }
+        }
+
+        /* ============================================================
+           OPTION C: CONSTELLATION / PARTICLE NETWORK
+           ============================================================ */
+        #bg-particles {
+            background: #030712;
+        }
+
+        #bg-particles canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .particles-gradient-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 70% 50% at 30% 30%, rgba(139, 92, 246, 0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 60% at 70% 70%, rgba(14, 165, 233, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ============================================================
+           OPTION D: AURORA BOREALIS (FLUID RIBBONS)
+           ============================================================ */
+        #bg-aurora {
+            background: #030712;
+        }
+
+        .aurora-base {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 100%, rgba(17, 24, 39, 0.8), #030712);
+        }
+
+        .aurora-ribbon {
+            position: absolute;
+            width: 120%;
+            left: -10%;
+            height: 300px;
+            filter: blur(40px);
+            opacity: 0;
+            mix-blend-mode: screen;
+        }
+
+        .aurora-ribbon-1 {
+            top: 15%;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(139, 92, 246, 0.3) 20%,
+                rgba(99, 102, 241, 0.4) 35%,
+                rgba(14, 165, 233, 0.3) 50%,
+                rgba(16, 185, 129, 0.2) 70%,
+                transparent 100%
+            );
+            animation: auroraRibbon1 12s ease-in-out infinite;
+            transform-origin: center;
+        }
+
+        .aurora-ribbon-2 {
+            top: 25%;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(16, 185, 129, 0.2) 15%,
+                rgba(139, 92, 246, 0.35) 40%,
+                rgba(236, 72, 153, 0.2) 65%,
+                rgba(14, 165, 233, 0.3) 85%,
+                transparent 100%
+            );
+            animation: auroraRibbon2 15s ease-in-out infinite;
+            animation-delay: -3s;
+            transform-origin: center;
+        }
+
+        .aurora-ribbon-3 {
+            top: 8%;
+            height: 200px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(14, 165, 233, 0.25) 30%,
+                rgba(139, 92, 246, 0.2) 50%,
+                rgba(16, 185, 129, 0.3) 75%,
+                transparent 100%
+            );
+            animation: auroraRibbon3 18s ease-in-out infinite;
+            animation-delay: -7s;
+            transform-origin: center;
+        }
+
+        .aurora-stars {
+            position: absolute;
+            inset: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle var(--duration) ease-in-out infinite;
+            animation-delay: var(--delay);
+        }
+
+        @keyframes auroraRibbon1 {
+            0%, 100% {
+                opacity: 0.4;
+                transform: translateX(-5%) scaleY(1) skewX(-2deg);
+            }
+            25% {
+                opacity: 0.7;
+                transform: translateX(3%) scaleY(1.3) skewX(3deg);
+            }
+            50% {
+                opacity: 0.5;
+                transform: translateX(8%) scaleY(0.8) skewX(-1deg);
+            }
+            75% {
+                opacity: 0.65;
+                transform: translateX(-2%) scaleY(1.1) skewX(2deg);
+            }
+        }
+
+        @keyframes auroraRibbon2 {
+            0%, 100% {
+                opacity: 0.3;
+                transform: translateX(5%) scaleY(1) skewX(1deg);
+            }
+            30% {
+                opacity: 0.6;
+                transform: translateX(-3%) scaleY(1.4) skewX(-3deg);
+            }
+            60% {
+                opacity: 0.45;
+                transform: translateX(6%) scaleY(0.7) skewX(2deg);
+            }
+        }
+
+        @keyframes auroraRibbon3 {
+            0%, 100% {
+                opacity: 0.25;
+                transform: translateX(0%) scaleY(1) skewX(0deg);
+            }
+            35% {
+                opacity: 0.5;
+                transform: translateX(-8%) scaleY(1.5) skewX(-4deg);
+            }
+            70% {
+                opacity: 0.35;
+                transform: translateX(4%) scaleY(0.9) skewX(1deg);
+            }
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.5); }
+        }
+
+        /* ============================================================
+           OPTION E: LIQUID GRADIENT MORPH
+           ============================================================ */
+        #bg-liquid {
+            background: #030712;
+        }
+
+        .liquid-base {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #030712 0%, #0f172a 50%, #030712 100%);
+        }
+
+        .liquid-shape {
+            position: absolute;
+            filter: blur(80px);
+            mix-blend-mode: screen;
+            opacity: 0.18;
+        }
+
+        .liquid-shape-1 {
+            width: 50vw; height: 50vw;
+            top: -10%; left: -10%;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1, #3b82f6);
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            animation: liquidMorph1 20s ease-in-out infinite;
+        }
+
+        .liquid-shape-2 {
+            width: 45vw; height: 45vw;
+            bottom: -5%; right: -5%;
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4, #10b981);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            animation: liquidMorph2 25s ease-in-out infinite;
+        }
+
+        .liquid-shape-3 {
+            width: 35vw; height: 35vw;
+            top: 40%; left: 40%;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border-radius: 40% 60% 60% 40% / 70% 30% 70% 30%;
+            animation: liquidMorph3 30s ease-in-out infinite;
+            opacity: 0.1;
+        }
+
+        .liquid-grain {
+            position: absolute;
+            inset: 0;
+            opacity: 0.04;
+            mix-blend-mode: overlay;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        .liquid-vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(3,7,18,0.6) 100%);
+        }
+
+        @keyframes liquidMorph1 {
+            0%, 100% {
+                border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+                transform: translate(0, 0) rotate(0deg) scale(1);
+            }
+            25% {
+                border-radius: 58% 42% 34% 66% / 63% 68% 32% 37%;
+                transform: translate(40px, -20px) rotate(5deg) scale(1.05);
+            }
+            50% {
+                border-radius: 50% 50% 35% 65% / 40% 60% 40% 60%;
+                transform: translate(20px, 30px) rotate(-3deg) scale(0.95);
+            }
+            75% {
+                border-radius: 40% 60% 65% 35% / 55% 35% 65% 45%;
+                transform: translate(-30px, 10px) rotate(4deg) scale(1.02);
+            }
+        }
+
+        @keyframes liquidMorph2 {
+            0%, 100% {
+                border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+                transform: translate(0, 0) rotate(0deg) scale(1);
+            }
+            33% {
+                border-radius: 35% 65% 55% 45% / 45% 55% 45% 55%;
+                transform: translate(-50px, 20px) rotate(-6deg) scale(1.08);
+            }
+            66% {
+                border-radius: 55% 45% 40% 60% / 35% 65% 35% 65%;
+                transform: translate(30px, -30px) rotate(4deg) scale(0.92);
+            }
+        }
+
+        @keyframes liquidMorph3 {
+            0%, 100% {
+                border-radius: 40% 60% 60% 40% / 70% 30% 70% 30%;
+                transform: translate(0, 0) rotate(0deg);
+            }
+            50% {
+                border-radius: 65% 35% 35% 65% / 40% 60% 40% 60%;
+                transform: translate(-40px, 40px) rotate(8deg);
+            }
+        }
+
+        /* ============================================================
+           APP MOCK LAYOUT
+           ============================================================ */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            padding-top: 56px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            bottom: 0;
+            width: 240px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 20px 12px;
+            z-index: 10;
+        }
+
+        .sidebar-logo {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            padding: 0 8px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-logo .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #94a3b8;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #e2e8f0;
+        }
+
+        .sidebar-item.active {
+            background: rgba(139, 92, 246, 0.15);
+            color: #c4b5fd;
+        }
+
+        .sidebar-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 3px;
+            height: 24px;
+            background: #8b5cf6;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.08);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 240px;
+            padding: 28px 32px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #f8fafc;
+        }
+
+        /* Stat Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(139,92,246,0) 0%, rgba(139,92,246,0) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .stat-card:hover::before {
+            background: linear-gradient(135deg, rgba(139,92,246,0.5) 0%, rgba(59,130,246,0.3) 50%, rgba(16,185,129,0.5) 100%);
+            opacity: 1;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .stat-change.positive { color: #34d399; }
+        .stat-change.negative { color: #fb7185; }
+
+        /* Table */
+        .table-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 28px;
+        }
+
+        .table-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .table-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(139, 92, 246, 0.15);
+            color: #c4b5fd;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 20px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 14px;
+            color: #e2e8f0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-dot.green { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+        .status-dot.yellow { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+        .status-dot.blue { background: #60a5fa; box-shadow: 0 0 8px rgba(96,165,250,0.4); }
+        .status-dot.purple { background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.4); }
+
+        /* Bottom Grid */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 20px;
+            height: 220px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .chart-placeholder {
+            flex: 1;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: flex-end;
+            padding: 12px;
+            gap: 6px;
+        }
+
+        .bar {
+            flex: 1;
+            border-radius: 4px 4px 0 0;
+            min-height: 10px;
+            transition: all 0.3s;
+        }
+
+        .bar:nth-child(1) { height: 45%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(2) { height: 70%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(3) { height: 55%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(4) { height: 85%; background: rgba(139,92,246,0.7); }
+        .bar:nth-child(5) { height: 60%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(6) { height: 90%; background: rgba(139,92,246,0.8); }
+        .bar:nth-child(7) { height: 75%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(8) { height: 50%; background: rgba(139,92,246,0.5); }
+
+        .donut-placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .donut {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #8b5cf6 0deg 130deg,
+                #22d3ee 130deg 220deg,
+                #34d399 220deg 290deg,
+                #fbbf24 290deg 340deg,
+                #fb7185 340deg 360deg
+            );
+            position: relative;
+        }
+
+        .donut::after {
+            content: '';
+            position: absolute;
+            inset: 30px;
+            border-radius: 50%;
+            background: rgba(3, 7, 18, 0.9);
+        }
+
+        /* Description label */
+        .bg-description {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(3, 7, 18, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 12px 24px;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .bg-description h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #c4b5fd;
+            margin-bottom: 4px;
+        }
+
+        .bg-description p {
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* Performance indicator */
+        .perf-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .perf-low { background: rgba(52,211,153,0.15); color: #34d399; }
+        .perf-mid { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        .perf-high { background: rgba(251,113,133,0.15); color: #fb7185; }
+    </style>
+</head>
+<body>
+
+    <!-- Option Selector Bar -->
+    <div class="option-bar">
+        <h3>FONDO:</h3>
+        <button class="option-btn active" onclick="switchBg('current')">
+            A. Actual (Blobs)
+        </button>
+        <button class="option-btn" onclick="switchBg('mesh')">
+            B. Mesh + Grid
+        </button>
+        <button class="option-btn" onclick="switchBg('particles')">
+            C. Constelaciones
+        </button>
+        <button class="option-btn" onclick="switchBg('aurora')">
+            D. Aurora Borealis
+        </button>
+        <button class="option-btn" onclick="switchBg('liquid')">
+            E. Liquid Morph
+        </button>
+    </div>
+
+    <!-- ============ BACKGROUNDS ============ -->
+
+    <!-- A: Current -->
+    <div id="bg-current" class="bg-layer active">
+        <div class="base-gradient"></div>
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- B: Mesh Gradient -->
+    <div id="bg-mesh" class="bg-layer">
+        <div class="mesh-base"></div>
+        <div class="mesh-wave mesh-wave-1"></div>
+        <div class="mesh-wave mesh-wave-2"></div>
+        <div class="mesh-lines"></div>
+        <div class="mesh-glow-orb mesh-glow-1"></div>
+        <div class="mesh-glow-orb mesh-glow-2"></div>
+        <div class="mesh-glow-orb mesh-glow-3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- C: Particles -->
+    <div id="bg-particles" class="bg-layer">
+        <canvas id="particleCanvas"></canvas>
+        <div class="particles-gradient-overlay"></div>
+    </div>
+
+    <!-- D: Aurora Borealis -->
+    <div id="bg-aurora" class="bg-layer">
+        <div class="aurora-base"></div>
+        <div class="aurora-stars" id="starsContainer"></div>
+        <div class="aurora-ribbon aurora-ribbon-1"></div>
+        <div class="aurora-ribbon aurora-ribbon-2"></div>
+        <div class="aurora-ribbon aurora-ribbon-3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <!-- E: Liquid Morph -->
+    <div id="bg-liquid" class="bg-layer">
+        <div class="liquid-base"></div>
+        <div class="liquid-shape liquid-shape-1"></div>
+        <div class="liquid-shape liquid-shape-2"></div>
+        <div class="liquid-shape liquid-shape-3"></div>
+        <div class="liquid-grain"></div>
+        <div class="liquid-vignette"></div>
+    </div>
+
+    <!-- ============ APP MOCK ============ -->
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-logo">
+                <span class="dot"></span>
+                Proptech CRM
+            </div>
+            <div class="sidebar-item active" style="position:relative;">
+                <div class="sidebar-icon"></div>
+                Dashboard
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Clientes
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Búsquedas
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Emprendimientos
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Competencia
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Reportes
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-icon"></div>
+                Configuración
+            </div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Dashboard</h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Clientes Activos</div>
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-change positive">+12.5% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Reservas</div>
+                    <div class="stat-value">86</div>
+                    <div class="stat-change positive">+8.3% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Cierres del Mes</div>
+                    <div class="stat-value">23</div>
+                    <div class="stat-change positive">+15.0% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Comisiones</div>
+                    <div class="stat-value">$4.2M</div>
+                    <div class="stat-change negative">-3.1% vs mes anterior</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Últimas Operaciones</h3>
+                    <span class="table-badge">12 esta semana</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Propiedad</th>
+                            <th>Estado</th>
+                            <th>Valor</th>
+                            <th>Agente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Martín González</td>
+                            <td>Depto 3amb - Palermo</td>
+                            <td><span class="status-dot green"></span>Cerrado</td>
+                            <td>USD 185,000</td>
+                            <td>Ana Ruiz</td>
+                        </tr>
+                        <tr>
+                            <td>Laura Fernández</td>
+                            <td>Casa 4amb - Nordelta</td>
+                            <td><span class="status-dot yellow"></span>Reserva</td>
+                            <td>USD 320,000</td>
+                            <td>Carlos López</td>
+                        </tr>
+                        <tr>
+                            <td>Diego Morales</td>
+                            <td>Oficina - Microcentro</td>
+                            <td><span class="status-dot blue"></span>Negociación</td>
+                            <td>USD 95,000</td>
+                            <td>María Torres</td>
+                        </tr>
+                        <tr>
+                            <td>Sofía Rodríguez</td>
+                            <td>Loft - San Telmo</td>
+                            <td><span class="status-dot purple"></span>Visita</td>
+                            <td>USD 145,000</td>
+                            <td>Ana Ruiz</td>
+                        </tr>
+                        <tr>
+                            <td>Pablo Méndez</td>
+                            <td>PH - Belgrano</td>
+                            <td><span class="status-dot green"></span>Cerrado</td>
+                            <td>USD 210,000</td>
+                            <td>Carlos López</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bottom-grid">
+                <div class="chart-card">
+                    <h3>Ventas Mensuales</h3>
+                    <div class="chart-placeholder">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Distribución por Zona</h3>
+                    <div class="donut-placeholder">
+                        <div class="donut"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Description -->
+    <div class="bg-description" id="bgDescription">
+        <h4 id="descTitle">A. Actual — Aurora Blobs</h4>
+        <p id="descText">El fondo actual con blobs de gradiente animados. Movimiento suave pero predecible. Los blobs pueden opacar el contraste con las tarjetas en algunas posiciones.</p>
+    </div>
+
+    <script>
+        // ============================================================
+        // Background switcher
+        // ============================================================
+        const descriptions = {
+            current: {
+                title: 'A. Actual — Aurora Blobs',
+                text: 'El fondo actual con blobs de gradiente animados. Movimiento suave pero predecible. Buen look general pero el contraste con las tarjetas puede mejorar.'
+            },
+            mesh: {
+                title: 'B. Mesh Gradient + Grid',
+                text: 'Gradientes cónicos que rotan lentamente con una grilla sutil. Los orbes flotantes dan profundidad. La grilla aporta un toque tech/premium sin distraer del contenido.'
+            },
+            particles: {
+                title: 'C. Constelaciones Interactivas',
+                text: 'Red de partículas con conexiones dinámicas que reaccionan al mouse. Efecto de profundidad espacial. Muy bueno para generar contraste ya que el fondo es más oscuro y uniforme.'
+            },
+            aurora: {
+                title: 'D. Aurora Borealis — Ribbons',
+                text: 'Cintas de luz tipo aurora boreal con estrellas de fondo. Movimiento orgánico y fluido. Excelente contraste: la actividad está arriba y el contenido abajo queda limpio.'
+            },
+            liquid: {
+                title: 'E. Liquid Morph',
+                text: 'Formas líquidas que mutan suavemente con grain overlay. El efecto es sutil y sofisticado. Las formas morphean su border-radius creando movimiento orgánico constante.'
+            }
+        };
+
+        let currentBg = 'current';
+        let particlesInitialized = false;
+        let animationFrameId = null;
+
+        function switchBg(name) {
+            if (name === currentBg) return;
+
+            // Update buttons
+            document.querySelectorAll('.option-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Fade backgrounds
+            document.querySelectorAll('.bg-layer').forEach(layer => layer.classList.remove('active'));
+
+            const bgMap = {
+                current: 'bg-current',
+                mesh: 'bg-mesh',
+                particles: 'bg-particles',
+                aurora: 'bg-aurora',
+                liquid: 'bg-liquid'
+            };
+
+            document.getElementById(bgMap[name]).classList.add('active');
+
+            // Update description
+            const desc = descriptions[name];
+            document.getElementById('descTitle').textContent = desc.title;
+            document.getElementById('descText').textContent = desc.text;
+
+            // Initialize particles on first view
+            if (name === 'particles' && !particlesInitialized) {
+                initParticles();
+                particlesInitialized = true;
+            }
+
+            // Manage particle animation
+            if (name === 'particles') {
+                if (!animationFrameId) animateParticles();
+            } else {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+            }
+
+            currentBg = name;
+        }
+
+        // ============================================================
+        // Particle Network System
+        // ============================================================
+        let particles = [];
+        let mouseParticle = { x: -1000, y: -1000 };
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+
+        function initParticles() {
+            if (!canvas || !ctx) return;
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const count = Math.floor((canvas.width * canvas.height) / 12000);
+            particles = [];
+
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    radius: Math.random() * 1.5 + 0.5,
+                    color: ['rgba(139,92,246,', 'rgba(14,165,233,', 'rgba(16,185,129,', 'rgba(167,139,250,'][Math.floor(Math.random() * 4)],
+                    alpha: Math.random() * 0.5 + 0.3
+                });
+            }
+        }
+
+        function animateParticles() {
+            if (!ctx) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const connectionDistance = 120;
+
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+
+                // Move
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Wrap around
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                // Draw particle
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color + p.alpha + ')';
+                ctx.fill();
+
+                // Connect to nearby particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < connectionDistance) {
+                        const opacity = (1 - dist / connectionDistance) * 0.15;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+
+                // Connect to mouse
+                const mdx = p.x - mouseParticle.x;
+                const mdy = p.y - mouseParticle.y;
+                const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+
+                if (mDist < 200) {
+                    const opacity = (1 - mDist / 200) * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(mouseParticle.x, mouseParticle.y);
+                    ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`;
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+
+                    // Slight attraction
+                    p.vx += (mouseParticle.x - p.x) * 0.00005;
+                    p.vy += (mouseParticle.y - p.y) * 0.00005;
+                }
+
+                // Speed limit
+                const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                if (speed > 0.5) {
+                    p.vx *= 0.99;
+                    p.vy *= 0.99;
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(animateParticles);
+        }
+
+        // Mouse tracking for particles
+        document.addEventListener('mousemove', (e) => {
+            mouseParticle.x = e.clientX;
+            mouseParticle.y = e.clientY;
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            if (particlesInitialized) initParticles();
+        });
+
+        // ============================================================
+        // Generate Aurora Stars
+        // ============================================================
+        function generateStars() {
+            const container = document.getElementById('starsContainer');
+            if (!container) return;
+
+            for (let i = 0; i < 80; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.setProperty('--duration', (Math.random() * 4 + 2) + 's');
+                star.style.setProperty('--delay', (Math.random() * 5) + 's');
+                star.style.opacity = Math.random() * 0.6 + 0.1;
+                if (Math.random() > 0.85) {
+                    star.style.width = '3px';
+                    star.style.height = '3px';
+                    star.style.boxShadow = '0 0 6px rgba(255,255,255,0.3)';
+                }
+                container.appendChild(star);
+            }
+        }
+
+        generateStars();
+    </script>
+
+</body>
+</html>

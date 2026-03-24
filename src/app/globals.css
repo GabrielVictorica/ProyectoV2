@@ -100,12 +100,12 @@
   --background: #030712;
   --foreground: #f8fafc;
 
-  /* Cards - Glassmorphism surfaces */
-  --card: rgba(255, 255, 255, 0.03);
+  /* Cards - Solid enough to stand out over animated background */
+  --card: rgba(3, 7, 18, 0.82);
   --card-foreground: #f1f5f9;
 
   /* Popovers/Dropdowns */
-  --popover: rgba(15, 23, 42, 0.95);
+  --popover: rgba(3, 7, 18, 0.95);
   --popover-foreground: #f1f5f9;
 
   /* Primary - Electric Violet */
@@ -113,11 +113,11 @@
   --primary-foreground: #ffffff;
 
   /* Secondary - Muted surfaces */
-  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary: rgba(255, 255, 255, 0.08);
   --secondary-foreground: #e2e8f0;
 
   /* Muted text and backgrounds */
-  --muted: rgba(255, 255, 255, 0.04);
+  --muted: rgba(255, 255, 255, 0.06);
   --muted-foreground: #94a3b8;
 
   /* Accent - Subtle highlight */
@@ -127,9 +127,9 @@
   /* Destructive */
   --destructive: #f87171;
 
-  /* Borders - Very subtle */
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.08);
+  /* Borders - Visible enough to define card edges */
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
   --ring: #8b5cf6;
 
   /* Chart colors - Vibrant for dark mode */
@@ -139,14 +139,14 @@
   --chart-4: #fbbf24;
   --chart-5: #fb7185;
 
-  /* Sidebar - Glass effect */
-  --sidebar: rgba(255, 255, 255, 0.02);
+  /* Sidebar - Solid enough to read navigation clearly */
+  --sidebar: rgba(3, 7, 18, 0.75);
   --sidebar-foreground: #f1f5f9;
   --sidebar-primary: #a78bfa;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(139, 92, 246, 0.2);
   --sidebar-accent-foreground: #c4b5fd;
-  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #8b5cf6;
 }
 
@@ -176,114 +176,14 @@
 }
 
 /* ========================================================================
-   AURORA BACKGROUND ANIMATIONS
+   OCEAN BACKGROUND — canvas-based, styles handled in component
    ======================================================================== */
 
-.aurora-container {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-  background: linear-gradient(to bottom, #030712, #0f172a 50%, #030712);
-}
-
-.aurora-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.12;
-  will-change: transform;
-}
-
-/* Primary - Deep Violet */
-.aurora-blob-1 {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
-  top: -10%;
-  left: 20%;
-  animation: aurora-drift-1 25s ease-in-out infinite;
-}
-
-/* Secondary - Emerald */
-.aurora-blob-2 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #10b981 0%, transparent 70%);
-  bottom: 10%;
-  right: 15%;
-  animation: aurora-drift-2 30s ease-in-out infinite;
-}
-
-/* Tertiary - Electric Blue */
-.aurora-blob-3 {
-  width: 550px;
-  height: 550px;
-  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
-  top: 40%;
-  left: -5%;
-  animation: aurora-drift-3 35s ease-in-out infinite;
-}
-
-@keyframes aurora-drift-1 {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  25% {
-    transform: translate(50px, 30px) scale(1.05);
-  }
-
-  50% {
-    transform: translate(20px, -20px) scale(0.95);
-  }
-
-  75% {
-    transform: translate(-30px, 20px) scale(1.02);
-  }
-}
-
-@keyframes aurora-drift-2 {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  33% {
-    transform: translate(-40px, -30px) scale(1.08);
-  }
-
-  66% {
-    transform: translate(30px, 40px) scale(0.92);
-  }
-}
-
-@keyframes aurora-drift-3 {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  20% {
-    transform: translate(60px, 20px) scale(1.03);
-  }
-
-  40% {
-    transform: translate(30px, -40px) scale(0.97);
-  }
-
-  60% {
-    transform: translate(-20px, 30px) scale(1.05);
-  }
-
-  80% {
-    transform: translate(-40px, -10px) scale(0.98);
-  }
+/* Global surface boost: ensure all dark surfaces stand out over animated bg */
+.dark [class*="bg-slate-900/"],
+.dark [class*="bg-slate-800/"] {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* ========================================================================
@@ -291,10 +191,10 @@
    ======================================================================== */
 
 .glass {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(3, 7, 18, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-hover {
@@ -302,9 +202,9 @@
 }
 
 .glass-hover:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+  background: rgba(3, 7, 18, 0.88);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.08);
 }
 
 /* ========================================================================
@@ -428,8 +328,13 @@
    ======================================================================== */
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .animate-shimmer {

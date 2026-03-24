@@ -22,6 +22,8 @@ export interface Client {
     search_bedrooms: string[];
     search_payment_methods: string[];
     person_id?: string | null;
+    is_mortgage_eligible: boolean;
+    is_mortgage_prequalified: boolean;
     last_interaction_at: string;
     created_at: string;
     updated_at: string;
@@ -39,6 +41,8 @@ export interface AnonymousClient {
     search_property_types: string[];
     search_bedrooms: string[];
     search_payment_methods: string[];
+    is_mortgage_eligible: boolean;
+    is_mortgage_prequalified: boolean;
     motivation: string | null;
     created_at: string;
     anonymous_label: string;
@@ -177,6 +181,8 @@ export interface PersonSearch {
     property_types: string[];
     bedrooms: string[];
     payment_methods: string[];
+    is_mortgage_eligible: boolean;
+    is_mortgage_prequalified: boolean;
 
     motivation: string | null;
     urgency: string | null;
@@ -208,7 +214,10 @@ export type PersonHistoryEventType =
     | 'note_added'
     | 'contact'
     | 'acm_result'
-    | 'visit_record';
+    | 'visit_record'
+    | 'activity_record'
+    | 'search_linked'
+    | 'search_closed';
 
 export interface PersonHistoryEvent {
     id: string;

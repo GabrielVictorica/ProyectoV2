@@ -12,11 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, Loader2, Calendar, DollarSign, Percent } from 'lucide-react';
+import { CheckCircle2, Loader2, Calendar, DollarSign } from 'lucide-react';
 import { closeReservationAction } from '../actions/reservationActions';
 import { toast } from 'sonner';
 import { TransactionWithRelations } from '../hooks/useTransactions';
 import { useQueryClient } from '@tanstack/react-query';
+import { DateMaskedInput } from '@/components/ui/date-masked-input';
 
 interface CloseReservationDialogProps {
     transaction: TransactionWithRelations;
@@ -34,17 +35,11 @@ export function CloseReservationDialog({
     const queryClient = useQueryClient();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Pre-fill from reservation data
+    // Solo dos campos visibles
     const [closingDate, setClosingDate] = useState(
         new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
     );
     const [actualPrice, setActualPrice] = useState(transaction.actual_price || 0);
-    const [commissionPercentage, setCommissionPercentage] = useState(transaction.commission_percentage || 3);
-    const [agentSplitPercentage, setAgentSplitPercentage] = useState(transaction.agent_split_percentage || 45);
-    const [sides, setSides] = useState(transaction.sides || 1);
-
-    // Calculated preview
-    const grossCommission = actualPrice * (commissionPercentage / 100) * sides;
 
     const handleSubmit = async () => {
         if (!closingDate) {
@@ -61,9 +56,10 @@ export function CloseReservationDialog({
             const result = await closeReservationAction(transaction.id, {
                 closingDate,
                 actualPrice,
-                commissionPercentage,
-                agentSplitPercentage,
-                sides,
+                // Heredar valores de la reserva original
+                commissionPercentage: transaction.commission_percentage || 3,
+                agentSplitPercentage: transaction.agent_split_percentage || 45,
+                sides: transaction.sides || 1,
             });
 
             if (!result.success) throw new Error(result.error || 'Error al cerrar la reserva');
@@ -104,25 +100,11 @@ export function CloseReservationDialog({
                 </div>
 
                 <div className="space-y-4">
-                    {/* Fecha de cierre */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-200 flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-emerald-400" />
-                            Fecha de Cierre *
-                        </Label>
-                        <Input
-                            type="date"
-                            value={closingDate}
-                            onChange={(e) => setClosingDate(e.target.value)}
-                            className="bg-slate-800 border-slate-700 text-white"
-                        />
-                    </div>
-
                     {/* Precio */}
                     <div className="space-y-2">
                         <Label className="text-slate-200 flex items-center gap-1.5">
                             <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
-                            Precio Final (USD)
+                            Precio Final (USD) *
                         </Label>
                         <Input
                             type="number"
@@ -133,63 +115,18 @@ export function CloseReservationDialog({
                         />
                     </div>
 
-                    {/* Comisión y Split en una fila */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                            <Label className="text-slate-200 flex items-center gap-1.5">
-                                <Percent className="h-3.5 w-3.5 text-emerald-400" />
-                                % Comisión
-                            </Label>
-                            <Input
-                                type="number"
-                                step="0.1"
-                                value={commissionPercentage || ''}
-                                onChange={(e) => setCommissionPercentage(Number(e.target.value))}
-                                className="bg-slate-800 border-slate-700 text-white"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-slate-200 flex items-center gap-1.5">
-                                <Percent className="h-3.5 w-3.5 text-emerald-400" />
-                                % Split Agente
-                            </Label>
-                            <Input
-                                type="number"
-                                step="1"
-                                value={agentSplitPercentage || ''}
-                                onChange={(e) => setAgentSplitPercentage(Number(e.target.value))}
-                                className="bg-slate-800 border-slate-700 text-white"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Puntas */}
+                    {/* Fecha de cierre DD/MM/AAAA */}
                     <div className="space-y-2">
-                        <Label className="text-slate-200">Puntas</Label>
-                        <div className="flex gap-2">
-                            {[1, 2].map((n) => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => setSides(n)}
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${
-                                        sides === n
-                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                                    }`}
-                                >
-                                    {n} {n === 1 ? 'punta' : 'puntas'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Commission preview */}
-                    <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
-                        <p className="text-xs text-emerald-400 mb-1">Comisión Bruta Estimada</p>
-                        <p className="text-lg font-bold text-emerald-300">
-                            USD {grossCommission.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                        </p>
+                        <Label className="text-slate-200 flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+                            Fecha de Cierre *
+                        </Label>
+                        <DateMaskedInput
+                            value={closingDate}
+                            onChange={setClosingDate}
+                            placeholder="DD/MM/AAAA"
+                            className="bg-slate-800 border-slate-700 text-white"
+                        />
                     </div>
                 </div>
 

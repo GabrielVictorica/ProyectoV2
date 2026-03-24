@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo V3 - Wavy Backgrounds | Proptech CRM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+            overflow-x: hidden;
+            min-height: 100vh;
+            background: #030712;
+        }
+
+        /* ============================================================
+           OPTION BAR
+           ============================================================ */
+        .option-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; padding: 12px 20px;
+            background: rgba(3, 7, 18, 0.92); backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-wrap: wrap;
+        }
+
+        .option-bar h3 { font-size: 13px; font-weight: 500; color: #94a3b8; margin-right: 12px; }
+
+        .option-btn {
+            padding: 6px 14px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: #94a3b8; font-family: 'Inter', sans-serif;
+            font-size: 12px; font-weight: 500; cursor: pointer;
+            transition: all 0.3s ease; white-space: nowrap;
+        }
+
+        .option-btn:hover { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.3); color: #c4b5fd; }
+
+        .option-btn.active {
+            background: rgba(139,92,246,0.25); border-color: rgba(139,92,246,0.5);
+            color: #fff; box-shadow: 0 0 20px rgba(139,92,246,0.2);
+        }
+
+        /* ============================================================
+           CANVAS
+           ============================================================ */
+        canvas#bgCanvas {
+            position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2;
+        }
+
+        /* ============================================================
+           APP MOCK
+           ============================================================ */
+        .app-container { position: relative; z-index: 1; min-height: 100vh; padding-top: 60px; }
+
+        .sidebar {
+            position: fixed; top: 60px; left: 0; bottom: 0; width: 240px;
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(16px);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px; z-index: 10;
+        }
+
+        .sidebar-logo {
+            font-size: 18px; font-weight: 700; color: #fff;
+            padding: 0 8px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .sidebar-logo .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #8b5cf6; box-shadow: 0 0 12px rgba(139,92,246,0.6);
+        }
+
+        .sidebar-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            font-size: 14px; color: #94a3b8;
+            transition: all 0.2s; margin-bottom: 2px; position: relative;
+        }
+
+        .sidebar-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
+        .sidebar-item.active { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+
+        .sidebar-item.active::before {
+            content: ''; position: absolute; left: 0;
+            width: 3px; height: 24px; background: #8b5cf6; border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-icon { width: 18px; height: 18px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+
+        .main-content { margin-left: 240px; padding: 28px 32px; }
+
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 24px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+
+        .stat-card {
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; padding: 20px;
+            transition: all 0.3s ease; position: relative; overflow: hidden;
+        }
+
+        .stat-card:hover {
+            background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(139,92,246,0.1); transform: translateY(-1px);
+        }
+
+        .stat-card::before {
+            content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px;
+            background: linear-gradient(135deg, rgba(139,92,246,0), rgba(139,92,246,0));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            opacity: 0; transition: all 0.3s ease; pointer-events: none;
+        }
+
+        .stat-card:hover::before {
+            background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(59,130,246,0.3), rgba(16,185,129,0.5));
+            opacity: 1;
+        }
+
+        .stat-label { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-change { font-size: 12px; margin-top: 6px; }
+        .stat-change.positive { color: #34d399; }
+        .stat-change.negative { color: #fb7185; }
+
+        .table-card {
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+        }
+
+        .table-header {
+            padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .table-header h3 { font-size: 15px; font-weight: 600; }
+
+        .table-badge {
+            padding: 4px 10px; border-radius: 6px; font-size: 12px;
+            background: rgba(139,92,246,0.15); color: #c4b5fd;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th {
+            text-align: left; padding: 12px 20px; font-size: 12px; font-weight: 500;
+            color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        td {
+            padding: 14px 20px; font-size: 14px; color: #e2e8f0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+        .status-dot.green { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+        .status-dot.yellow { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+        .status-dot.blue { background: #60a5fa; box-shadow: 0 0 8px rgba(96,165,250,0.4); }
+        .status-dot.purple { background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.4); }
+
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .chart-card {
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; padding: 20px; height: 220px;
+            display: flex; flex-direction: column;
+        }
+
+        .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+
+        .chart-placeholder {
+            flex: 1; border-radius: 8px; background: rgba(255,255,255,0.02);
+            display: flex; align-items: flex-end; padding: 12px; gap: 6px;
+        }
+
+        .bar { flex: 1; border-radius: 4px 4px 0 0; min-height: 10px; }
+        .bar:nth-child(1) { height: 45%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(2) { height: 70%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(3) { height: 55%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(4) { height: 85%; background: rgba(139,92,246,0.7); }
+        .bar:nth-child(5) { height: 60%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(6) { height: 90%; background: rgba(139,92,246,0.8); }
+        .bar:nth-child(7) { height: 75%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(8) { height: 50%; background: rgba(139,92,246,0.5); }
+
+        .donut-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; }
+
+        .donut {
+            width: 120px; height: 120px; border-radius: 50%;
+            background: conic-gradient(#8b5cf6 0deg 130deg, #22d3ee 130deg 220deg, #34d399 220deg 290deg, #fbbf24 290deg 340deg, #fb7185 340deg 360deg);
+            position: relative;
+        }
+
+        .donut::after { content: ''; position: absolute; inset: 30px; border-radius: 50%; background: rgba(3,7,18,0.9); }
+
+        /* Description */
+        .bg-description {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 100; background: rgba(3,7,18,0.92); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+            padding: 12px 24px; max-width: 700px; text-align: center;
+        }
+
+        .bg-description h4 { font-size: 14px; font-weight: 600; color: #c4b5fd; margin-bottom: 4px; }
+        .bg-description p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+
+        /* Speed control */
+        .speed-control {
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+            z-index: 100; display: flex; align-items: center; gap: 10px;
+            background: rgba(3,7,18,0.92); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+            padding: 8px 16px;
+        }
+
+        .speed-control label { font-size: 12px; color: #94a3b8; }
+
+        .speed-control input[type="range"] {
+            width: 120px; accent-color: #8b5cf6;
+        }
+
+        .speed-val { font-size: 12px; color: #c4b5fd; min-width: 35px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="option-bar">
+        <h3>VARIANTES WAVY:</h3>
+        <button class="option-btn active" onclick="switchBg('brand')">1. Brand Violet</button>
+        <button class="option-btn" onclick="switchBg('aurora')">2. Aurora Waves</button>
+        <button class="option-btn" onclick="switchBg('ocean')">3. Deep Ocean</button>
+        <button class="option-btn" onclick="switchBg('neon')">4. Neon Pulse</button>
+        <button class="option-btn" onclick="switchBg('subtle')">5. Minimal Subtle</button>
+        <button class="option-btn" onclick="switchBg('hybrid')">6. Waves + Particles</button>
+    </div>
+
+    <canvas id="bgCanvas"></canvas>
+
+    <!-- APP MOCK -->
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-logo"><span class="dot"></span>Proptech CRM</div>
+            <div class="sidebar-item active"><div class="sidebar-icon"></div>Dashboard</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Clientes</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Búsquedas</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Emprendimientos</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Competencia</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Reportes</div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Dashboard</h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Clientes Activos</div>
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-change positive">+12.5% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Reservas</div>
+                    <div class="stat-value">86</div>
+                    <div class="stat-change positive">+8.3% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Cierres del Mes</div>
+                    <div class="stat-value">23</div>
+                    <div class="stat-change positive">+15.0% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Comisiones</div>
+                    <div class="stat-value">$4.2M</div>
+                    <div class="stat-change negative">-3.1% vs mes anterior</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Últimas Operaciones</h3>
+                    <span class="table-badge">12 esta semana</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Cliente</th><th>Propiedad</th><th>Estado</th><th>Valor</th><th>Agente</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Martín González</td><td>Depto 3amb - Palermo</td><td><span class="status-dot green"></span>Cerrado</td><td>USD 185,000</td><td>Ana Ruiz</td></tr>
+                        <tr><td>Laura Fernández</td><td>Casa 4amb - Nordelta</td><td><span class="status-dot yellow"></span>Reserva</td><td>USD 320,000</td><td>Carlos López</td></tr>
+                        <tr><td>Diego Morales</td><td>Oficina - Microcentro</td><td><span class="status-dot blue"></span>Negociación</td><td>USD 95,000</td><td>María Torres</td></tr>
+                        <tr><td>Sofía Rodríguez</td><td>Loft - San Telmo</td><td><span class="status-dot purple"></span>Visita</td><td>USD 145,000</td><td>Ana Ruiz</td></tr>
+                        <tr><td>Pablo Méndez</td><td>PH - Belgrano</td><td><span class="status-dot green"></span>Cerrado</td><td>USD 210,000</td><td>Carlos López</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bottom-grid">
+                <div class="chart-card">
+                    <h3>Ventas Mensuales</h3>
+                    <div class="chart-placeholder">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Distribución por Zona</h3>
+                    <div class="donut-placeholder"><div class="donut"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="speed-control">
+        <label>Velocidad:</label>
+        <input type="range" id="speedSlider" min="1" max="10" value="3" oninput="updateSpeed(this.value)">
+        <span class="speed-val" id="speedVal">3</span>
+        <label style="margin-left:12px">Blur:</label>
+        <input type="range" id="blurSlider" min="0" max="30" value="10" oninput="updateBlur(this.value)">
+        <span class="speed-val" id="blurVal">10</span>
+        <label style="margin-left:12px">Opacidad:</label>
+        <input type="range" id="opacitySlider" min="1" max="10" value="5" oninput="updateOpacity(this.value)">
+        <span class="speed-val" id="opacityVal">0.5</span>
+    </div>
+
+    <div class="bg-description">
+        <h4 id="descTitle">1. Brand Violet — Ondas con tu paleta principal</h4>
+        <p id="descText">Ondas suaves usando violet, indigo y cyan de tu brand. Blur alto para fondo difuso. Excelente contraste con tarjetas glass.</p>
+    </div>
+
+    <script>
+    // ============================================================
+    // Simplex Noise 3D (inlined - same algorithm as simplex-noise npm)
+    // ============================================================
+    const F3 = 1/3, G3 = 1/6;
+    const grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+    const perm = new Uint8Array(512);
+    const permMod12 = new Uint8Array(512);
+
+    (function seedNoise() {
+        const p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) p[i] = i;
+        for (let i = 255; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [p[i], p[j]] = [p[j], p[i]];
+        }
+        for (let i = 0; i < 512; i++) {
+            perm[i] = p[i & 255];
+            permMod12[i] = perm[i] % 12;
+        }
+    })();
+
+    function noise3D(x, y, z) {
+        const s = (x + y + z) * F3;
+        const i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+        const t = (i + j + k) * G3;
+        const X0 = i - t, Y0 = j - t, Z0 = k - t;
+        const x0 = x - X0, y0 = y - Y0, z0 = z - Z0;
+
+        let i1, j1, k1, i2, j2, k2;
+        if (x0 >= y0) {
+            if (y0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; }
+            else if (x0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; }
+            else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; }
+        } else {
+            if (y0 < z0) { i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; }
+            else if (x0 < z0) { i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; }
+            else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; }
+        }
+
+        const x1 = x0-i1+G3, y1 = y0-j1+G3, z1 = z0-k1+G3;
+        const x2 = x0-i2+2*G3, y2 = y0-j2+2*G3, z2 = z0-k2+2*G3;
+        const x3 = x0-1+3*G3, y3 = y0-1+3*G3, z3 = z0-1+3*G3;
+
+        const ii = i & 255, jj = j & 255, kk = k & 255;
+
+        function dot3(gi, x, y, z) { const g = grad3[gi]; return g[0]*x + g[1]*y + g[2]*z; }
+
+        let n0 = 0, n1 = 0, n2 = 0, n3 = 0;
+        let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
+        if (t0 >= 0) { t0 *= t0; n0 = t0*t0 * dot3(permMod12[ii+perm[jj+perm[kk]]], x0, y0, z0); }
+        let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
+        if (t1 >= 0) { t1 *= t1; n1 = t1*t1 * dot3(permMod12[ii+i1+perm[jj+j1+perm[kk+k1]]], x1, y1, z1); }
+        let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
+        if (t2 >= 0) { t2 *= t2; n2 = t2*t2 * dot3(permMod12[ii+i2+perm[jj+j2+perm[kk+k2]]], x2, y2, z2); }
+        let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
+        if (t3 >= 0) { t3 *= t3; n3 = t3*t3 * dot3(permMod12[ii+1+perm[jj+1+perm[kk+1]]], x3, y3, z3); }
+
+        return 32 * (n0 + n1 + n2 + n3);
+    }
+
+    // ============================================================
+    // CORE ENGINE
+    // ============================================================
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, nt = 0, animId;
+    let currentMode = 'brand';
+    let speedFactor = 0.001;
+    let blurAmount = 10;
+    let waveOpacity = 0.5;
+
+    // Particles for hybrid mode
+    let hybridParticles = [];
+
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        ctx.filter = `blur(${blurAmount}px)`;
+        if (currentMode === 'hybrid') initHybridParticles();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    let mouse = { x: W / 2, y: H / 2 };
+    document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    // ============================================================
+    // COLOR PRESETS
+    // ============================================================
+    const presets = {
+        brand: {
+            colors: ['#8b5cf6', '#6366f1', '#a78bfa', '#c084fc', '#0ea5e9'],
+            bg: '#030712',
+            blur: 10,
+            waveWidth: 50,
+            waveCount: 5,
+            yOffset: 0.5,
+            amplitude: 100,
+            title: '1. Brand Violet — Ondas con tu paleta principal',
+            text: 'Ondas suaves usando violet, indigo y cyan. Blur alto genera un fondo difuso premium. Las ondas quedan detrás del contenido sin competir con las tarjetas.'
+        },
+        aurora: {
+            colors: ['#8b5cf6', '#10b981', '#0ea5e9', '#22d3ee', '#6366f1', '#34d399'],
+            bg: '#030712',
+            blur: 14,
+            waveWidth: 60,
+            waveCount: 6,
+            yOffset: 0.45,
+            amplitude: 120,
+            title: '2. Aurora Waves — Violet + Emerald + Cyan',
+            text: 'Mezcla de los colores aurora (violet, emerald, cyan) con ondas más anchas y blur alto. Simula cintas de aurora boreal en movimiento fluido.'
+        },
+        ocean: {
+            colors: ['#0ea5e9', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6'],
+            bg: '#020617',
+            blur: 12,
+            waveWidth: 45,
+            waveCount: 7,
+            yOffset: 0.55,
+            amplitude: 90,
+            title: '3. Deep Ocean — Tonos azules profundos',
+            text: 'Paleta ocean-blue con más capas de ondas. Movimiento denso y fluido como corrientes submarinas. Fondo aún más oscuro para máximo contraste.'
+        },
+        neon: {
+            colors: ['#8b5cf6', '#ec4899', '#f43f5e', '#a855f7', '#d946ef'],
+            bg: '#030712',
+            blur: 8,
+            waveWidth: 35,
+            waveCount: 5,
+            yOffset: 0.5,
+            amplitude: 110,
+            title: '4. Neon Pulse — Violet + Pink + Rose',
+            text: 'Ondas con colores neon vibrantes (pink, rose, fuchsia). Blur más bajo = bordes más definidos. Más energético y llamativo.'
+        },
+        subtle: {
+            colors: ['rgba(139,92,246,0.5)', 'rgba(99,102,241,0.4)', 'rgba(14,165,233,0.3)', 'rgba(167,139,250,0.35)', 'rgba(16,185,129,0.25)'],
+            bg: '#030712',
+            blur: 18,
+            waveWidth: 70,
+            waveCount: 4,
+            yOffset: 0.5,
+            amplitude: 80,
+            title: '5. Minimal Subtle — Ultra sutil y elegante',
+            text: 'Ondas con opacidad reducida y blur muy alto. Apenas perceptible pero agrega movimiento vivo al fondo. Máximo contraste, mínima distracción.'
+        },
+        hybrid: {
+            colors: ['#8b5cf6', '#6366f1', '#0ea5e9', '#a78bfa', '#22d3ee'],
+            bg: '#030712',
+            blur: 12,
+            waveWidth: 50,
+            waveCount: 4,
+            yOffset: 0.5,
+            amplitude: 90,
+            title: '6. Waves + Particles — Lo mejor de ambos mundos',
+            text: 'Combina las ondas wavy con partículas de constelaciones flotando encima. Las ondas dan ambiente y las partículas dan interactividad con el mouse.'
+        }
+    };
+
+    // ============================================================
+    // HYBRID PARTICLES
+    // ============================================================
+    function initHybridParticles() {
+        hybridParticles = [];
+        const count = Math.floor((W * H) / 18000);
+        const colors = [[139,92,246],[14,165,233],[16,185,129],[167,139,250]];
+        for (let i = 0; i < count; i++) {
+            hybridParticles.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: (Math.random() - 0.5) * 0.3,
+                r: Math.random() * 1.5 + 0.5,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                alpha: Math.random() * 0.4 + 0.2
+            });
+        }
+    }
+
+    function drawHybridParticles() {
+        // Temporarily remove blur for crisp particles
+        ctx.filter = 'none';
+
+        for (let i = 0; i < hybridParticles.length; i++) {
+            const p = hybridParticles[i];
+            p.x += p.vx; p.y += p.vy;
+            if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+            if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+            ctx.fill();
+
+            // Connections
+            for (let j = i + 1; j < hybridParticles.length; j++) {
+                const p2 = hybridParticles[j];
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 110) {
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(139,92,246,${(1-dist/110)*0.12})`;
+                    ctx.lineWidth = 0.4; ctx.stroke();
+                }
+            }
+
+            // Mouse
+            const mdx = p.x - mouse.x, mdy = p.y - mouse.y;
+            const mDist = Math.sqrt(mdx*mdx + mdy*mdy);
+            if (mDist < 180) {
+                ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = `rgba(139,92,246,${(1-mDist/180)*0.25})`;
+                ctx.lineWidth = 0.6; ctx.stroke();
+                p.vx += (mouse.x - p.x) * 0.00004;
+                p.vy += (mouse.y - p.y) * 0.00004;
+            }
+
+            const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+            if (speed > 0.4) { p.vx *= 0.99; p.vy *= 0.99; }
+        }
+
+        // Restore blur for next wave frame
+        ctx.filter = `blur(${blurAmount}px)`;
+    }
+
+    // ============================================================
+    // DRAW WAVES
+    // ============================================================
+    function drawWave(preset) {
+        const p = presets[preset];
+        nt += speedFactor;
+
+        for (let i = 0; i < p.waveCount; i++) {
+            ctx.beginPath();
+            ctx.lineWidth = p.waveWidth;
+            ctx.strokeStyle = p.colors[i % p.colors.length];
+
+            for (let x = 0; x < W; x += 5) {
+                const y = noise3D(x / 800, 0.3 * i, nt) * p.amplitude;
+                ctx.lineTo(x, y + H * p.yOffset);
+            }
+
+            ctx.stroke();
+            ctx.closePath();
+        }
+    }
+
+    // ============================================================
+    // RENDER LOOP
+    // ============================================================
+    function render() {
+        const p = presets[currentMode];
+
+        ctx.fillStyle = p.bg;
+        ctx.globalAlpha = waveOpacity;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.filter = `blur(${blurAmount}px)`;
+        drawWave(currentMode);
+
+        // Hybrid: draw particles on top without blur
+        if (currentMode === 'hybrid') {
+            drawHybridParticles();
+        }
+
+        animId = requestAnimationFrame(render);
+    }
+
+    // ============================================================
+    // CONTROLS
+    // ============================================================
+    function updateSpeed(val) {
+        speedFactor = val * 0.0005;
+        document.getElementById('speedVal').textContent = val;
+    }
+
+    function updateBlur(val) {
+        blurAmount = parseInt(val);
+        document.getElementById('blurVal').textContent = val;
+        ctx.filter = `blur(${blurAmount}px)`;
+    }
+
+    function updateOpacity(val) {
+        waveOpacity = val / 10;
+        document.getElementById('opacityVal').textContent = waveOpacity.toFixed(1);
+    }
+
+    function switchBg(mode) {
+        if (mode === currentMode) return;
+        currentMode = mode;
+
+        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        const p = presets[mode];
+        document.getElementById('descTitle').textContent = p.title;
+        document.getElementById('descText').textContent = p.text;
+
+        // Update blur
+        blurAmount = p.blur;
+        document.getElementById('blurSlider').value = p.blur;
+        document.getElementById('blurVal').textContent = p.blur;
+        ctx.filter = `blur(${blurAmount}px)`;
+
+        if (mode === 'hybrid') initHybridParticles();
+    }
+
+    // ============================================================
+    // START
+    // ============================================================
+    render();
+    </script>
+
+</body>
+</html>

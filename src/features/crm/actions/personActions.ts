@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ActionResult } from '@/features/admin/actions/adminActions';
@@ -28,20 +29,25 @@ async function recordPersonEvent(params: {
     oldValue?: string | null;
     newValue?: string | null;
     metadata?: Record<string, any>;
+    createdAt?: string;
 }): Promise<void> {
     try {
-        const supabase = await createClient();
-        const { error } = await (supabase as any)
+        const adminClient = createAdminClient();
+        const insertPayload: any = {
+            person_id: params.personId,
+            event_type: params.eventType,
+            agent_id: params.agentId,
+            field_name: params.fieldName,
+            old_value: params.oldValue,
+            new_value: params.newValue,
+            metadata: params.metadata || {}
+        };
+        if (params.createdAt) {
+            insertPayload.created_at = params.createdAt;
+        }
+        const { error } = await (adminClient as any)
             .from('person_history')
-            .insert({
-                person_id: params.personId,
-                event_type: params.eventType,
-                agent_id: params.agentId,
-                field_name: params.fieldName,
-                old_value: params.oldValue,
-                new_value: params.newValue,
-                metadata: params.metadata || {}
-            });
+            .insert(insertPayload);
 
         if (error) {
             console.error('Error recording person event:', error);
@@ -108,42 +114,50 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
             targetOrgId = validatedData.organizationId;
         }
 
+        const insertPayload: any = {
+            organization_id: targetOrgId,
+            agent_id: targetAgentId,
+            first_name: validatedData.firstName,
+            last_name: validatedData.lastName,
+            email: validatedData.email || null,
+            phone: validatedData.phone || null,
+            dni_cuil: validatedData.dniCuil || null,
+            birthday: validatedData.birthday || null,
+            family_composition: validatedData.familyComposition || null,
+            family_notes: validatedData.familyNotes || null,
+            occupation_company: validatedData.occupationCompany || null,
+            interests_hobbies: validatedData.interestsHobbies || null,
+            personality_notes: validatedData.personalityNotes || null,
+            contact_type: validatedData.contactType,
+            source: validatedData.source || null,
+            referred_by_id: validatedData.referredById || null,
+            influence_level: validatedData.influenceLevel,
+            preferred_channel: validatedData.preferredChannel || null,
+            best_contact_time: validatedData.bestContactTime || null,
+            relationship_status: validatedData.relationshipStatus,
+            lifecycle_status: validatedData.lifecycleStatus,
+            lost_reason: validatedData.lostReason || null,
+            next_action_at: validatedData.nextActionAt || null,
+            tags: normalizeTags(validatedData.tags),
+            observations: validatedData.observations || null,
+            is_vip: validatedData.isVip,
+        };
+
+        // Si viene una fecha de creación explícita (ej: desde actividad semanal), usarla
+        if (validatedData.createdAt) {
+            insertPayload.created_at = new Date(validatedData.createdAt + 'T12:00:00Z').toISOString();
+            insertPayload.last_interaction_at = insertPayload.created_at;
+        }
+
         const { data, error } = await supabase
             .from('persons' as any)
-            .insert({
-                organization_id: targetOrgId,
-                agent_id: targetAgentId,
-                first_name: validatedData.firstName,
-                last_name: validatedData.lastName,
-                email: validatedData.email || null,
-                phone: validatedData.phone || null,
-                dni_cuil: validatedData.dniCuil || null,
-                birthday: validatedData.birthday || null,
-                family_composition: validatedData.familyComposition || null,
-                family_notes: validatedData.familyNotes || null,
-                occupation_company: validatedData.occupationCompany || null,
-                interests_hobbies: validatedData.interestsHobbies || null,
-                personality_notes: validatedData.personalityNotes || null,
-                contact_type: validatedData.contactType,
-                source: validatedData.source || null,
-                referred_by_id: validatedData.referredById || null,
-                influence_level: validatedData.influenceLevel,
-                preferred_channel: validatedData.preferredChannel || null,
-                best_contact_time: validatedData.bestContactTime || null,
-                relationship_status: validatedData.relationshipStatus,
-                lifecycle_status: validatedData.lifecycleStatus,
-                lost_reason: validatedData.lostReason || null,
-                next_action_at: validatedData.nextActionAt || null,
-                tags: normalizeTags(validatedData.tags),
-                observations: validatedData.observations || null,
-                is_vip: validatedData.isVip,
-            } as any)
+            .insert(insertPayload)
             .select()
             .single();
 
         if (error) throw error;
 
-        // Registrar evento de creación
+        // Registrar evento de creación (con fecha de actividad si viene)
         await recordPersonEvent({
             personId: (data as any).id,
             eventType: 'creation',
@@ -151,7 +165,10 @@ export async function createPersonAction(formData: z.infer<typeof personSchema>)
             metadata: {
                 initial_status: validatedData.relationshipStatus,
                 initial_lifecycle: validatedData.lifecycleStatus
-            }
+            },
+            createdAt: validatedData.createdAt
+                ? new Date(validatedData.createdAt + 'T12:00:00Z').toISOString()
+                : undefined
         });
 
         revalidatePath('/dashboard/crm');
@@ -307,7 +324,7 @@ export async function touchPersonAction(id: string): Promise<ActionResult<void>>
  */
 export async function getPersonsAction(filters: {
     relationshipStatus?: string[];
-    tags?: string[];
+    vinculo?: string[];
     search?: string;
     organizationId?: string;
     agentId?: string[];
@@ -315,8 +332,6 @@ export async function getPersonsAction(filters: {
     influenceLevel?: number[];
     contactType?: string[];
     source?: string[];
-    referredById?: string[];
-    lifecycleStatus?: LifecycleStatus[];
     isVip?: boolean;
 } = {}): Promise<ActionResult<Person[]>> {
     try {
@@ -348,14 +363,8 @@ export async function getPersonsAction(filters: {
             query = query.in('relationship_status', filters.relationshipStatus);
         }
 
-        // Estado Lead / Lifecycle (Array de strings)
-        // Por defecto: 'active' y 'following_up' si no se especifica nada
-        if (filters.lifecycleStatus && filters.lifecycleStatus.length > 0) {
-            query = query.in('lifecycle_status', filters.lifecycleStatus);
-        } else {
-            // Si no hay filtro explícito, ocultamos los 'lost' por defecto
-            query = query.in('lifecycle_status', ['active', 'following_up']);
-        }
+        // Lifecycle: siempre ocultar 'lost' por defecto
+        query = query.in('lifecycle_status', ['active', 'following_up']);
 
         // Search
         if (filters.search) {
@@ -381,10 +390,9 @@ export async function getPersonsAction(filters: {
 
         // --- Filtros Avanzados (Multi-Opción) ---
 
-        // Tags: Usamos contains para filtrar si tiene AL MENOS una de las etiquetas (OR logic simulado con overlaps)
-        // PostgreSQL array operator && (overlaps) es lo ideal. Supabase filter: .overlaps('tags', ['a', 'b'])
-        if (filters.tags && filters.tags.length > 0) {
-            query = query.overlaps('tags', filters.tags);
+        // Vínculo: filtra por tags que representan el vínculo con la persona
+        if (filters.vinculo && filters.vinculo.length > 0) {
+            query = query.overlaps('tags', filters.vinculo);
         }
 
         // Nivel de Influencia (Array de números)
@@ -399,11 +407,6 @@ export async function getPersonsAction(filters: {
         // Fuente (Array de strings)
         if (filters.source && filters.source.length > 0) {
             query = query.in('source', filters.source);
-        }
-
-        // Referidor (Array de IDs)
-        if (filters.referredById && filters.referredById.length > 0) {
-            query = query.in('referred_by_id', filters.referredById);
         }
 
         // Semáforo (HealthScore)
@@ -647,7 +650,8 @@ export async function getPersonHistoryAction(personId: string): Promise<ActionRe
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
-        const { data, error } = await (supabase as any)
+        const adminClient = createAdminClient();
+        const { data, error } = await (adminClient as any)
             .from('person_history')
             .select(`
                 *,
@@ -707,7 +711,8 @@ export async function getPersonVisitHistoryAction(personId: string): Promise<Act
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
-        const { data, error } = await (supabase as any)
+        const adminClient = createAdminClient();
+        const { data, error } = await (adminClient as any)
             .from('person_history')
             .select(`
                 id,

@@ -31,9 +31,10 @@ import {
     DollarSign,
     Trophy,
     History,
-    MessageCircle
+    MessageCircle,
+    Landmark
 } from "lucide-react";
-import { parseNURC } from '../utils/clientUtils';
+import { parseNURC, getNURCLevel } from '../utils/clientUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
@@ -158,6 +159,17 @@ export function SearchDetailSheet({
                                             );
                                         })}
                                     </div>
+                                    {client.is_mortgage_eligible && (
+                                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+                                            <Landmark className="w-4 h-4 text-cyan-400" />
+                                            <span className="text-sm font-bold text-cyan-400">Apto Crédito Hipotecario</span>
+                                            {client.is_mortgage_prequalified && (
+                                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
+                                                    ✓ Precalificado
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Propiedad */}
@@ -203,31 +215,53 @@ export function SearchDetailSheet({
 
                         {/* NURC Psychology Section */}
                         <div className="space-y-6">
-                            <h3 className="text-lg font-semibold flex items-center gap-2 text-emerald-400">
-                                <Trophy className="w-5 h-5" />
-                                Psicología de la Búsqueda (NURC)
-                            </h3>
+                            {(() => {
+                                const nurcLevel = getNURCLevel(client.motivation);
+                                const nurc = parseNURC(client.motivation);
+                                return (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-lg font-semibold flex items-center gap-2 text-emerald-400">
+                                                <Trophy className="w-5 h-5" />
+                                                Psicología de la Búsqueda (NURC)
+                                            </h3>
+                                            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${nurcLevel.bgColor} ${nurcLevel.borderColor} ${nurcLevel.color}`}>
+                                                {nurcLevel.emoji} {nurcLevel.label}
+                                            </span>
+                                        </div>
 
-                            <div className="grid grid-cols-1 gap-4">
-                                {[
-                                    { key: 'N', label: 'Necesidad', icon: Target, color: 'text-emerald-400', bg: 'bg-emerald-500/10', value: nurc.n },
-                                    { key: 'U', label: 'Urgencia', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10', value: nurc.u },
-                                    { key: 'R', label: 'Realismo', icon: Eye, color: 'text-blue-400', bg: 'bg-blue-500/10', value: nurc.r },
-                                    { key: 'C', label: 'Capacidad', icon: Wallet, color: 'text-violet-400', bg: 'bg-violet-500/10', value: nurc.c }
-                                ].map((item) => (
-                                    <div key={item.key} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 flex gap-4">
-                                        <div className={`h-12 w-12 rounded-xl ${item.bg} border border-white/10 flex items-center justify-center flex-shrink-0`}>
-                                            <item.icon className={`w-6 h-6 ${item.color}`} />
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {[
+                                                { key: 'N', label: 'Necesidad', icon: Target, color: 'text-emerald-400', bg: 'bg-emerald-500/10', value: nurc.n, chars: nurcLevel.fieldChars.n },
+                                                { key: 'U', label: 'Urgencia', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10', value: nurc.u, chars: nurcLevel.fieldChars.u },
+                                                { key: 'R', label: 'Realismo', icon: Eye, color: 'text-blue-400', bg: 'bg-blue-500/10', value: nurc.r, chars: nurcLevel.fieldChars.r },
+                                                { key: 'C', label: 'Capacidad', icon: Wallet, color: 'text-violet-400', bg: 'bg-violet-500/10', value: nurc.c, chars: nurcLevel.fieldChars.c }
+                                            ].map((item) => {
+                                                const fieldOk = item.chars >= 20;
+                                                const fieldGood = item.chars >= 50;
+                                                return (
+                                                    <div key={item.key} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 flex gap-4">
+                                                        <div className={`h-12 w-12 rounded-xl ${item.bg} border border-white/10 flex items-center justify-center flex-shrink-0`}>
+                                                            <item.icon className={`w-6 h-6 ${item.color}`} />
+                                                        </div>
+                                                        <div className="space-y-1 flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{item.label}</span>
+                                                                <span className={`text-[9px] font-bold ${fieldGood ? 'text-emerald-400' : fieldOk ? 'text-yellow-400' : 'text-red-400'}`}>
+                                                                    {item.chars} chars {fieldGood ? '🟢' : fieldOk ? '🟡' : '🔴'}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-slate-300 leading-relaxed italic">
+                                                                {item.value || 'Información no disponible'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">{item.label}</span>
-                                            <p className="text-sm text-slate-300 leading-relaxed italic">
-                                                {item.value || 'Información no disponible'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    </>
+                                );
+                            })()}
                         </div>
 
                         <Separator className="bg-white/10" />

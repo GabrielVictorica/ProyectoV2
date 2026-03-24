@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ActionResult } from '@/features/admin/actions/adminActions';
@@ -42,8 +43,8 @@ function applyFiltersToQuery(query: any, filters: any) {
         query = query.overlaps('search_bedrooms', filters.bedrooms);
     }
 
-    if (filters?.tags && filters.tags.length > 0) {
-        query = query.overlaps('tags', filters.tags);
+    if (filters?.isMortgageEligible) {
+        query = query.eq('is_mortgage_eligible', true);
     }
 
     return query;
@@ -66,6 +67,8 @@ const clientSchema = z.object({
     searchPropertyTypes: z.array(z.string()).default([]),
     searchBedrooms: z.array(z.string()).default([]),
     searchPaymentMethods: z.array(z.string()).default([]),
+    isMortgageEligible: z.boolean().default(false),
+    isMortgagePrequalified: z.boolean().default(false),
     organizationId: z.string().uuid().optional(),
     agentId: z.string().uuid().optional(),
     personId: z.string().uuid('Debes vincular una persona del CRM'),
@@ -160,6 +163,8 @@ export async function createClientAction(
                 property_types: validatedData.searchPropertyTypes,
                 bedrooms: validatedData.searchBedrooms,
                 payment_methods: validatedData.searchPaymentMethods,
+                is_mortgage_eligible: validatedData.isMortgageEligible || false,
+                is_mortgage_prequalified: validatedData.isMortgageEligible ? (validatedData.isMortgagePrequalified || false) : false,
                 notes: (validatedData as any).notes || null,
             } as any)
             .select()
@@ -188,6 +193,25 @@ export async function createClientAction(
             if (syncError) {
                 console.error('Error syncing person last_interaction_at:', syncError);
             }
+
+            // Registrar en person_history la vinculación de búsqueda
+            const adminClient = createAdminClient();
+            await (adminClient as any)
+                .from('person_history')
+                .insert({
+                    person_id: validatedData.personId,
+                    event_type: 'search_linked',
+                    agent_id: targetAgentId,
+                    field_name: 'person_search',
+                    new_value: validatedData.type || 'comprador',
+                    metadata: {
+                        search_id: (data as any).id,
+                        search_type: validatedData.type,
+                        preferred_zones: validatedData.preferredZones,
+                        budget_min: validatedData.budgetMin,
+                        budget_max: validatedData.budgetMax,
+                    }
+                });
         }
 
         revalidatePath('/dashboard/clients');
@@ -242,6 +266,14 @@ export async function updateClientAction(
         if (validatedData.searchPropertyTypes !== undefined) updatePayload.property_types = validatedData.searchPropertyTypes;
         if (validatedData.searchBedrooms !== undefined) updatePayload.bedrooms = validatedData.searchBedrooms;
         if (validatedData.searchPaymentMethods !== undefined) updatePayload.payment_methods = validatedData.searchPaymentMethods;
+        if ((validatedData as any).isMortgageEligible !== undefined) {
+            updatePayload.is_mortgage_eligible = (validatedData as any).isMortgageEligible;
+            // If not mortgage eligible, force prequalified to false
+            if (!(validatedData as any).isMortgageEligible) {
+                updatePayload.is_mortgage_prequalified = false;
+            }
+        }
+        if ((validatedData as any).isMortgagePrequalified !== undefined) updatePayload.is_mortgage_prequalified = (validatedData as any).isMortgagePrequalified;
         if (validatedData.personId !== undefined) updatePayload.person_id = validatedData.personId;
 
         // Solo God/Parent puede reasignar agente
@@ -257,6 +289,26 @@ export async function updateClientAction(
             .single();
 
         if (error) throw error;
+
+        // Registrar en person_history si la búsqueda se cerró/archivó
+        const personId = (data as any)?.person_id;
+        if (personId && validatedData.status && (validatedData.status === 'closed' || validatedData.status === 'archived')) {
+            const adminClient = createAdminClient();
+            await (adminClient as any)
+                .from('person_history')
+                .insert({
+                    person_id: personId,
+                    event_type: 'search_closed',
+                    agent_id: user.id,
+                    field_name: 'person_search',
+                    new_value: validatedData.status,
+                    metadata: {
+                        search_id: validatedData.id,
+                        search_type: (data as any)?.search_type,
+                        final_status: validatedData.status,
+                    }
+                });
+        }
 
         revalidatePath('/dashboard/clients');
         return { success: true, data: data as Client };
@@ -317,7 +369,7 @@ export async function getClientsAction(
         budgetMax?: number | null;
         bedrooms?: string[];
         statusFilter?: string[];
-        tags?: string[];
+        isMortgageEligible?: boolean;
         isCritical?: boolean;
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {
@@ -407,7 +459,7 @@ export async function getNetworkClientsAction(
         budgetMax?: number | null;
         bedrooms?: string[];
         statusFilter?: string[];
-        tags?: string[];
+        isMortgageEligible?: boolean;
         isCritical?: boolean;
     }
 ): Promise<ActionResult<{ clients: any[], total: number }>> {

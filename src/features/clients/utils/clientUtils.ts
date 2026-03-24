@@ -33,7 +33,81 @@ export function parseNURC(motivation: string | null): NURCProfile {
 
     return profile;
 }
-// Helper para generar texto de búsqueda apto para portapapeles (WhatsApp)
+
+// ─── NURC Completion Level (Semáforo) ─────────────────────────────
+
+export type NURCLevel = 'incomplete' | 'partial' | 'complete';
+
+export interface NURCLevelResult {
+    level: NURCLevel;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    label: string;
+    emoji: string;
+    avgChars: number;
+    fieldChars: { n: number; u: number; r: number; c: number };
+}
+
+/**
+ * Evalúa el nivel de completitud del NURC basándose en la cantidad de caracteres.
+ * Umbrales configurados en constants.ts (NURC_SCORING).
+ *
+ * @param minChars - mínimo por campo (default 20)
+ * @param idealAvg - promedio ideal (default 50)
+ */
+export function getNURCLevel(
+    motivation: string | null,
+    minChars: number = 20,
+    idealAvg: number = 50,
+): NURCLevelResult {
+    const nurc = parseNURC(motivation);
+    const chars = {
+        n: nurc.n.length,
+        u: nurc.u.length,
+        r: nurc.r.length,
+        c: nurc.c.length,
+    };
+    const avg = (chars.n + chars.u + chars.r + chars.c) / 4;
+    const allAboveMin = chars.n >= minChars && chars.u >= minChars && chars.r >= minChars && chars.c >= minChars;
+
+    if (!allAboveMin) {
+        return {
+            level: 'incomplete',
+            color: 'text-red-400',
+            bgColor: 'bg-red-500/10',
+            borderColor: 'border-red-500/20',
+            label: 'Incompleto',
+            emoji: '🔴',
+            avgChars: avg,
+            fieldChars: chars,
+        };
+    }
+
+    if (avg < idealAvg) {
+        return {
+            level: 'partial',
+            color: 'text-yellow-400',
+            bgColor: 'bg-yellow-500/10',
+            borderColor: 'border-yellow-500/20',
+            label: 'Parcial',
+            emoji: '🟡',
+            avgChars: avg,
+            fieldChars: chars,
+        };
+    }
+
+    return {
+        level: 'complete',
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/20',
+        label: 'Completo',
+        emoji: '🟢',
+        avgChars: avg,
+        fieldChars: chars,
+    };
+}
 // Helper para generar texto de búsqueda apto para portapapeles (WhatsApp)
 export function generateSearchClipboardText(client: any, propertyTypes: any[]): string {
     // Tipos de Propiedad

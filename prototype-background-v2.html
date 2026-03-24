@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prototipo V2 - Variaciones Constelaciones | Proptech CRM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+            overflow-x: hidden;
+            min-height: 100vh;
+            background: #030712;
+        }
+
+        /* ============================================================
+           OPTION SELECTOR
+           ============================================================ */
+        .option-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: rgba(3, 7, 18, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-wrap: wrap;
+        }
+
+        .option-bar h3 {
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-right: 12px;
+        }
+
+        .option-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: #94a3b8;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .option-btn:hover {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #c4b5fd;
+        }
+
+        .option-btn.active {
+            background: rgba(139, 92, 246, 0.25);
+            border-color: rgba(139, 92, 246, 0.5);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+
+        /* ============================================================
+           CANVAS (shared for all options)
+           ============================================================ */
+        canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+        }
+
+        .gradient-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            transition: opacity 0.8s ease;
+        }
+
+        /* ============================================================
+           APP MOCK LAYOUT
+           ============================================================ */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            padding-top: 60px;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 60px; left: 0; bottom: 0;
+            width: 240px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 20px 12px;
+            z-index: 10;
+        }
+
+        .sidebar-logo {
+            font-size: 18px; font-weight: 700; color: #fff;
+            padding: 0 8px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .sidebar-logo .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #8b5cf6;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+
+        .sidebar-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            font-size: 14px; color: #94a3b8;
+            transition: all 0.2s; margin-bottom: 2px;
+            position: relative;
+        }
+
+        .sidebar-item:hover { background: rgba(255,255,255,0.04); color: #e2e8f0; }
+
+        .sidebar-item.active {
+            background: rgba(139, 92, 246, 0.15);
+            color: #c4b5fd;
+        }
+
+        .sidebar-item.active::before {
+            content: ''; position: absolute; left: 0;
+            width: 3px; height: 24px;
+            background: #8b5cf6; border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-icon {
+            width: 18px; height: 18px; border-radius: 4px;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .main-content {
+            margin-left: 240px;
+            padding: 28px 32px;
+        }
+
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 24px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px; margin-bottom: 28px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px; padding: 20px;
+            transition: all 0.3s ease;
+            position: relative; overflow: hidden;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .stat-card::before {
+            content: ''; position: absolute; inset: -1px;
+            border-radius: inherit; padding: 1px;
+            background: linear-gradient(135deg, rgba(139,92,246,0) 0%, rgba(139,92,246,0) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            opacity: 0; transition: all 0.3s ease; pointer-events: none;
+        }
+
+        .stat-card:hover::before {
+            background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(59,130,246,0.3), rgba(16,185,129,0.5));
+            opacity: 1;
+        }
+
+        .stat-label { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-change { font-size: 12px; margin-top: 6px; }
+        .stat-change.positive { color: #34d399; }
+        .stat-change.negative { color: #fb7185; }
+
+        .table-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+        }
+
+        .table-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .table-header h3 { font-size: 15px; font-weight: 600; }
+
+        .table-badge {
+            padding: 4px 10px; border-radius: 6px; font-size: 12px;
+            background: rgba(139, 92, 246, 0.15); color: #c4b5fd;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th {
+            text-align: left; padding: 12px 20px; font-size: 12px; font-weight: 500;
+            color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        td {
+            padding: 14px 20px; font-size: 14px; color: #e2e8f0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+        .status-dot {
+            display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%; margin-right: 8px;
+        }
+
+        .status-dot.green { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+        .status-dot.yellow { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+        .status-dot.blue { background: #60a5fa; box-shadow: 0 0 8px rgba(96,165,250,0.4); }
+        .status-dot.purple { background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.4); }
+
+        .bottom-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px; padding: 20px; height: 220px;
+            display: flex; flex-direction: column;
+        }
+
+        .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+
+        .chart-placeholder {
+            flex: 1; border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            display: flex; align-items: flex-end;
+            padding: 12px; gap: 6px;
+        }
+
+        .bar { flex: 1; border-radius: 4px 4px 0 0; min-height: 10px; }
+        .bar:nth-child(1) { height: 45%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(2) { height: 70%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(3) { height: 55%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(4) { height: 85%; background: rgba(139,92,246,0.7); }
+        .bar:nth-child(5) { height: 60%; background: rgba(139,92,246,0.5); }
+        .bar:nth-child(6) { height: 90%; background: rgba(139,92,246,0.8); }
+        .bar:nth-child(7) { height: 75%; background: rgba(139,92,246,0.6); }
+        .bar:nth-child(8) { height: 50%; background: rgba(139,92,246,0.5); }
+
+        .donut-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; }
+
+        .donut {
+            width: 120px; height: 120px; border-radius: 50%;
+            background: conic-gradient(#8b5cf6 0deg 130deg, #22d3ee 130deg 220deg, #34d399 220deg 290deg, #fbbf24 290deg 340deg, #fb7185 340deg 360deg);
+            position: relative;
+        }
+
+        .donut::after {
+            content: ''; position: absolute; inset: 30px;
+            border-radius: 50%; background: rgba(3, 7, 18, 0.9);
+        }
+
+        /* Description */
+        .bg-description {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(3, 7, 18, 0.9); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+            padding: 12px 24px; max-width: 650px; text-align: center;
+        }
+
+        .bg-description h4 { font-size: 14px; font-weight: 600; color: #c4b5fd; margin-bottom: 4px; }
+        .bg-description p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+
+        .perf { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-left: 6px; }
+        .perf-low { background: rgba(52,211,153,0.15); color: #34d399; }
+        .perf-mid { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    </style>
+</head>
+<body>
+
+    <div class="option-bar">
+        <h3>VARIANTES:</h3>
+        <button class="option-btn active" onclick="switchBg('classic')">1. Classic Network</button>
+        <button class="option-btn" onclick="switchBg('nebula')">2. Nebula Flow</button>
+        <button class="option-btn" onclick="switchBg('galaxy')">3. Deep Galaxy</button>
+        <button class="option-btn" onclick="switchBg('pulse')">4. Pulse Grid</button>
+        <button class="option-btn" onclick="switchBg('firefly')">5. Fireflies</button>
+        <button class="option-btn" onclick="switchBg('wave')">6. Wave Field</button>
+    </div>
+
+    <canvas id="bgCanvas"></canvas>
+    <div class="gradient-overlay" id="gradientOverlay"></div>
+
+    <!-- APP MOCK -->
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-logo"><span class="dot"></span>Proptech CRM</div>
+            <div class="sidebar-item active"><div class="sidebar-icon"></div>Dashboard</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Clientes</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Búsquedas</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Emprendimientos</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Competencia</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Reportes</div>
+        </div>
+
+        <div class="main-content">
+            <h1 class="page-title">Dashboard</h1>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Clientes Activos</div>
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-change positive">+12.5% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Reservas</div>
+                    <div class="stat-value">86</div>
+                    <div class="stat-change positive">+8.3% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Cierres del Mes</div>
+                    <div class="stat-value">23</div>
+                    <div class="stat-change positive">+15.0% vs mes anterior</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Comisiones</div>
+                    <div class="stat-value">$4.2M</div>
+                    <div class="stat-change negative">-3.1% vs mes anterior</div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Últimas Operaciones</h3>
+                    <span class="table-badge">12 esta semana</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Cliente</th><th>Propiedad</th><th>Estado</th><th>Valor</th><th>Agente</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Martín González</td><td>Depto 3amb - Palermo</td>
+                            <td><span class="status-dot green"></span>Cerrado</td>
+                            <td>USD 185,000</td><td>Ana Ruiz</td>
+                        </tr>
+                        <tr>
+                            <td>Laura Fernández</td><td>Casa 4amb - Nordelta</td>
+                            <td><span class="status-dot yellow"></span>Reserva</td>
+                            <td>USD 320,000</td><td>Carlos López</td>
+                        </tr>
+                        <tr>
+                            <td>Diego Morales</td><td>Oficina - Microcentro</td>
+                            <td><span class="status-dot blue"></span>Negociación</td>
+                            <td>USD 95,000</td><td>María Torres</td>
+                        </tr>
+                        <tr>
+                            <td>Sofía Rodríguez</td><td>Loft - San Telmo</td>
+                            <td><span class="status-dot purple"></span>Visita</td>
+                            <td>USD 145,000</td><td>Ana Ruiz</td>
+                        </tr>
+                        <tr>
+                            <td>Pablo Méndez</td><td>PH - Belgrano</td>
+                            <td><span class="status-dot green"></span>Cerrado</td>
+                            <td>USD 210,000</td><td>Carlos López</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bottom-grid">
+                <div class="chart-card">
+                    <h3>Ventas Mensuales</h3>
+                    <div class="chart-placeholder">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Distribución por Zona</h3>
+                    <div class="donut-placeholder"><div class="donut"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-description" id="bgDescription">
+        <h4 id="descTitle">1. Classic Network</h4>
+        <p id="descText">Red de partículas con conexiones que reaccionan al mouse. El estilo original de constelaciones con colores violet/cyan.</p>
+    </div>
+
+    <script>
+    // ============================================================
+    // CORE ENGINE
+    // ============================================================
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('gradientOverlay');
+    let W, H;
+    let mouse = { x: -9999, y: -9999 };
+    let particles = [];
+    let currentMode = 'classic';
+    let frameId = null;
+    let time = 0;
+
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', () => { resize(); initMode(currentMode); });
+    document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    // ============================================================
+    // DESCRIPTIONS
+    // ============================================================
+    const desc = {
+        classic: {
+            title: '1. Classic Network',
+            text: 'Red de partículas conectadas que reaccionan al cursor. Líneas violet/cyan con atracción suave. Fondo uniforme oscuro = máximo contraste con tarjetas glass.'
+        },
+        nebula: {
+            title: '2. Nebula Flow',
+            text: 'Partículas que fluyen como gas nebular con trails largos. Movimiento más orgánico y direccional. Colores que se mezclan creando profundidad atmosférica.'
+        },
+        galaxy: {
+            title: '3. Deep Galaxy',
+            text: 'Campo de estrellas con diferentes capas de profundidad (parallax). Estrellas brillantes que pulsan + conexiones sutiles. Efecto de inmersión espacial.'
+        },
+        pulse: {
+            title: '4. Pulse Grid',
+            text: 'Grilla de puntos que pulsan en ondas desde el cursor. Combina la estética de constelaciones con orden geométrico. Efecto tech/futurista muy limpio.'
+        },
+        firefly: {
+            title: '5. Fireflies',
+            text: 'Partículas que brillan y se apagan como luciérnagas con glow suave. Movimiento errático natural. Conexiones aparecen solo cuando se acercan — más mágico y orgánico.'
+        },
+        wave: {
+            title: '6. Wave Field',
+            text: 'Campo de partículas que forman ondas sinusoidales. El mouse deforma el campo creando ondulaciones. Efecto hipnótico y fluido con profundidad.'
+        }
+    };
+
+    // ============================================================
+    // COLOR PALETTES
+    // ============================================================
+    const palettes = {
+        classic: [
+            [139, 92, 246],  // violet
+            [14, 165, 233],  // cyan
+            [16, 185, 129],  // emerald
+            [167, 139, 250], // light violet
+        ],
+        nebula: [
+            [139, 92, 246],  // violet
+            [236, 72, 153],  // pink
+            [99, 102, 241],  // indigo
+            [14, 165, 233],  // cyan
+        ],
+        galaxy: [
+            [255, 255, 255], // white
+            [167, 139, 250], // violet
+            [96, 165, 250],  // blue
+            [251, 191, 36],  // amber (warm stars)
+        ],
+        pulse: [
+            [139, 92, 246],
+            [99, 102, 241],
+            [14, 165, 233],
+            [16, 185, 129],
+        ],
+        firefly: [
+            [139, 92, 246],
+            [16, 185, 129],
+            [251, 191, 36],
+            [96, 165, 250],
+        ],
+        wave: [
+            [139, 92, 246],
+            [14, 165, 233],
+            [99, 102, 241],
+            [167, 139, 250],
+        ]
+    };
+
+    // ============================================================
+    // OVERLAYS per mode
+    // ============================================================
+    const overlays = {
+        classic: 'radial-gradient(ellipse 70% 50% at 30% 30%, rgba(139,92,246,0.06) 0%, transparent 70%), radial-gradient(ellipse 60% 60% at 70% 70%, rgba(14,165,233,0.04) 0%, transparent 70%)',
+        nebula: 'radial-gradient(ellipse 80% 60% at 25% 35%, rgba(139,92,246,0.1) 0%, transparent 60%), radial-gradient(ellipse 60% 70% at 75% 65%, rgba(236,72,153,0.07) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 50% 90%, rgba(99,102,241,0.05) 0%, transparent 60%)',
+        galaxy: 'radial-gradient(ellipse 100% 100% at 50% 50%, rgba(17,24,39,0) 30%, rgba(3,7,18,0.5) 100%)',
+        pulse: 'radial-gradient(ellipse 70% 50% at 40% 40%, rgba(139,92,246,0.05) 0%, transparent 70%)',
+        firefly: 'radial-gradient(ellipse 80% 60% at 30% 40%, rgba(16,185,129,0.05) 0%, transparent 70%), radial-gradient(ellipse 60% 60% at 70% 60%, rgba(139,92,246,0.04) 0%, transparent 70%)',
+        wave: 'radial-gradient(ellipse 80% 50% at 50% 60%, rgba(139,92,246,0.06) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 20% 30%, rgba(14,165,233,0.04) 0%, transparent 70%)',
+    };
+
+    // ============================================================
+    // INIT MODES
+    // ============================================================
+    function initMode(mode) {
+        particles = [];
+        const pal = palettes[mode];
+
+        switch(mode) {
+            case 'classic': {
+                const count = Math.floor((W * H) / 11000);
+                for (let i = 0; i < count; i++) {
+                    const c = pal[Math.floor(Math.random() * pal.length)];
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
+                        r: Math.random() * 1.8 + 0.5,
+                        color: c, alpha: Math.random() * 0.5 + 0.3
+                    });
+                }
+                break;
+            }
+            case 'nebula': {
+                const count = Math.floor((W * H) / 8000);
+                for (let i = 0; i < count; i++) {
+                    const c = pal[Math.floor(Math.random() * pal.length)];
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 0.3 + 0.1;
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                        r: Math.random() * 2 + 0.5,
+                        color: c, alpha: Math.random() * 0.6 + 0.2,
+                        trail: [], maxTrail: Math.floor(Math.random() * 15) + 8,
+                        life: Math.random() * 100
+                    });
+                }
+                break;
+            }
+            case 'galaxy': {
+                // Layer 1: far stars (small, slow)
+                for (let i = 0; i < 200; i++) {
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: (Math.random() - 0.5) * 0.05,
+                        vy: (Math.random() - 0.5) * 0.05,
+                        r: Math.random() * 0.8 + 0.3,
+                        color: pal[0], alpha: Math.random() * 0.3 + 0.1,
+                        layer: 0, pulseSpeed: Math.random() * 0.02 + 0.005, pulseOffset: Math.random() * Math.PI * 2
+                    });
+                }
+                // Layer 2: mid stars
+                for (let i = 0; i < 80; i++) {
+                    const c = pal[Math.floor(Math.random() * 3)];
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: (Math.random() - 0.5) * 0.15,
+                        vy: (Math.random() - 0.5) * 0.15,
+                        r: Math.random() * 1.5 + 0.8,
+                        color: c, alpha: Math.random() * 0.5 + 0.3,
+                        layer: 1, pulseSpeed: Math.random() * 0.03 + 0.01, pulseOffset: Math.random() * Math.PI * 2
+                    });
+                }
+                // Layer 3: bright close stars
+                for (let i = 0; i < 25; i++) {
+                    const c = pal[Math.floor(Math.random() * pal.length)];
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: (Math.random() - 0.5) * 0.3,
+                        vy: (Math.random() - 0.5) * 0.3,
+                        r: Math.random() * 2 + 1.5,
+                        color: c, alpha: Math.random() * 0.6 + 0.4,
+                        layer: 2, pulseSpeed: Math.random() * 0.04 + 0.02, pulseOffset: Math.random() * Math.PI * 2,
+                        glow: true
+                    });
+                }
+                break;
+            }
+            case 'pulse': {
+                const cols = Math.ceil(W / 40);
+                const rows = Math.ceil(H / 40);
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        const c = pal[Math.floor(Math.random() * pal.length)];
+                        particles.push({
+                            ox: i * 40 + 20, oy: j * 40 + 20,
+                            x: i * 40 + 20, y: j * 40 + 20,
+                            r: 1.2,
+                            color: c, alpha: 0.15,
+                            baseAlpha: 0.15
+                        });
+                    }
+                }
+                break;
+            }
+            case 'firefly': {
+                const count = Math.floor((W * H) / 15000);
+                for (let i = 0; i < count; i++) {
+                    const c = pal[Math.floor(Math.random() * pal.length)];
+                    particles.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        vx: (Math.random() - 0.5) * 0.6,
+                        vy: (Math.random() - 0.5) * 0.6,
+                        r: Math.random() * 2.5 + 1,
+                        color: c,
+                        alpha: 0,
+                        targetAlpha: 0,
+                        glowPhase: Math.random() * Math.PI * 2,
+                        glowSpeed: Math.random() * 0.03 + 0.01,
+                        wanderAngle: Math.random() * Math.PI * 2,
+                        wanderSpeed: Math.random() * 0.01 + 0.005
+                    });
+                }
+                break;
+            }
+            case 'wave': {
+                const cols = Math.ceil(W / 30) + 1;
+                const rows = Math.ceil(H / 30) + 1;
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        const c = pal[Math.floor(Math.random() * pal.length)];
+                        particles.push({
+                            ox: i * 30, oy: j * 30,
+                            x: i * 30, y: j * 30,
+                            r: 1,
+                            color: c, alpha: 0.2,
+                            phase: (i + j) * 0.3
+                        });
+                    }
+                }
+                break;
+            }
+        }
+
+        overlay.style.background = overlays[mode];
+    }
+
+    // ============================================================
+    // RENDER MODES
+    // ============================================================
+    function render() {
+        ctx.clearRect(0, 0, W, H);
+        time += 0.016; // ~60fps
+
+        switch(currentMode) {
+            case 'classic': renderClassic(); break;
+            case 'nebula': renderNebula(); break;
+            case 'galaxy': renderGalaxy(); break;
+            case 'pulse': renderPulse(); break;
+            case 'firefly': renderFirefly(); break;
+            case 'wave': renderWave(); break;
+        }
+
+        frameId = requestAnimationFrame(render);
+    }
+
+    // --- CLASSIC ---
+    function renderClassic() {
+        const connDist = 130;
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+            if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+            ctx.fill();
+
+            for (let j = i + 1; j < particles.length; j++) {
+                const p2 = particles[j];
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < connDist) {
+                    const op = (1 - dist / connDist) * 0.15;
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(139,92,246,${op})`;
+                    ctx.lineWidth = 0.5; ctx.stroke();
+                }
+            }
+
+            // Mouse interaction
+            const mdx = p.x - mouse.x, mdy = p.y - mouse.y;
+            const mDist = Math.sqrt(mdx*mdx + mdy*mdy);
+            if (mDist < 200) {
+                const op = (1 - mDist / 200) * 0.35;
+                ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = `rgba(139,92,246,${op})`;
+                ctx.lineWidth = 0.8; ctx.stroke();
+                p.vx += (mouse.x - p.x) * 0.00005;
+                p.vy += (mouse.y - p.y) * 0.00005;
+            }
+
+            const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+            if (speed > 0.5) { p.vx *= 0.99; p.vy *= 0.99; }
+        }
+    }
+
+    // --- NEBULA ---
+    function renderNebula() {
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.life += 0.01;
+
+            // Perlin-like flow
+            const angle = Math.sin(p.x * 0.003 + time * 0.5) * Math.cos(p.y * 0.003 + time * 0.3) * Math.PI;
+            p.vx += Math.cos(angle) * 0.01;
+            p.vy += Math.sin(angle) * 0.01;
+
+            // Mouse repulsion
+            const mdx = p.x - mouse.x, mdy = p.y - mouse.y;
+            const mDist = Math.sqrt(mdx*mdx + mdy*mdy);
+            if (mDist < 180) {
+                const force = (1 - mDist / 180) * 0.3;
+                p.vx += (mdx / mDist) * force;
+                p.vy += (mdy / mDist) * force;
+            }
+
+            // Damping
+            p.vx *= 0.98; p.vy *= 0.98;
+
+            p.x += p.vx; p.y += p.vy;
+
+            // Wrap
+            if (p.x < -20) p.x = W + 20; if (p.x > W + 20) p.x = -20;
+            if (p.y < -20) p.y = H + 20; if (p.y > H + 20) p.y = -20;
+
+            // Trail
+            p.trail.push({ x: p.x, y: p.y });
+            if (p.trail.length > p.maxTrail) p.trail.shift();
+
+            // Draw trail
+            if (p.trail.length > 1) {
+                for (let t = 0; t < p.trail.length - 1; t++) {
+                    const progress = t / p.trail.length;
+                    const tAlpha = progress * p.alpha * 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(p.trail[t].x, p.trail[t].y);
+                    ctx.lineTo(p.trail[t+1].x, p.trail[t+1].y);
+                    ctx.strokeStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${tAlpha})`;
+                    ctx.lineWidth = p.r * progress;
+                    ctx.stroke();
+                }
+            }
+
+            // Draw particle
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+            ctx.fill();
+        }
+
+        // Connections (sparse)
+        for (let i = 0; i < particles.length; i += 3) {
+            const p = particles[i];
+            for (let j = i + 3; j < particles.length; j += 3) {
+                const p2 = particles[j];
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 100) {
+                    const op = (1 - dist / 100) * 0.08;
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${op})`;
+                    ctx.lineWidth = 0.3; ctx.stroke();
+                }
+            }
+        }
+    }
+
+    // --- GALAXY ---
+    function renderGalaxy() {
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            const pulse = Math.sin(time * p.pulseSpeed * 60 + p.pulseOffset);
+            const currentAlpha = p.alpha * (0.7 + pulse * 0.3);
+            const currentR = p.r * (0.8 + pulse * 0.2);
+
+            // Parallax mouse effect
+            const parallax = (p.layer + 1) * 0.3;
+            const mx = (mouse.x - W/2) * parallax * 0.01;
+            const my = (mouse.y - H/2) * parallax * 0.01;
+
+            p.x += p.vx; p.y += p.vy;
+            if (p.x < -10) p.x = W + 10; if (p.x > W + 10) p.x = -10;
+            if (p.y < -10) p.y = H + 10; if (p.y > H + 10) p.y = -10;
+
+            const drawX = p.x + mx;
+            const drawY = p.y + my;
+
+            // Glow for bright stars
+            if (p.glow) {
+                const grad = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, currentR * 8);
+                grad.addColorStop(0, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${currentAlpha * 0.3})`);
+                grad.addColorStop(1, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},0)`);
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, currentR * 8, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
+
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, currentR, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${currentAlpha})`;
+            ctx.fill();
+
+            // Connections only for layer 2 close stars
+            if (p.layer === 2) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    if (p2.layer < 1) continue;
+                    const dx = drawX - (p2.x + mx), dy = drawY - (p2.y + my);
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 180) {
+                        const op = (1 - dist / 180) * 0.1;
+                        ctx.beginPath(); ctx.moveTo(drawX, drawY); ctx.lineTo(p2.x + mx, p2.y + my);
+                        ctx.strokeStyle = `rgba(167,139,250,${op})`;
+                        ctx.lineWidth = 0.3; ctx.stroke();
+                    }
+                }
+            }
+        }
+    }
+
+    // --- PULSE GRID ---
+    function renderPulse() {
+        // Pulse wave from mouse
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            const dx = p.ox - mouse.x, dy = p.oy - mouse.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Ripple effect
+            const wave = Math.sin(dist * 0.02 - time * 3) * Math.max(0, 1 - dist / 500);
+            const displacement = wave * 8;
+
+            p.x = p.ox + (dx / (dist || 1)) * displacement;
+            p.y = p.oy + (dy / (dist || 1)) * displacement;
+
+            const intensity = Math.abs(wave) * (1 - Math.min(dist / 400, 1));
+            p.alpha = p.baseAlpha + intensity * 0.7;
+            const currentR = p.r + intensity * 2;
+
+            // Draw
+            if (p.alpha > 0.05) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, currentR, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+                ctx.fill();
+
+                // Glow on bright ones
+                if (intensity > 0.3) {
+                    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentR * 4);
+                    grad.addColorStop(0, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${intensity * 0.2})`);
+                    grad.addColorStop(1, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},0)`);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, currentR * 4, 0, Math.PI * 2);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Connections near mouse
+        const nearby = particles.filter(p => {
+            const d = Math.sqrt((p.ox-mouse.x)**2 + (p.oy-mouse.y)**2);
+            return d < 200;
+        });
+
+        for (let i = 0; i < nearby.length; i++) {
+            for (let j = i + 1; j < nearby.length; j++) {
+                const p = nearby[i], p2 = nearby[j];
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 60) {
+                    const op = (1 - dist / 60) * 0.15;
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(139,92,246,${op})`;
+                    ctx.lineWidth = 0.4; ctx.stroke();
+                }
+            }
+        }
+    }
+
+    // --- FIREFLY ---
+    function renderFirefly() {
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+
+            // Wander
+            p.wanderAngle += (Math.random() - 0.5) * 0.3;
+            p.vx += Math.cos(p.wanderAngle) * p.wanderSpeed;
+            p.vy += Math.sin(p.wanderAngle) * p.wanderSpeed;
+            p.vx *= 0.97; p.vy *= 0.97;
+
+            p.x += p.vx; p.y += p.vy;
+
+            // Soft bounds
+            if (p.x < 20) p.vx += 0.05; if (p.x > W - 20) p.vx -= 0.05;
+            if (p.y < 20) p.vy += 0.05; if (p.y > H - 20) p.vy -= 0.05;
+
+            // Glow cycle
+            p.glowPhase += p.glowSpeed;
+            const glow = Math.pow(Math.max(0, Math.sin(p.glowPhase)), 3);
+            p.alpha = glow * 0.8;
+
+            if (p.alpha < 0.02) continue;
+
+            // Mouse attraction
+            const mdx = mouse.x - p.x, mdy = mouse.y - p.y;
+            const mDist = Math.sqrt(mdx*mdx + mdy*mdy);
+            if (mDist < 250) {
+                p.vx += mdx * 0.00008;
+                p.vy += mdy * 0.00008;
+            }
+
+            // Draw glow
+            const glowR = p.r * 6;
+            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+            grad.addColorStop(0, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha * 0.5})`);
+            grad.addColorStop(0.4, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha * 0.15})`);
+            grad.addColorStop(1, `rgba(${p.color[0]},${p.color[1]},${p.color[2]},0)`);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * 0.6, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+            ctx.fill();
+        }
+
+        // Connections only between visible nearby fireflies
+        for (let i = 0; i < particles.length; i++) {
+            if (particles[i].alpha < 0.2) continue;
+            for (let j = i + 1; j < particles.length; j++) {
+                if (particles[j].alpha < 0.2) continue;
+                const p = particles[i], p2 = particles[j];
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 120) {
+                    const op = (1 - dist / 120) * Math.min(p.alpha, p2.alpha) * 0.3;
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(139,92,246,${op})`;
+                    ctx.lineWidth = 0.4; ctx.stroke();
+                }
+            }
+        }
+    }
+
+    // --- WAVE FIELD ---
+    function renderWave() {
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+
+            // Wave displacement
+            const waveX = Math.sin(p.phase + time * 1.5) * 6;
+            const waveY = Math.cos(p.phase * 0.7 + time * 1.2) * 6;
+
+            // Mouse deformation
+            const mdx = p.ox - mouse.x, mdy = p.oy - mouse.y;
+            const mDist = Math.sqrt(mdx*mdx + mdy*mdy);
+            let mouseDisplaceX = 0, mouseDisplaceY = 0;
+            if (mDist < 200) {
+                const force = (1 - mDist / 200);
+                const wave2 = Math.sin(mDist * 0.05 - time * 4) * force * 15;
+                mouseDisplaceX = (mdx / (mDist || 1)) * wave2;
+                mouseDisplaceY = (mdy / (mDist || 1)) * wave2;
+            }
+
+            p.x = p.ox + waveX + mouseDisplaceX;
+            p.y = p.oy + waveY + mouseDisplaceY;
+
+            const distFactor = mDist < 200 ? (1 - mDist / 200) : 0;
+            p.alpha = 0.12 + distFactor * 0.5;
+            const currentR = p.r + distFactor * 1.5;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, currentR, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${p.alpha})`;
+            ctx.fill();
+        }
+
+        // Connections near mouse
+        for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            const md = Math.sqrt((p.ox-mouse.x)**2 + (p.oy-mouse.y)**2);
+            if (md > 150) continue;
+
+            for (let j = i + 1; j < particles.length; j++) {
+                const p2 = particles[j];
+                const md2 = Math.sqrt((p2.ox-mouse.x)**2 + (p2.oy-mouse.y)**2);
+                if (md2 > 150) continue;
+
+                const dx = p.x - p2.x, dy = p.y - p2.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 50) {
+                    const op = (1 - dist / 50) * 0.2;
+                    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(139,92,246,${op})`;
+                    ctx.lineWidth = 0.3; ctx.stroke();
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // SWITCH
+    // ============================================================
+    function switchBg(mode) {
+        if (mode === currentMode) return;
+        currentMode = mode;
+
+        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        const d = desc[mode];
+        document.getElementById('descTitle').textContent = d.title;
+        document.getElementById('descText').textContent = d.text;
+
+        initMode(mode);
+    }
+
+    // ============================================================
+    // START
+    // ============================================================
+    initMode('classic');
+    render();
+    </script>
+
+</body>
+</html>

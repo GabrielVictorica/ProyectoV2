@@ -196,7 +196,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return (
         <div className="min-h-screen">
             {/* Sidebar - Glassmorphism */}
-            <aside className="fixed left-0 top-0 z-40 h-screen w-64 glass border-r border-white/[0.06]">
+            <aside className="fixed left-0 top-0 z-40 h-screen w-64 glass border-r border-white/[0.1]">
                 <div className="flex flex-col h-full">
                     {/* Logo */}
                     <div className="flex items-center gap-3 p-6 border-b border-white/[0.06]">

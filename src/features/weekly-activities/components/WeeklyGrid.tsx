@@ -127,12 +127,14 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                     const isFuture = dateStr > todayStr;
                                     const cellData = data[dateStr];
                                     const activities = cellData?.activities.filter(a => a.type === row.id) || [];
+                                    const cierreActivities = row.id === 'cierre' ? (cellData?.activities.filter(a => a.type === 'cierre') || []) : [];
                                     let count = 0;
                                     if (row.isVirtual) {
                                         if (row.id === 'reserva') {
                                             count = cellData?.reservaCount || 0;
                                         } else {
-                                            count = cellData?.cierreCount || 0;
+                                            // Cierre: contar desde actividades (1 por persona/punta)
+                                            count = cierreActivities.length;
                                         }
                                     } else {
                                         if (row.id === 'visita') {
@@ -162,29 +164,48 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                             </p>
                                                             {row.isVirtual ? (
                                                                 <div className="space-y-3">
-                                                                    {(cellData?.transactions || [])
-                                        .filter(trans => row.id === 'reserva' ? trans._gridRowType === 'reserva' : trans._gridRowType === 'cierre')
-                                                                        .map((trans, tIdx) => (
-                                                                            <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
+                                                                    {row.id === 'cierre' && cierreActivities.length > 0 ? (
+                                                                        // Cierre: mostrar actividades individuales (1 por persona/punta)
+                                                                        cierreActivities.map((act, aIdx) => (
+                                                                            <div key={aIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
                                                                                 <div className="flex justify-between items-start gap-2">
                                                                                     <p className="font-bold text-white text-sm leading-tight max-w-[160px] truncate">
-                                                                                        {trans.property?.title || 'Propiedad sin título'}
+                                                                                        {act.person ? `${act.person.first_name} ${act.person.last_name}` : 'Cliente'}
                                                                                     </p>
-                                                                                    <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
-                                                                                        ${trans.actual_price?.toLocaleString() || '0'}
-                                                                                    </span>
                                                                                 </div>
-                                                                                <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
-                                                                                    <span>Vendedor: {trans.seller_name || '-'}</span>
-                                                                                    <span>Comprador: {trans.buyer_name || '-'}</span>
-                                                                                </div>
-                                                                                {trans.notes && (
+                                                                                {act.notes && (
                                                                                     <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
-                                                                                        "{trans.notes}"
+                                                                                        "{act.notes}"
                                                                                     </p>
                                                                                 )}
                                                                             </div>
-                                                                        ))}
+                                                                        ))
+                                                                    ) : (
+                                                                        // Reserva: mostrar transacciones
+                                                                        (cellData?.transactions || [])
+                                                                            .filter(trans => trans._gridRowType === 'reserva')
+                                                                            .map((trans, tIdx) => (
+                                                                                <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
+                                                                                    <div className="flex justify-between items-start gap-2">
+                                                                                        <p className="font-bold text-white text-sm leading-tight max-w-[160px] truncate">
+                                                                                            {trans.property?.title || 'Propiedad sin título'}
+                                                                                        </p>
+                                                                                        <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
+                                                                                            ${trans.actual_price?.toLocaleString() || '0'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
+                                                                                        <span>Vendedor: {trans.seller_name || '-'}</span>
+                                                                                        <span>Comprador: {trans.buyer_name || '-'}</span>
+                                                                                    </div>
+                                                                                    {trans.notes && (
+                                                                                        <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
+                                                                                            "{trans.notes}"
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">

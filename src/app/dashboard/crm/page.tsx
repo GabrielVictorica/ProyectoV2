@@ -21,29 +21,25 @@ export default function RelationshipsPage() {
     const [filters, setFilters] = useState({
         search: '',
         relationshipStatus: [] as string[],
-        tags: [] as string[],
+        vinculo: [] as string[],
         agentId: [role === 'child' ? 'me' : 'all'],
         healthScore: 'all',
         influenceLevel: [] as number[],
         contactType: [] as string[],
         source: [] as string[],
-        referredById: [] as string[],
-        lifecycleStatus: [] as string[],
         organizationId: 'all',
         isVip: false
     });
 
-    const { persons, agents, availableTags, availableSources, isLoading, refetch } = useCRM({
+    const { persons, agents, availableSources, isLoading, refetch } = useCRM({
         search: filters.search,
         relationshipStatus: filters.relationshipStatus,
-        tags: filters.tags,
+        vinculo: filters.vinculo,
         healthScore: filters.healthScore,
         agentId: filters.agentId,
         influenceLevel: filters.influenceLevel,
         contactType: filters.contactType,
         source: filters.source,
-        referredById: filters.referredById,
-        lifecycleStatus: filters.lifecycleStatus as any,
         organizationId: filters.organizationId,
         isVip: filters.isVip
     });
@@ -142,7 +138,6 @@ export default function RelationshipsPage() {
                     filters={filters}
                     setFilters={setFilters}
                     agents={agents}
-                    availableTags={availableTags}
                     availableSources={availableSources}
                     organizations={organizations || []}
                     isGod={isGod}

@@ -68,13 +68,13 @@ export function WeeklyDashboard() {
         let plCount = 0;
 
         Object.values(weeklyData).forEach(day => {
-            // Add transactions (Reservas + Cierres) to the total count
+            // Reservas cuentan como reuniones verdes (desde transacciones)
             greenCount += (day.reservaCount || 0);
-            greenCount += (day.cierreCount || 0);
 
             day.activities.forEach(act => {
-                // Sum all activities except referrals
-                if (act.type !== 'referido') {
+                // Todas las actividades cuentan como reuniones verdes excepto referidos
+                // Reservas ya se cuentan desde transacciones, no duplicar
+                if (act.type !== 'referido' && act.type !== 'reserva') {
                     if (act.type === 'visita' && act.visit_metadata?.punta === 'ambas') {
                         greenCount += 2;
                     } else {

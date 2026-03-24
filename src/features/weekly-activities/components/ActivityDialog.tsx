@@ -320,6 +320,7 @@ export function ActivityDialog({
                         value={buyerPersonId}
                         onChange={(id) => { setBuyerPersonId(id); setShowValidation(false); }}
                         placeholder="Buscar comprador..."
+                        activityDate={date}
                     />
                     {showValidation && !buyerPersonId && (
                         <p className="text-rose-400 text-xs">Debes seleccionar un cliente comprador</p>
@@ -336,6 +337,7 @@ export function ActivityDialog({
                         value={sellerPersonId}
                         onChange={(id) => { setSellerPersonId(id); setShowValidation(false); }}
                         placeholder="Buscar vendedor..."
+                        activityDate={date}
                     />
                     {showValidation && !sellerPersonId && (
                         <p className="text-rose-400 text-xs">Debes seleccionar un cliente vendedor</p>
@@ -501,6 +503,7 @@ export function ActivityDialog({
                                             value={personId}
                                             onChange={(id) => { setPersonId(id); setShowValidation(false); }}
                                             placeholder="Buscar o crear cliente..."
+                                            activityDate={date}
                                         />
                                         {showValidation && !personId && (
                                             <p className="text-rose-400 text-xs">Debes seleccionar un cliente</p>

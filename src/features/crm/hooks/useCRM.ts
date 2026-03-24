@@ -7,26 +7,23 @@ import {
     updatePersonAction,
     touchPersonAction,
     getCRMAgentsAction,
-    getExistingTagsAction,
     getExistingSourcesAction,
     getPersonByIdAction,
     deletePersonAction
 } from '../actions/personActions';
-import { LifecycleStatus } from '@/features/clients/types';
 import { toast } from 'sonner';
 
 export const crmKeys = {
     all: ['crm'] as const,
     persons: (filters: any) => [...crmKeys.all, 'persons', filters] as const,
     agents: () => [...crmKeys.all, 'agents'] as const,
-    tags: () => [...crmKeys.all, 'tags'] as const,
     sources: () => [...crmKeys.all, 'sources'] as const,
     person: (id: string) => [...crmKeys.all, 'person', id] as const,
 };
 
 export function useCRM(filters: {
     relationshipStatus?: string[];
-    tags?: string[];
+    vinculo?: string[];
     search?: string;
     organizationId?: string;
     agentId?: string[];
@@ -34,8 +31,6 @@ export function useCRM(filters: {
     influenceLevel?: number[];
     contactType?: string[];
     source?: string[];
-    referredById?: string[];
-    lifecycleStatus?: LifecycleStatus[];
     isVip?: boolean;
 } = {}) {
     const queryClient = useQueryClient();
@@ -61,17 +56,6 @@ export function useCRM(filters: {
             return result.data;
         },
         staleTime: 10 * 60 * 1000, // 10 minutes
-    });
-
-    // Query for fetching existing tags
-    const tagsQuery = useQuery({
-        queryKey: crmKeys.tags(),
-        queryFn: async () => {
-            const result = await getExistingTagsAction();
-            if (!result.success) return [];
-            return result.data;
-        },
-        staleTime: 5 * 60 * 1000,
     });
 
     // Query for fetching existing sources
@@ -156,7 +140,6 @@ export function useCRM(filters: {
     return {
         persons: personsQuery.data || [],
         agents: agentsQuery.data || [],
-        availableTags: tagsQuery.data || [],
         availableSources: sourcesQuery.data || [],
         isLoading: personsQuery.isLoading || agentsQuery.isLoading,
         error: personsQuery.error || agentsQuery.error,

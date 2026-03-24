@@ -128,8 +128,9 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
 
                 // 2. Añadir a la fila de CIERRE (basado en closing_date)
                 // Solo si está completada y tiene fecha de cierre
+                // El cierreCount se calcula desde actividades tipo 'cierre' (1 por persona/punta)
+                // Aquí solo agregamos la transacción para el tooltip de referencia
                 if (trans.status === 'completed' && closingDateStr && map[closingDateStr]) {
-                    map[closingDateStr].cierreCount += 1;
                     map[closingDateStr].transactions.push({ ...enhancedTrans, _gridRowType: 'cierre' });
                 }
             });

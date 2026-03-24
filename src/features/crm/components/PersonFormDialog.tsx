@@ -48,18 +48,6 @@ const TAG_GROUPS: MultiSelectOptionGroup[] = [
         label: 'Vínculo / Origen',
         options: ['Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro']
     },
-    {
-        label: 'Perfil',
-        options: ['Inversor', 'Desarrollador', 'VIP', 'Requiere Atención', 'Embajador']
-    },
-    {
-        label: 'Proyecto',
-        options: ['Primer Hogar', 'Agrandarse', 'Achicarse', 'Inversión / Renta', 'Vacacional / Descanso']
-    },
-    {
-        label: 'Estado',
-        options: ['Caliente', 'Tibio', 'Frío']
-    }
 ];
 
 import { RELATIONSHIP_STATUSES } from '../constants/relationshipStatuses';
@@ -141,6 +129,7 @@ interface PersonFormDialogProps {
     initialData?: Partial<PersonFormValues>;
     onSuccess?: (person: Person) => void;
     agents?: { id: string, first_name: string, last_name: string }[];
+    activityDate?: string;
 }
 
 // --- Tab definitions ---
@@ -182,7 +171,7 @@ const inputWithIconClass = `${inputClass} pl-10`;
 const labelClass = "text-white/70 text-xs font-medium uppercase tracking-wider";
 const sectionTitleClass = "text-sm font-bold text-white/80 flex items-center gap-2 mb-1";
 
-export function PersonFormDialog({ open, onOpenChange, person, initialData, onSuccess, agents = [] }: PersonFormDialogProps) {
+export function PersonFormDialog({ open, onOpenChange, person, initialData, onSuccess, agents = [], activityDate }: PersonFormDialogProps) {
     const isEditing = !!person;
     const [activeTab, setActiveTab] = useState('identity');
     const [showDiscardWarning, setShowDiscardWarning] = useState(false);
@@ -301,7 +290,11 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                     onSuccess?.(result.data);
                 }
             } else {
-                const result = await createPerson.mutateAsync(actionData as any);
+                // Si viene activityDate (desde Mi Semana), usarlo como fecha de creación
+                const createData = activityDate
+                    ? { ...actionData, createdAt: activityDate }
+                    : actionData;
+                const result = await createPerson.mutateAsync(createData as any);
                 if (result.success && result.data) {
                     onSuccess?.(result.data);
                 }
@@ -740,7 +733,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
 
                                                             return (
                                                                 <FormItem>
-                                                                    <FormLabel className={labelClass}>Etiquetas / Segmentación</FormLabel>
+                                                                    <FormLabel className={labelClass}>Vínculo</FormLabel>
                                                                     <FormControl>
                                                                         <SmartMultiSelect
                                                                             groups={TAG_GROUPS}
@@ -750,7 +743,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                                                             icon={Tag}
                                                                         />
                                                                     </FormControl>
-                                                                    <p className="text-[10px] text-white/30 italic">Podes elegir varias categorías (Ej: Amigo + Inversor).</p>
+                                                                    <p className="text-[10px] text-white/30 italic">Seleccioná el tipo de vínculo con esta persona.</p>
                                                                 </FormItem>
                                                             );
                                                         }} />

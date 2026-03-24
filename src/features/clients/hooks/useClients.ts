@@ -13,7 +13,7 @@ import {
     getClientInteractionsAction,
     getClientDashboardStatsAction,
 } from '../actions/clientActions';
-import { getExistingSearchTagsAction } from '@/features/crm/actions/personActions';
+
 import { usePermissions } from '@/features/auth/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -79,7 +79,7 @@ export interface ClientFilters {
     budgetMax?: number | null;
     bedrooms?: string[];
     statusFilter?: string[];
-    tags?: string[];
+    isMortgageEligible?: boolean;
     isCritical?: boolean;
 }
 
@@ -104,7 +104,7 @@ export function useClients(filters?: ClientFilters) {
                     budgetMax: filters.budgetMax,
                     bedrooms: filters.bedrooms,
                     statusFilter: filters.statusFilter,
-                    tags: filters.tags,
+                    isMortgageEligible: filters.isMortgageEligible,
                     isCritical: filters.isCritical,
                 });
                 if (!actionResult.success) throw new Error(actionResult.error);
@@ -219,21 +219,6 @@ export function useDeleteClient() {
             toast.error('Error al eliminar la búsqueda');
             console.error(error);
         }
-    });
-}
-
-/**
- * Hook para obtener etiquetas exclusivas de búsquedas.
- */
-export function useSearchTags() {
-    return useQuery({
-        queryKey: [...clientKeys.all, 'search-tags'],
-        queryFn: async () => {
-            const result = await getExistingSearchTagsAction();
-            if (!result.success) return [];
-            return result.data;
-        },
-        staleTime: 5 * 60 * 1000,
     });
 }
 

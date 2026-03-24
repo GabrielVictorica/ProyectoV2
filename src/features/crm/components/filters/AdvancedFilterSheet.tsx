@@ -22,19 +22,19 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-    X, Filter, RotateCcw, Star, Users, Briefcase, MapPin, Tag, Phone,
-    Handshake, Search, FileSearch, BarChart3, Home, CheckCircle2, PenTool, UserCheck
+    X, Filter, RotateCcw, Handshake, UserCheck
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { PersonSelector } from '@/features/clients/components/shared/PersonSelector';
 
-// Reusing options from previous file or defining them here
 import { RELATIONSHIP_STATUSES } from '../../constants/relationshipStatuses';
-import { LIFECYCLE_STATUSES } from '../../constants/lifecycleStatuses';
 
 const CONTACT_TYPE_OPTIONS = [
     { label: 'Comprador', value: 'comprador' },
     { label: 'Vendedor', value: 'vendedor' },
+];
+
+const VINCULO_OPTIONS = [
+    'Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro'
 ];
 
 const HEALTH_OPTIONS = [
@@ -50,19 +50,17 @@ interface AdvancedFilterSheetProps {
     filters: {
         search: string;
         relationshipStatus: string[];
-        tags: string[];
+        vinculo: string[];
         agentId: string[];
         healthScore: string;
         influenceLevel: number[];
         contactType: string[];
         source: string[];
-        referredById: string[];
-        lifecycleStatus: string[];
         organizationId?: string;
+        isVip: boolean;
     };
     setFilters: (filters: any) => void;
     agents?: { id: string, first_name: string, last_name: string }[];
-    availableTags?: string[];
     availableSources?: string[];
 }
 
@@ -72,7 +70,6 @@ export function AdvancedFilterSheet({
     filters,
     setFilters,
     agents = [],
-    availableTags = [],
     availableSources = []
 }: AdvancedFilterSheetProps) {
 
@@ -87,30 +84,27 @@ export function AdvancedFilterSheet({
 
     const resetFilters = () => {
         setFilters({
-            search: filters.search, // Keep search
+            search: filters.search,
             relationshipStatus: [],
-            tags: [],
-            agentId: ['me'], // Reset to 'me' default? Or empty? let's stick to current logic
+            vinculo: [],
+            agentId: ['me'],
             healthScore: 'all',
             influenceLevel: [],
             contactType: [],
             source: [],
-            referredById: [],
-            lifecycleStatus: [],
-            organizationId: filters.organizationId
+            organizationId: filters.organizationId,
+            isVip: false
         });
     };
 
     const activeCount =
         filters.relationshipStatus.length +
-        filters.tags.length +
-        (filters.agentId.length > 0 && !filters.agentId.includes('me') ? 1 : 0) + // only count if customized
+        filters.vinculo.length +
+        (filters.agentId.length > 0 && !filters.agentId.includes('me') ? 1 : 0) +
         (filters.healthScore !== 'all' ? 1 : 0) +
         filters.influenceLevel.length +
         filters.contactType.length +
-        filters.source.length +
-        filters.referredById.length +
-        filters.lifecycleStatus.length;
+        filters.source.length;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -146,36 +140,9 @@ export function AdvancedFilterSheet({
                 <ScrollArea className="flex-1 px-6 py-6">
                     <div className="space-y-8 pb-12">
 
-                        {/* Lifecycle Status */}
+                        {/* Estado del proceso/embudo */}
                         <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Estado del Lead</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {LIFECYCLE_STATUSES.map((option) => {
-                                    const isSelected = filters.lifecycleStatus?.includes(option.value);
-                                    return (
-                                        <div
-                                            key={option.value}
-                                            onClick={() => toggleFilter('lifecycleStatus', option.value)}
-                                            className={cn(
-                                                "cursor-pointer rounded-lg border p-3 flex flex-col items-center justify-center gap-2 transition-all hover:bg-white/5",
-                                                isSelected
-                                                    ? `${option.bgColor} ${option.borderColor} ${option.color}`
-                                                    : "bg-transparent border-white/10 text-white/50"
-                                            )}
-                                        >
-                                            <option.icon className={cn("w-4 h-4", isSelected ? option.color : "text-white/30")} />
-                                            <span className="text-[10px] font-medium text-center">{option.label}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-
-                        <Separator className="bg-white/10" />
-
-                        {/* Status */}
-                        <div className="space-y-3">
-                            <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Estado de Relación</Label>
+                            <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Estado del Proceso / Embudo</Label>
                             <div className="grid grid-cols-2 gap-2">
                                 {RELATIONSHIP_STATUSES.map((option) => {
                                     const isSelected = filters.relationshipStatus.includes(option.value);
@@ -200,7 +167,7 @@ export function AdvancedFilterSheet({
 
                         <Separator className="bg-white/10" />
 
-                        {/* Influence Level */}
+                        {/* Nivel de Influencia */}
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Nivel de Influencia</Label>
                             <div className="grid grid-cols-4 gap-2 bg-white/5 p-2 rounded-xl border border-white/10">
@@ -232,7 +199,7 @@ export function AdvancedFilterSheet({
 
                         <Separator className="bg-white/10" />
 
-                        {/* Contact Type */}
+                        {/* Tipo de Contacto */}
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Tipo de Contacto</Label>
                             <div className="flex flex-wrap gap-2">
@@ -257,40 +224,36 @@ export function AdvancedFilterSheet({
 
                         <Separator className="bg-white/10" />
 
-                        {/* Tags */}
+                        {/* Vínculo */}
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider flex items-center gap-2">
-                                <Tag className="w-3 h-3" /> Etiquetas
+                                <Handshake className="w-3 h-3" /> Vínculo
                             </Label>
                             <div className="flex flex-wrap gap-2">
-                                {availableTags.length === 0 ? (
-                                    <p className="text-xs text-white/30 italic">No hay etiquetas disponibles</p>
-                                ) : (
-                                    availableTags.map((tag) => {
-                                        const isSelected = filters.tags.includes(tag);
-                                        return (
-                                            <Badge
-                                                key={tag}
-                                                variant="secondary"
-                                                onClick={() => toggleFilter('tags', tag)}
-                                                className={cn(
-                                                    "cursor-pointer transition-all",
-                                                    isSelected
-                                                        ? "bg-violet-600 text-white hover:bg-violet-500"
-                                                        : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
-                                                )}
-                                            >
-                                                {tag}
-                                            </Badge>
-                                        )
-                                    })
-                                )}
+                                {VINCULO_OPTIONS.map((vinculo) => {
+                                    const isSelected = filters.vinculo.includes(vinculo);
+                                    return (
+                                        <Badge
+                                            key={vinculo}
+                                            variant="secondary"
+                                            onClick={() => toggleFilter('vinculo', vinculo)}
+                                            className={cn(
+                                                "cursor-pointer transition-all",
+                                                isSelected
+                                                    ? "bg-violet-600 text-white hover:bg-violet-500"
+                                                    : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+                                            )}
+                                        >
+                                            {vinculo}
+                                        </Badge>
+                                    )
+                                })}
                             </div>
                         </div>
 
                         <Separator className="bg-white/10" />
 
-                        {/* Sources & Health (Compact) */}
+                        {/* Origen & Estado de Salud */}
                         <div className="grid grid-cols-1 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Origen</Label>
@@ -323,35 +286,6 @@ export function AdvancedFilterSheet({
                                         </Badge>
                                     ))}
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider flex items-center gap-2">
-                                    <UserCheck className="w-3 h-3 text-emerald-400" /> Referido Por
-                                </Label>
-                                <PersonSelector
-                                    value={null}
-                                    onChange={(id) => {
-                                        if (id && !filters.referredById.includes(id)) {
-                                            toggleFilter('referredById', id);
-                                        }
-                                    }}
-                                    placeholder="Vincular referidor..."
-                                    className="bg-white/5 border-white/10"
-                                />
-                                {/* Active Referrals Chips */}
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {filters.referredById.map(id => (
-                                        <Badge key={id} variant="outline" className="bg-emerald-500/10 border-emerald-500/20 text-emerald-300 gap-1 pl-2">
-                                            <span className="text-[10px] opacity-70">Referente ID:</span> {id.slice(0, 5)}...
-                                            <X
-                                                className="w-3 h-3 cursor-pointer hover:text-white"
-                                                onClick={() => toggleFilter('referredById', id)}
-                                            />
-                                        </Badge>
-                                    ))}
-                                </div>
-                                <p className="text-[10px] text-white/30 italic">Filtra contactos traídos por una persona específica.</p>
                             </div>
 
                             <div className="space-y-2">

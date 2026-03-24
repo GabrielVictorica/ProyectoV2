@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdvancedFilterSheet } from "./filters/AdvancedFilterSheet";
 import { getStatusLabel } from "../constants/relationshipStatuses";
-import { getLifecycleLabel } from "../constants/lifecycleStatuses";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 
@@ -12,20 +11,17 @@ interface RelationshipFiltersProps {
     filters: {
         search: string;
         relationshipStatus: string[];
-        tags: string[];
+        vinculo: string[];
         agentId: string[];
         healthScore: string;
         influenceLevel: number[];
         contactType: string[];
         source: string[];
-        referredById: string[];
-        lifecycleStatus: string[];
         organizationId: string;
         isVip: boolean;
     };
     setFilters: (filters: any) => void;
     agents?: { id: string, first_name: string, last_name: string, organization_id?: string }[];
-    availableTags?: string[];
     availableSources?: string[];
     organizations?: { id: string, name: string }[];
     isGod?: boolean;
@@ -37,7 +33,6 @@ export function RelationshipFilters({
     filters,
     setFilters,
     agents = [],
-    availableTags = [],
     availableSources = [],
     organizations = [],
     isGod = false,
@@ -55,24 +50,22 @@ export function RelationshipFilters({
     // Helper to check if any filter is active (excluding search)
     const isFiltered =
         filters.relationshipStatus.length > 0 ||
-        filters.tags.length > 0 ||
+        filters.vinculo.length > 0 ||
         (filters.agentId.length > 0 && !filters.agentId.includes('all') && !filters.agentId.includes('me')) ||
         filters.healthScore !== 'all' ||
         filters.influenceLevel.length > 0 ||
         filters.contactType.length > 0 ||
         filters.source.length > 0 ||
-        filters.lifecycleStatus.length > 0 ||
         filters.organizationId !== 'all';
 
     const activeFilterCount =
         filters.relationshipStatus.length +
-        filters.tags.length +
+        filters.vinculo.length +
         (filters.agentId.length > 0 && !filters.agentId.includes('all') && !filters.agentId.includes('me') ? 1 : 0) +
         (filters.healthScore !== 'all' ? 1 : 0) +
         filters.influenceLevel.length +
         filters.contactType.length +
         filters.source.length +
-        filters.lifecycleStatus.length +
         (filters.organizationId !== 'all' ? 1 : 0);
 
     const clearFilter = (key: string, value: any) => {
@@ -164,7 +157,7 @@ export function RelationshipFilters({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                const newTypes = filters.contactType.includes('comprador') 
+                                const newTypes = filters.contactType.includes('comprador')
                                     ? filters.contactType.filter((t: string) => t !== 'comprador')
                                     : [...filters.contactType, 'comprador'];
                                 setFilters({ ...filters, contactType: newTypes });
@@ -177,7 +170,7 @@ export function RelationshipFilters({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                const newTypes = filters.contactType.includes('vendedor') 
+                                const newTypes = filters.contactType.includes('vendedor')
                                     ? filters.contactType.filter((t: string) => t !== 'vendedor')
                                     : [...filters.contactType, 'vendedor'];
                                 setFilters({ ...filters, contactType: newTypes });
@@ -209,7 +202,6 @@ export function RelationshipFilters({
                     filters={filters}
                     setFilters={setFilters}
                     agents={agents}
-                    availableTags={availableTags}
                     availableSources={availableSources}
                 />
             </div>
@@ -223,21 +215,15 @@ export function RelationshipFilters({
                             <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('relationshipStatus', status)} />
                         </Badge>
                     ))}
-                    {filters.lifecycleStatus.map(status => (
-                        <Badge key={status} variant="secondary" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap gap-1 pr-1">
-                            Lead: {getLifecycleLabel(status)}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('lifecycleStatus', status)} />
-                        </Badge>
-                    ))}
-                    {filters.tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap gap-1 pr-1">
-                            #{tag}
-                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('tags', tag)} />
+                    {filters.vinculo.map(v => (
+                        <Badge key={v} variant="secondary" className="bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap gap-1 pr-1">
+                            {v}
+                            <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('vinculo', v)} />
                         </Badge>
                     ))}
                     {filters.influenceLevel.map(level => (
                         <Badge key={level} variant="secondary" className="bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap gap-1 pr-1">
-                            {level} ⭐
+                            {level === 4 ? 'A' : level === 3 ? 'B' : level === 2 ? 'C' : 'D'}
                             <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => clearFilter('influenceLevel', level)} />
                         </Badge>
                     ))}

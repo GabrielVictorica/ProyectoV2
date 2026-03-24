@@ -1,0 +1,16 @@
+﻿6426470 ­ƒÜÇ Proptech CRM: Complete Audit, VIP Filter & Tags Deployment
+bd7c141 feat: optimize search architecture and transaction workflow
+a8708e0 fix: correct activity sync for reservation-to-closure flow - Move closing_date auto-set before DB update in PUT handler - Add closing_date to currentTx select for proper comparisons - Fix date parsing in weekly grid to use YYYY-MM-DD substring - Insert new cierre activity instead of overwriting reserva activity
+dbda8ba Fix SQL view: cierres count as green meetings even in same week as reservation
+2f3c579 Final: Cierre->Reserva in Copa, cierres count as green meetings, cancelled reservas keep points
+fce77b9 Add cierres to green meetings count across all tabs
+bfe14f3 Fix Copa: visita ambas counts as 2, Perfect Week uses full green meetings concept
+cabea80 Fix green meeting count calculations in dashboard and DB view
+d2904f9 feat: sync operations and weekly activities upon date updates or deletions
+0b48852 fix: hydration error in layout and React hook rules in framer motion background
+8c7e0b7 feat: implement interactive framer-motion background with orbital mouse tracking
+2c31b0e feat: optimizaciones, auditor├¡a final y mejoras en pesta├▒a de operaciones
+285e7ed chore: enable vercel analytics and speed insights
+dc9e47d Merge develop: copa date filter fix + activity tooltips + client validation
+bada323 feat(mi-semana): add activity tooltips + enforce client validation - Tooltip definitions on hover for all activity types - Required client validation prevents saving without linked client
+3f28c45 fix(copa): add debounce + keepPreviousData to date filter - prevents UI from unmounting while typing dates

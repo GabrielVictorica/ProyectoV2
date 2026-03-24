@@ -82,10 +82,13 @@ export async function createActivityAction(data: ActivityInsert) {
             .eq('id', data.person_id);
     }
 
-    // ── Registro acumulativo de visitas en person_history ──
+    // ── Registro en person_history para actividades vinculadas a persona ──
+    const adminClient = createAdminClient();
+    const agentId = user?.id || null;
+
     if (data.type === 'visita' && data.visit_metadata) {
+        // Registro acumulativo de visitas
         const vm = data.visit_metadata;
-        const agentId = user?.id || null;
 
         // Helper para obtener nombre de una persona
         const getPersonName = async (id: string) => {
@@ -101,7 +104,7 @@ export async function createActivityAction(data: ActivityInsert) {
         // Registrar visita para el COMPRADOR
         const buyerId = vm.buyer_person_id || (vm.punta === 'compradora' ? data.person_id : null);
         if (buyerId) {
-            await (supabase as any)
+            await (adminClient as any)
                 .from('person_history')
                 .insert({
                     person_id: buyerId,
@@ -129,7 +132,7 @@ export async function createActivityAction(data: ActivityInsert) {
         const sellerId = vm.seller_person_id || (vm.punta === 'vendedora' ? data.person_id : null);
         if (sellerId) {
             const buyerName = buyerId ? await getPersonName(buyerId) : 'Comprador externo';
-            await (supabase as any)
+            await (adminClient as any)
                 .from('person_history')
                 .insert({
                     person_id: sellerId,
@@ -152,6 +155,31 @@ export async function createActivityAction(data: ActivityInsert) {
                 .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
                 .eq('id', sellerId);
         }
+    } else if (data.person_id && data.type !== 'visita') {
+        // Registro de actividades no-visita (llamada, whatsapp, oferta, captación, etc.)
+        const ACTIVITY_LABELS: Record<string, string> = {
+            llamada: 'Llamada',
+            whatsapp: 'WhatsApp',
+            oferta: 'Oferta',
+            captacion: 'Captación',
+            tasacion: 'Tasación',
+            firma: 'Firma',
+            reunion: 'Reunión',
+        };
+        await (adminClient as any)
+            .from('person_history')
+            .insert({
+                person_id: data.person_id,
+                event_type: 'activity_record',
+                agent_id: agentId,
+                field_name: data.type,
+                new_value: ACTIVITY_LABELS[data.type] || data.type,
+                metadata: {
+                    activity_type: data.type,
+                    activity_date: data.date,
+                    notes: data.notes || null
+                }
+            });
     }
 
     revalidatePath('/dashboard/my-week');

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/gabri/Desktop/PROYECTO -maxdepth 2 -name tailwind.config.* -o -name tsconfig.json -o -name next.config.*)",
+      "Bash(npx tsc:*)",
+      "mcp__supabase__execute_sql",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}

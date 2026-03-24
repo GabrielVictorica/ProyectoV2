@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Ocean + Particles | Proptech CRM</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+            overflow-x: hidden;
+            background: #020617;
+        }
+
+        #bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+        }
+
+        .app-container { position: relative; z-index: 1; min-height: 100vh; }
+
+        .sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 240px;
+            background: rgba(2,6,23,0.75);
+            backdrop-filter: blur(24px);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px; z-index: 10;
+        }
+
+        .sidebar-logo {
+            font-size: 18px; font-weight: 700; color: #fff;
+            padding: 0 8px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .sidebar-logo .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #8b5cf6; box-shadow: 0 0 12px rgba(139,92,246,0.6);
+        }
+
+        .sidebar-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            font-size: 14px; color: #94a3b8;
+            margin-bottom: 2px; position: relative;
+        }
+
+        .sidebar-item.active { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+        .sidebar-item.active::before {
+            content: ''; position: absolute; left: 0;
+            width: 3px; height: 24px; background: #8b5cf6; border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-icon { width: 18px; height: 18px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+
+        .main-content { margin-left: 240px; padding: 28px 32px; }
+        .page-title { font-size: 24px; font-weight: 600; margin-bottom: 24px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+
+        .glass-card {
+            background: rgba(2,6,23,0.78);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px; padding: 20px;
+            transition: all 0.3s ease; overflow: hidden; position: relative;
+        }
+
+        .glass-card:hover {
+            background: rgba(2,6,23,0.85);
+            border-color: rgba(255,255,255,0.14);
+            box-shadow: 0 8px 32px rgba(14,165,233,0.08);
+            transform: translateY(-1px);
+        }
+
+        .stat-label { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-change { font-size: 12px; margin-top: 6px; }
+        .stat-change.pos { color: #34d399; }
+        .stat-change.neg { color: #fb7185; }
+
+        .table-card {
+            background: rgba(2,6,23,0.78);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+        }
+
+        .table-header {
+            padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .table-header h3 { font-size: 15px; font-weight: 600; }
+        .table-badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; background: rgba(139,92,246,0.15); color: #c4b5fd; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px 20px; font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        td { padding: 14px 20px; font-size: 14px; color: #e2e8f0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+        .status-dot.green { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+        .status-dot.yellow { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+        .status-dot.blue { background: #60a5fa; box-shadow: 0 0 8px rgba(96,165,250,0.4); }
+        .status-dot.purple { background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.4); }
+
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+        .chart-card { background: rgba(2,6,23,0.78); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; height: 220px; display: flex; flex-direction: column; }
+        .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+        .chart-placeholder { flex: 1; border-radius: 8px; background: rgba(255,255,255,0.02); display: flex; align-items: flex-end; padding: 12px; gap: 6px; }
+        .bar { flex: 1; border-radius: 4px 4px 0 0; }
+        .bar:nth-child(1){height:45%;background:rgba(14,165,233,0.5)}.bar:nth-child(2){height:70%;background:rgba(14,165,233,0.6)}.bar:nth-child(3){height:55%;background:rgba(59,130,246,0.5)}.bar:nth-child(4){height:85%;background:rgba(59,130,246,0.7)}.bar:nth-child(5){height:60%;background:rgba(99,102,241,0.5)}.bar:nth-child(6){height:90%;background:rgba(99,102,241,0.7)}.bar:nth-child(7){height:75%;background:rgba(139,92,246,0.6)}.bar:nth-child(8){height:50%;background:rgba(139,92,246,0.5)}
+        .donut-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; }
+        .donut { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(#0ea5e9 0deg 130deg,#06b6d4 130deg 220deg,#3b82f6 220deg 290deg,#6366f1 290deg 340deg,#8b5cf6 340deg 360deg); position: relative; }
+        .donut::after { content: ''; position: absolute; inset: 30px; border-radius: 50%; background: rgba(2,6,23,0.95); }
+
+        .info-label { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; background: rgba(2,6,23,0.92); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 20px; text-align: center; max-width: 750px; }
+        .info-label p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+        .info-label span { color: #38bdf8; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg"></canvas>
+
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-logo"><span class="dot"></span>Proptech CRM</div>
+            <div class="sidebar-item active"><div class="sidebar-icon"></div>Dashboard</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Clientes</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Búsquedas</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Emprendimientos</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Competencia</div>
+            <div class="sidebar-item"><div class="sidebar-icon"></div>Reportes</div>
+        </div>
+        <div class="main-content">
+            <h1 class="page-title">Dashboard</h1>
+            <div class="stats-grid">
+                <div class="glass-card"><div class="stat-label">Clientes Activos</div><div class="stat-value">1,247</div><div class="stat-change pos">+12.5% vs mes anterior</div></div>
+                <div class="glass-card"><div class="stat-label">Reservas</div><div class="stat-value">86</div><div class="stat-change pos">+8.3% vs mes anterior</div></div>
+                <div class="glass-card"><div class="stat-label">Cierres del Mes</div><div class="stat-value">23</div><div class="stat-change pos">+15.0% vs mes anterior</div></div>
+                <div class="glass-card"><div class="stat-label">Comisiones</div><div class="stat-value">$4.2M</div><div class="stat-change neg">-3.1% vs mes anterior</div></div>
+            </div>
+            <div class="table-card">
+                <div class="table-header"><h3>Últimas Operaciones</h3><span class="table-badge">12 esta semana</span></div>
+                <table><thead><tr><th>Cliente</th><th>Propiedad</th><th>Estado</th><th>Valor</th><th>Agente</th></tr></thead>
+                <tbody>
+                    <tr><td>Martín González</td><td>Depto 3amb - Palermo</td><td><span class="status-dot green"></span>Cerrado</td><td>USD 185,000</td><td>Ana Ruiz</td></tr>
+                    <tr><td>Laura Fernández</td><td>Casa 4amb - Nordelta</td><td><span class="status-dot yellow"></span>Reserva</td><td>USD 320,000</td><td>Carlos López</td></tr>
+                    <tr><td>Diego Morales</td><td>Oficina - Microcentro</td><td><span class="status-dot blue"></span>Negociación</td><td>USD 95,000</td><td>María Torres</td></tr>
+                    <tr><td>Sofía Rodríguez</td><td>Loft - San Telmo</td><td><span class="status-dot purple"></span>Visita</td><td>USD 145,000</td><td>Ana Ruiz</td></tr>
+                    <tr><td>Pablo Méndez</td><td>PH - Belgrano</td><td><span class="status-dot green"></span>Cerrado</td><td>USD 210,000</td><td>Carlos López</td></tr>
+                </tbody></table>
+            </div>
+            <div class="bottom-grid">
+                <div class="chart-card"><h3>Ventas Mensuales</h3><div class="chart-placeholder"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div></div>
+                <div class="chart-card"><h3>Distribución por Zona</h3><div class="donut-placeholder"><div class="donut"></div></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-label">
+        <p><span>Deep Ocean + Particles</span> — Ondas sinusoidales azules con partículas interactivas. Las tarjetas glass dejan entrever el movimiento del fondo. Mové el mouse para ver la interacción.</p>
+    </div>
+
+    <script>
+    // === Un solo canvas, todo junto, sin librerías externas ===
+    var canvas = document.getElementById('bg');
+    var ctx = canvas.getContext('2d');
+    var W, H, time = 0;
+    var mouseX = -500, mouseY = -500;
+    var particles = [];
+
+    // Wave colors — negro, blanco, azul elegante
+    var waveColors = [
+        'rgba(30,58,138,',   // blue-900 profundo
+        'rgba(59,130,246,',  // blue-500 medio
+        'rgba(148,163,184,', // slate-400 gris azulado
+        'rgba(30,64,175,',   // blue-800
+        'rgba(200,215,235,', // blanco azulado
+    ];
+
+    // Particle colors — misma paleta fría elegante
+    var pColors = [
+        [30,58,138],         // blue-900
+        [59,130,246],        // blue-500
+        [148,163,184],       // slate-400
+        [200,215,235],       // blanco azulado
+        [37,99,235]          // blue-600
+    ];
+
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+        initParticles();
+    }
+
+    function initParticles() {
+        particles = [];
+        var count = Math.min(Math.floor((W * H) / 15000), 120);
+        for (var i = 0; i < count; i++) {
+            var c = pColors[Math.floor(Math.random() * pColors.length)];
+            particles.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                vx: (Math.random() - 0.5) * 0.4,
+                vy: (Math.random() - 0.5) * 0.4,
+                r: Math.random() * 1.8 + 0.5,
+                c: c,
+                a: Math.random() * 0.5 + 0.2
+            });
+        }
+    }
+
+    window.addEventListener('resize', resize);
+    document.addEventListener('mousemove', function(e) {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    resize();
+
+    // === DRAW ===
+    function draw() {
+        time += 0.003;
+
+        // 1) Clear with dark background
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, W, H);
+
+        // 2) Draw blurred waves (simulate blur with thick semi-transparent strokes)
+        for (var w = 0; w < 5; w++) {
+            var baseY = H * (0.25 + w * 0.12);
+            var color = waveColors[w];
+
+            // Multiple passes for blur simulation
+            for (var pass = 0; pass < 3; pass++) {
+                var alpha = (0.08 - pass * 0.02);
+                var lineW = 60 + pass * 30;
+
+                ctx.beginPath();
+                ctx.lineWidth = lineW;
+                ctx.strokeStyle = color + alpha + ')';
+
+                for (var x = 0; x <= W; x += 4) {
+                    var y = baseY
+                        + Math.sin(x * 0.003 + time + w * 1.2) * 50
+                        + Math.sin(x * 0.007 - time * 0.7 + w * 0.8) * 30
+                        + Math.cos(x * 0.001 + time * 0.5 + w * 2.0) * 40;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // 3) Particles (nítidas, encima de las ondas)
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Wrap edges
+            if (p.x < 0) p.x += W;
+            if (p.x > W) p.x -= W;
+            if (p.y < 0) p.y += H;
+            if (p.y > H) p.y -= H;
+
+            // Draw dot
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, 6.283);
+            ctx.fillStyle = 'rgba(' + p.c[0] + ',' + p.c[1] + ',' + p.c[2] + ',' + p.a + ')';
+            ctx.fill();
+
+            // Lines to nearby particles
+            for (var j = i + 1; j < particles.length; j++) {
+                var p2 = particles[j];
+                var dx = p.x - p2.x;
+                var dy = p.y - p2.y;
+                var d = dx * dx + dy * dy;
+                if (d < 14400) { // 120px
+                    var op = (1 - Math.sqrt(d) / 120) * 0.12;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = 'rgba(148,163,184,' + op + ')';
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+
+            // Mouse interaction
+            var mdx = p.x - mouseX;
+            var mdy = p.y - mouseY;
+            var md = mdx * mdx + mdy * mdy;
+            if (md < 40000) { // 200px
+                var dist = Math.sqrt(md);
+                var op2 = (1 - dist / 200) * 0.35;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(mouseX, mouseY);
+                ctx.strokeStyle = 'rgba(59,130,246,' + op2 + ')';
+                ctx.lineWidth = 0.7;
+                ctx.stroke();
+
+                // Attract
+                p.vx += (mouseX - p.x) * 0.00005;
+                p.vy += (mouseY - p.y) * 0.00005;
+            }
+
+            // Speed limit
+            var spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            if (spd > 0.6) { p.vx *= 0.97; p.vy *= 0.97; }
+        }
+
+        requestAnimationFrame(draw);
+    }
+
+    draw();
+    </script>
+
+</body>
+</html>

@@ -36,4 +36,5 @@ export const personSchema = z.object({
 
     organizationId: z.string().uuid().optional().nullable(),
     agentId: z.string().uuid().optional().or(z.literal('')).nullable(),
+    createdAt: z.string().optional().nullable(),
 });

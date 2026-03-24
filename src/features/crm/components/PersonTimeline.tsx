@@ -11,7 +11,10 @@ import {
     MessageSquare,
     UserCircle,
     FileText,
-    MapPin
+    MapPin,
+    PhoneCall,
+    Search,
+    Archive
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusLabel } from '../constants/relationshipStatuses';
@@ -67,6 +70,24 @@ const EVENT_CONFIG = {
         color: 'text-teal-400',
         bgColor: 'bg-teal-500/10',
         label: 'Visita Registrada'
+    },
+    activity_record: {
+        icon: PhoneCall,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10',
+        label: 'Actividad Registrada'
+    },
+    search_linked: {
+        icon: Search,
+        color: 'text-violet-400',
+        bgColor: 'bg-violet-500/10',
+        label: 'Búsqueda Vinculada'
+    },
+    search_closed: {
+        icon: Archive,
+        color: 'text-rose-400',
+        bgColor: 'bg-rose-500/10',
+        label: 'Búsqueda Cerrada'
     }
 };
 
@@ -228,6 +249,26 @@ function renderEventDescription(event: PersonHistoryEvent) {
                 return `${visitor} visitó la propiedad "${addr}".`;
             }
             return `Visita registrada en "${addr}".`;
+        }
+
+        case 'activity_record': {
+            const actLabel = event.new_value || event.metadata?.activity_type || 'Actividad';
+            const notes = event.metadata?.notes;
+            return notes
+                ? `${actLabel} registrada. Nota: ${notes}`
+                : `${actLabel} registrada.`;
+        }
+
+        case 'search_linked': {
+            const searchType = event.new_value === 'vendedor' ? 'vendedor' : 'comprador';
+            const zones = event.metadata?.preferred_zones;
+            const zonesStr = zones?.length ? ` en ${zones.join(', ')}` : '';
+            return `Se vinculó una búsqueda de ${searchType}${zonesStr}.`;
+        }
+
+        case 'search_closed': {
+            const finalStatus = event.new_value === 'archived' ? 'archivada' : 'cerrada';
+            return `La búsqueda fue ${finalStatus}.`;
         }
 
         default:

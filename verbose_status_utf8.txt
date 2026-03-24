@@ -1,0 +1,49 @@
+﻿ M .gitignore
+ M src/app/api/transactions/route.ts
+ M src/app/dashboard/crm/page.tsx
+ M src/app/globals.css
+ M src/components/layouts/DashboardLayout.tsx
+ M src/components/ui/AuroraBackground.tsx
+ M src/features/clients/actions/clientActions.ts
+ M src/features/clients/components/ClientDataTable.tsx
+ M src/features/clients/components/ClientForm.tsx
+ M src/features/clients/components/ClientsDashboard.tsx
+ M src/features/clients/components/SearchDetailSheet.tsx
+ M src/features/clients/components/SearchFilterSheet.tsx
+ M src/features/clients/components/shared/PersonSelector.tsx
+ M src/features/clients/hooks/useClients.ts
+ M src/features/clients/types.ts
+ M src/features/clients/utils/clientUtils.ts
+ M src/features/competition/actions/competitionActions.ts
+ M src/features/competition/components/AgentRankingTable.tsx
+ M src/features/competition/constants.ts
+ M src/features/crm/actions/personActions.ts
+ M src/features/crm/components/PersonFormDialog.tsx
+ M src/features/crm/components/PersonTimeline.tsx
+ M src/features/crm/components/RelationshipFilters.tsx
+ M src/features/crm/components/filters/AdvancedFilterSheet.tsx
+ M src/features/crm/hooks/useCRM.ts
+ M src/features/crm/schemas/personSchema.ts
+ M src/features/transactions/components/CloseReservationDialog.tsx
+ M src/features/weekly-activities/actions/activityActions.ts
+ M src/features/weekly-activities/components/ActivityDialog.tsx
+ M src/features/weekly-activities/components/WeeklyDashboard.tsx
+ M src/features/weekly-activities/components/WeeklyGrid.tsx
+ M src/features/weekly-activities/hooks/useWeeklyActivities.ts
+?? .claude/settings.local.json
+?? changes.txt
+?? diff_origin_local.txt
+?? full_log.txt
+?? full_status.txt
+?? prototype-background-v2.html
+?? prototype-background-v3.html
+?? prototype-background-v4.html
+?? prototype-background.html
+?? recent_commits.txt
+?? src/components/ui/border-beam.tsx
+?? src/components/ui/magic-card.tsx
+?? src/features/clients/components/SearchCardGrid.tsx
+?? typescript_errors.txt
+?? verbose_log.txt
+?? verbose_status.txt
+?? verbose_status_utf8.txt

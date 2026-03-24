@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     X, Filter, RotateCcw,
     Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel,
-    DollarSign, Banknote, CreditCard, RefreshCw, Blend, HardHat
+    DollarSign, Banknote, CreditCard, RefreshCw, Blend, HardHat, Landmark
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -68,7 +68,7 @@ export interface SearchFilters {
     budgetMin: number | null;
     budgetMax: number | null;
     bedrooms: string[];
-    tags: string[];
+    isMortgageEligible?: boolean;
     isCritical?: boolean;
 }
 
@@ -79,7 +79,7 @@ export const defaultSearchFilters: SearchFilters = {
     budgetMin: null,
     budgetMax: null,
     bedrooms: [],
-    tags: [],
+    isMortgageEligible: false,
     isCritical: false,
 };
 
@@ -89,7 +89,6 @@ interface SearchFilterSheetProps {
     filters: SearchFilters;
     setFilters: (filters: SearchFilters) => void;
     propertyTypes?: { id: string; name: string }[];
-    availableTags?: string[];
 }
 
 export function SearchFilterSheet({
@@ -98,7 +97,6 @@ export function SearchFilterSheet({
     filters,
     setFilters,
     propertyTypes = [],
-    availableTags = [],
 }: SearchFilterSheetProps) {
 
     const toggleFilter = (key: keyof SearchFilters, value: any) => {
@@ -120,7 +118,7 @@ export function SearchFilterSheet({
         (filters.budgetMin ? 1 : 0) +
         (filters.budgetMax ? 1 : 0) +
         filters.bedrooms.length +
-        filters.tags.length;
+        (filters.isMortgageEligible ? 1 : 0);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -304,32 +302,24 @@ export function SearchFilterSheet({
                             </div>
                         </div>
 
-                        {availableTags && availableTags.length > 0 && (
-                            <>
-                                <Separator className="bg-white/10" />
-                                <div className="space-y-3">
-                                    <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Etiquetas de Búsqueda</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {availableTags.map((tag) => {
-                                            const isSelected = filters.tags.includes(tag);
-                                            return (
-                                                <Badge
-                                                    key={tag}
-                                                    variant="outline"
-                                                    onClick={() => toggleFilter('tags', tag)}
-                                                    className={cn(
-                                                        "cursor-pointer border-white/10 hover:bg-white/5 px-3 py-1.5 transition-all",
-                                                        isSelected && "bg-white text-black border-white hover:bg-white/90"
-                                                    )}
-                                                >
-                                                    {tag}
-                                                </Badge>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </>
-                        )}
+                        <Separator className="bg-white/10" />
+
+                        {/* Apto Crédito */}
+                        <div className="space-y-3">
+                            <Label className="text-sm font-semibold text-white/70 uppercase tracking-wider">Crédito Hipotecario</Label>
+                            <div
+                                onClick={() => setFilters({ ...filters, isMortgageEligible: !filters.isMortgageEligible })}
+                                className={cn(
+                                    "cursor-pointer rounded-lg border p-3 flex items-center gap-3 transition-all hover:bg-white/5",
+                                    filters.isMortgageEligible
+                                        ? "bg-cyan-500/10 border-cyan-500/50 text-white"
+                                        : "bg-transparent border-white/10 text-white/50"
+                                )}
+                            >
+                                <Landmark className={cn("w-5 h-5", filters.isMortgageEligible ? "text-cyan-400" : "text-white/30")} />
+                                <span className="text-sm font-medium">Apto Crédito</span>
+                            </div>
+                        </div>
 
                     </div>
                 </ScrollArea>

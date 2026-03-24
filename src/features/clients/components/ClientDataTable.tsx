@@ -38,6 +38,7 @@ import {
     CheckCircle2,
     Archive,
     Activity,
+    Ban,
 } from "lucide-react";
 import {
     Sheet,
@@ -83,7 +84,7 @@ import {
 import type { ClientWithAgent, AnonymousClient } from '../types';
 import { type ClientDisplay } from '../utils/privacy';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { parseNURC, generateSearchClipboardText } from '../utils/clientUtils';
+import { parseNURC, generateSearchClipboardText, getNURCLevel } from '../utils/clientUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
@@ -96,7 +97,7 @@ interface ClientDataTableProps {
     scope: 'personal' | 'office' | 'network';
     onEdit?: (client: any) => void;
     onDelete?: (id: string) => void;
-    onStatusChange?: (id: string, status: string) => void;
+    onStatusChange?: (id: string, status: string, note?: string) => void;
 }
 
 export function ClientDataTable({
@@ -160,8 +161,9 @@ export function ClientDataTable({
                 <TableHeader className="bg-white/[0.02]">
                     <TableRow className="hover:bg-transparent border-white/10">
                         <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 px-4">Búsqueda / Perfil</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 text-center w-[100px]">NURC</TableHead>
-                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 w-[140px]">Presupuesto</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 w-[160px]">Presupuesto</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 w-[150px]">Forma de Pago</TableHead>
+                        <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 text-center w-[80px]">Estado</TableHead>
                         {scope === 'office' && <TableHead className="text-white/40 font-bold uppercase tracking-widest text-[9px] h-10">Agente</TableHead>}
                         <TableHead className="text-right text-white/40 font-bold uppercase tracking-widest text-[9px] h-10 px-4">Acciones</TableHead>
                     </TableRow>
@@ -294,10 +296,26 @@ export function ClientDataTable({
                                                     </Tooltip>
                                                 </TooltipProvider>
 
-                                                <div className="text-[11px] text-white/50 truncate mt-1">
-                                                    <span className={`font-bold uppercase text-[9px] mr-1 ${client.type === 'buyer' ? 'text-blue-400' : 'text-amber-400'}`}>
+                                                <div className="text-[11px] text-white/50 truncate mt-1 flex items-center gap-1.5">
+                                                    <span className={`font-bold uppercase text-[9px] ${client.type === 'buyer' ? 'text-blue-400' : 'text-amber-400'}`}>
                                                         {client.type === 'buyer' ? 'Compra' : 'Venta'}
                                                     </span>
+                                                    {(() => {
+                                                        const nurcInfo = getNURCLevel(client.motivation);
+                                                        const dotColor = nurcInfo.level === 'complete' ? 'bg-emerald-400' : nurcInfo.level === 'partial' ? 'bg-yellow-400' : 'bg-red-400';
+                                                        return (
+                                                            <TooltipProvider delayDuration={0}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotColor}`} onClick={(e) => e.stopPropagation()} />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent className="bg-slate-900 border-slate-800 text-xs">
+                                                                        NURC: {nurcInfo.emoji} {nurcInfo.label}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        );
+                                                    })()}
                                                     <span className="text-white/70">{narrativeProperty}{rooms}</span>
                                                     <span className="italic text-white/40">{zones}</span>
                                                 </div>
@@ -305,37 +323,37 @@ export function ClientDataTable({
                                         </div>
                                     </TableCell>
 
-                                    {/* NURC SEMAPHOR */}
-                                    <TableCell className="py-2 text-center">
-                                        <div className="flex items-center justify-center gap-1">
-                                            {[
-                                                { val: nurc.n, color: 'bg-emerald-400' },
-                                                { val: nurc.u, color: 'bg-amber-400' },
-                                                { val: nurc.r, color: 'bg-blue-400' },
-                                                { val: nurc.c, color: 'bg-violet-400' }
-                                            ].map((item, i) => (
-                                                <div
-                                                    key={i}
-                                                    className={`w-1.5 h-1.5 rounded-full ${item.val ? item.color : 'bg-white/10'}`}
-                                                    title={item.val || 'Sin dato'}
-                                                />
-                                            ))}
+                                    {/* PRESUPUESTO */}
+                                    <TableCell className="py-2">
+                                        <span className="text-[12px] font-mono font-bold text-white/90">
+                                            USD {(client.budget_min || 0).toLocaleString()} – {(client.budget_max || 0).toLocaleString()}
+                                        </span>
+                                    </TableCell>
+
+                                    {/* FORMA DE PAGO */}
+                                    <TableCell className="py-2">
+                                        <div className="flex flex-wrap gap-1">
+                                            {(client.search_payment_methods || []).map(m => {
+                                                const cfg: Record<string, { label: string; cls: string }> = {
+                                                    cash: { label: 'Efectivo', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+                                                    swap: { label: 'Permuta', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+                                                    loan: { label: 'Financiación', cls: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
+                                                    mix: { label: 'Ef.+Permuta', cls: 'text-violet-400 bg-violet-500/10 border-violet-500/20' },
+                                                };
+                                                const c = cfg[m] || { label: m, cls: 'text-white/40 bg-white/5 border-white/10' };
+                                                return (
+                                                    <span key={m} className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${c.cls}`}>
+                                                        {c.label}
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </TableCell>
 
-                                    {/* PRESUPUESTO */}
-                                    <TableCell className="py-2">
-                                        <div className="flex flex-col">
-                                            <span className="text-[12px] font-mono font-bold text-white/90">
-                                                USD {(client.budget_min || 0).toLocaleString()} - {(client.budget_max || 0).toLocaleString()}
-                                            </span>
-                                            <div className="flex gap-1">
-                                                {client.search_payment_methods?.slice(0, 2).map(m => (
-                                                    <span key={m} className="text-[8px] uppercase font-black text-white/30 tracking-tighter">
-                                                        {m === 'cash' ? 'Efectivo' : m === 'swap' ? 'Permuta' : m}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                    {/* ESTADO / SALUD */}
+                                    <TableCell className="py-2 text-center">
+                                        <div className="flex items-center justify-center">
+                                            <div className={`w-2 h-2 rounded-full ${healthColor} ${isPulsing ? 'animate-pulse' : ''}`} title={healthText} />
                                         </div>
                                     </TableCell>
 
@@ -491,25 +509,28 @@ export function ClientDataTable({
                                                                             {client.status === 'active' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-emerald-400" />}
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem
-                                                                            onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'inactive'); }}
-                                                                            className="gap-2 cursor-pointer focus:bg-white/5"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                onStatusChange?.(client.id, 'inactive');
+                                                                            }}
+                                                                            className="gap-2 cursor-pointer focus:bg-amber-500/10 focus:text-amber-400"
                                                                         >
-                                                                            <Clock className="w-3.5 h-3.5" /> Inactiva
-                                                                            {client.status === 'inactive' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-slate-500" />}
+                                                                            <Clock className="w-3.5 h-3.5" /> Suspendida
+                                                                            {client.status === 'inactive' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-amber-500" />}
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem
                                                                             onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'closed'); }}
-                                                                            className="gap-2 cursor-pointer focus:bg-blue-500/10 focus:text-blue-400"
+                                                                            className="gap-2 cursor-pointer focus:bg-emerald-500/10 focus:text-emerald-400"
                                                                         >
-                                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Cerrada
-                                                                            {client.status === 'closed' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-blue-400" />}
+                                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Cerrada (éxito)
+                                                                            {client.status === 'closed' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-emerald-400" />}
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem
                                                                             onClick={(e) => { e.stopPropagation(); onStatusChange?.(client.id, 'archived'); }}
-                                                                            className="gap-2 cursor-pointer focus:bg-white/5"
+                                                                            className="gap-2 cursor-pointer focus:bg-rose-500/10 focus:text-rose-400"
                                                                         >
-                                                                            <Archive className="w-3.5 h-3.5" /> Archivada
-                                                                            {client.status === 'archived' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-slate-700" />}
+                                                                            <Ban className="w-3.5 h-3.5" /> Perdida
+                                                                            {client.status === 'archived' && <CheckCircle2 className="w-3.5 h-3.5 ml-auto text-rose-500" />}
                                                                         </DropdownMenuItem>
                                                                     </DropdownMenuSubContent>
                                                                 </DropdownMenuPortal>

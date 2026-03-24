@@ -30,6 +30,7 @@ const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
     cierre: { label: 'Reserva', color: 'text-indigo-400' },
     nuevo_contacto: { label: 'Contacto', color: 'text-cyan-400' },
     nueva_busqueda: { label: 'Búsqueda', color: 'text-teal-400' },
+    nurc_bonus: { label: 'NURC', color: 'text-lime-400' },
     referido_bonus: { label: 'Referido', color: 'text-orange-400' },
     perfect_weeks: { label: 'Semanas Perf.', color: 'text-yellow-400' },
 };

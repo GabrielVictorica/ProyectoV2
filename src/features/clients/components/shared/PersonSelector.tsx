@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Person } from '@/features/clients/types';
-import { searchPersonsAction, getRecentPersonsAction, getPersonByIdAction, getPersonsAction } from '@/features/crm/actions/personActions';
+import { searchPersonsAction, getRecentPersonsAction, getPersonByIdAction } from '@/features/crm/actions/personActions';
 import { PersonFormDialog } from '@/features/crm/components/PersonFormDialog';
 import { usePermissions } from '@/features/auth/hooks/useAuth';
-import { Search, UserPlus, X, Check, User, Phone, Mail, Loader2, Sparkles, History, UserPlus2, ArrowRight } from 'lucide-react';
+import { Search, X, User, Phone, Mail, Loader2, Sparkles, History, ArrowRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -17,9 +18,11 @@ interface PersonSelectorProps {
     onChange: (personId: string | null, person?: Person) => void;
     placeholder?: string;
     className?: string;
+    initialPerson?: any;
+    activityDate?: string;
 }
 
-export function PersonSelector({ value, onChange, placeholder = "Buscar persona...", className }: PersonSelectorProps) {
+export function PersonSelector({ value, onChange, placeholder = "Buscar persona...", className, initialPerson, activityDate }: PersonSelectorProps) {
     const { isGod, isParent } = usePermissions();
     const showAgentInfo = isGod || isParent;
     const [search, setSearch] = useState('');
@@ -27,8 +30,16 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
     const [recentPersons, setRecentPersons] = useState<Person[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
+    const [selectedPerson, setSelectedPerson] = useState<Person | any | null>(initialPerson || null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+
+    const updateDropdownPosition = () => {
+        if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setDropdownStyle({ top: rect.bottom + 8, left: rect.left, width: rect.width });
+        }
+    };
 
     // Cargar contactos recientes
     useEffect(() => {
@@ -39,48 +50,50 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         fetchRecent();
     }, []);
 
-    // Se eliminó la precarga de todas las personas para optimizar la performance.
-
     // Resolver ID a Persona si viene por prop
     const { data: resolvedPerson, isFetching: isResolving } = useQuery({
         queryKey: ['person', value],
         queryFn: async () => {
-             if (!value) return null;
-             const res = await getPersonByIdAction(value);
-             return res.success && res.data ? res.data : null;
+            if (!value) return null;
+            if (initialPerson && initialPerson.id === value) return initialPerson;
+            const res = await getPersonByIdAction(value);
+            return res.success && res.data ? res.data : null;
         },
-        enabled: !!value && (!selectedPerson || selectedPerson.id !== value),
+        enabled: !!value && (!selectedPerson || selectedPerson.id !== value) && (!initialPerson || initialPerson.id !== value),
         staleTime: 5 * 60 * 1000,
     });
 
     useEffect(() => {
-        if (resolvedPerson) {
+        if (initialPerson && initialPerson.id === value) {
+            setSelectedPerson(initialPerson);
+        } else if (resolvedPerson) {
             setSelectedPerson(resolvedPerson);
         } else if (!value) {
             setSelectedPerson(null);
         }
-    }, [resolvedPerson, value]);
+    }, [resolvedPerson, value, initialPerson]);
 
-    // Cerrar al hacer clic afuera
+    // Actualizar posición del dropdown al abrir y en scroll/resize
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        if (isOpen) {
+            updateDropdownPosition();
+            window.addEventListener('scroll', updateDropdownPosition, true);
+            window.addEventListener('resize', updateDropdownPosition);
+            return () => {
+                window.removeEventListener('scroll', updateDropdownPosition, true);
+                window.removeEventListener('resize', updateDropdownPosition);
+            };
+        }
+    }, [isOpen]);
 
-    // Estado derivado para el debounce de la entrada
+    // Debounce del search
     const [debouncedSearch, setDebouncedSearch] = useState('');
-
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search), 300);
         return () => clearTimeout(timer);
     }, [search]);
 
-    // Búsqueda en el servidor Cacheada por React Query
+    // Búsqueda cacheada con React Query
     const { data: searchResults, isFetching: isSearching } = useQuery({
         queryKey: ['persons', 'search', debouncedSearch],
         queryFn: async () => {
@@ -89,7 +102,7 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
             return res.success ? (res.data || []) : [];
         },
         enabled: debouncedSearch.length >= 2,
-        staleTime: 5 * 60 * 1000, // Caché de 5 minutos, la respuesta será instantánea (0ms) al volver a escribir algo ya buscado
+        staleTime: 5 * 60 * 1000,
     });
 
     useEffect(() => {
@@ -99,8 +112,7 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
             setResults(searchResults);
         }
     }, [searchResults, debouncedSearch]);
-    
-    // Unificar los estados de carga
+
     const loading = isResolving || isSearching;
 
     const handleSelect = (person: Person) => {
@@ -115,6 +127,136 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         onChange(null);
         setSearch('');
     };
+
+    const portal = typeof window !== 'undefined' ? createPortal(
+        <AnimatePresence>
+            {isOpen && !selectedPerson && (
+                <>
+                    {/* Backdrop: cierra el dropdown al hacer click afuera, sin interferir con clicks adentro */}
+                    <div
+                        className="fixed inset-0"
+                        style={{ zIndex: 99998, pointerEvents: 'auto' }}
+                        onMouseDown={() => setIsOpen(false)}
+                    />
+
+                    {/* Dropdown */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 6, scale: 0.99 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 4, scale: 0.99 }}
+                        transition={{ type: 'spring' as const, stiffness: 400, damping: 32 }}
+                        style={{
+                            position: 'fixed',
+                            top: dropdownStyle.top,
+                            left: dropdownStyle.left,
+                            width: dropdownStyle.width,
+                            zIndex: 99999,
+                            pointerEvents: 'auto',
+                        }}
+                        className="bg-[#0d0d10] border border-white/[0.07] rounded-2xl shadow-[0_20px_50px_-10px_rgba(0,0,0,0.85)] overflow-hidden"
+                    >
+                        {/* Resultados */}
+                        <div className="max-h-[240px] overflow-y-auto">
+                            {(search.length >= 2 || recentPersons.length > 0) && (
+                                <div className="px-4 pt-3 pb-1">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.18em] text-white/20 flex items-center gap-1.5">
+                                        {search.length >= 2
+                                            ? <><Sparkles className="w-2.5 h-2.5 text-violet-400" /> Resultados</>
+                                            : <><History className="w-2.5 h-2.5" /> Recientes</>
+                                        }
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="p-2 space-y-0.5">
+                                {(search.length < 2 ? recentPersons : results).map((person) => {
+                                    const initials = `${(person.first_name || '?')[0]}${(person.last_name || '')[0] || ''}`.toUpperCase();
+                                    const subtitle = search.length >= 2
+                                        ? (person.phone || person.email || 'Sin datos')
+                                        : 'Reciente';
+                                    return (
+                                        <motion.button
+                                            key={person.id}
+                                            type="button"
+                                            onClick={() => handleSelect(person)}
+                                            whileHover={{ x: 2 }}
+                                            transition={{ type: 'spring' as const, stiffness: 500, damping: 30 }}
+                                            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/[0.04] rounded-xl text-left group transition-colors border border-transparent hover:border-white/[0.05]"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600/25 to-fuchsia-600/15 flex items-center justify-center border border-violet-500/20 group-hover:border-violet-500/40 transition-colors flex-shrink-0">
+                                                    <span className="text-[10px] font-black text-violet-300 group-hover:text-violet-200">{initials}</span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-[13px] font-semibold text-white/80 group-hover:text-white transition-colors leading-tight">
+                                                        {person.first_name} {person.last_name}
+                                                    </p>
+                                                    <p className="text-[10px] text-white/30 group-hover:text-white/40 transition-colors truncate">
+                                                        {subtitle}
+                                                        {showAgentInfo && person.agent && (
+                                                            <span className="text-violet-400/70 ml-1.5">· {person.agent.first_name}</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ArrowRight className="w-3 h-3 text-white/0 group-hover:text-violet-400 transition-all -translate-x-1 group-hover:translate-x-0 flex-shrink-0" />
+                                        </motion.button>
+                                    );
+                                })}
+
+                                {search.length >= 2 && !loading && results.length === 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="flex items-center gap-3 px-3 py-3"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center flex-shrink-0">
+                                            <Search className="w-3.5 h-3.5 text-white/20" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[12px] font-medium text-white/40">Sin coincidencias</p>
+                                            <p className="text-[10px] text-white/20">Crealo como nuevo contacto ↓</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {search.length < 2 && recentPersons.length === 0 && (
+                                    <div className="flex items-center gap-3 px-3 py-3">
+                                        <div className="w-8 h-8 rounded-full bg-violet-500/5 border border-violet-500/10 flex items-center justify-center flex-shrink-0">
+                                            <Search className="w-3.5 h-3.5 text-violet-400/30" />
+                                        </div>
+                                        <p className="text-[11px] text-white/30">Escribí el nombre para buscar...</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-white/[0.05] mx-3" />
+
+                        <div className="p-2">
+                            <motion.button
+                                type="button"
+                                onClick={() => { setIsOpen(false); setIsDialogOpen(true); }}
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-violet-600/15 to-fuchsia-600/10 hover:from-violet-600/25 hover:to-fuchsia-600/20 border border-violet-500/20 hover:border-violet-500/40 transition-all duration-200 group/btn"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
+                                    <Plus className="w-3.5 h-3.5 text-violet-300" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-[12px] font-bold text-violet-200 leading-tight">Crear nuevo contacto</p>
+                                    <p className="text-[9px] text-violet-400/60 uppercase tracking-wider">Y vincularlo a esta búsqueda</p>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-violet-400/0 group-hover/btn:text-violet-400 transition-all ml-auto -translate-x-1 group-hover/btn:translate-x-0" />
+                            </motion.button>
+                        </div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>,
+        document.body
+    ) : null;
 
     return (
         <div className={cn("relative w-full", className)} ref={containerRef}>
@@ -179,114 +321,7 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
                 </div>
             )}
 
-            <AnimatePresence>
-                {isOpen && !selectedPerson && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        className="absolute top-full left-0 right-0 mt-3 bg-[#0c0c0e]/95 backdrop-blur-2xl border border-white/[0.08] rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] z-[10050] overflow-hidden"
-                    >
-                        <div className="max-h-[380px] overflow-y-auto p-3 custom-scrollbar">
-                            {/* Buscar Título */}
-                            <div className="px-3 py-2 flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 flex items-center gap-2">
-                                    {search.length >= 2 ? <Sparkles className="w-3 h-3 text-violet-400" /> : <History className="w-3 h-3" />}
-                                    {search.length >= 2 ? 'Resultados' : 'Sugerencias Recientes'}
-                                </span>
-                            </div>
-
-                            <div className="space-y-1">
-                                {search.length < 2 && recentPersons.length > 0 ? (
-                                    recentPersons.map((person) => (
-                                        <button
-                                            key={person.id}
-                                            onClick={() => handleSelect(person)}
-                                            className="w-full flex items-center justify-between p-3 hover:bg-white/[0.03] rounded-xl text-left group transition-all duration-200 border border-transparent hover:border-white/[0.05]"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-white/[0.03] flex items-center justify-center text-white/40 border border-white/[0.05] group-hover:bg-violet-500/10 group-hover:text-violet-400 group-hover:border-violet-500/20 transition-all duration-300">
-                                                    <User className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors">
-                                                        {person.first_name} {person.last_name}
-                                                    </p>
-                                                    <p className="text-[11px] text-white/30 group-hover:text-white/40 transition-colors">
-                                                        Contacto reciente
-                                                        {showAgentInfo && person.agent && (
-                                                            <span className="text-[10px] text-violet-400 font-medium ml-2 uppercase tracking-wide">
-                                                                Resp: {person.agent.first_name} {person.agent.last_name}
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <ArrowRight className="w-3 h-3 text-white/0 group-hover:text-violet-400 transition-all -translate-x-2 group-hover:translate-x-0" />
-                                        </button>
-                                    ))
-                                ) : results.length > 0 ? (
-                                    results.map((person) => (
-                                        <button
-                                            key={person.id}
-                                            onClick={() => handleSelect(person)}
-                                            className="w-full flex items-center justify-between p-3 hover:bg-white/[0.03] rounded-xl text-left group transition-all duration-200 border border-transparent hover:border-white/[0.05]"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-white/[0.03] flex items-center justify-center text-slate-500 border border-white/[0.05] group-hover:border-violet-500/20 group-hover:text-violet-400 group-hover:bg-violet-500/10 transition-all duration-300">
-                                                    <User className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors">
-                                                        {person.first_name} {person.last_name}
-                                                    </p>
-                                                    <p className="text-[11px] text-white/30 truncate max-w-[180px]">
-                                                        {person.phone || person.email || 'Sin datos de contacto'}
-                                                        {showAgentInfo && person.agent && (
-                                                            <span className="text-[10px] text-violet-400 font-medium ml-2 uppercase tracking-wide">
-                                                                Resp: {person.agent.first_name} {person.agent.last_name}
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Check className="w-4 h-4 text-violet-500 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100" />
-                                        </button>
-                                    ))
-                                ) : search.length >= 2 && !loading ? (
-                                    <div className="p-10 text-center animate-in fade-in zoom-in-95 duration-500">
-                                        <div className="w-16 h-16 bg-white/[0.02] rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5 shadow-inner">
-                                            <Search className="w-6 h-6 text-white/10" />
-                                        </div>
-                                        <p className="text-sm font-medium text-white/40">No hay coincidencias en tu base</p>
-                                        <p className="text-[11px] text-white/20 mt-1 uppercase tracking-wide">Probá cargarlo como nuevo debajo</p>
-                                    </div>
-                                ) : search.length < 2 && recentPersons.length === 0 ? (
-                                    <div className="p-8 text-center py-12">
-                                        <div className="w-12 h-12 bg-violet-600/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-violet-500/10">
-                                            <Search className="w-5 h-5 text-violet-400/30" />
-                                        </div>
-                                        <p className="text-xs font-medium text-white/30">Escribe el nombre del cliente para buscar...</p>
-                                    </div>
-                                ) : null}
-                            </div>
-                        </div>
-
-                        {/* Create New Client CTA */}
-                        <div className="p-3 border-t border-white/[0.05]">
-                            <button
-                                onClick={() => setIsDialogOpen(true)}
-                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 transition-all duration-300 group/btn"
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                                    <UserPlus2 className="w-4 h-4 text-violet-400" />
-                                </div>
-                                <p className="text-sm font-semibold text-white">Crear Nuevo Cliente</p>
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {portal}
 
             <PersonFormDialog
                 open={isDialogOpen}
@@ -296,6 +331,7 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
                     lastName: search.split(' ').slice(1).join(' ') || ''
                 }}
                 onSuccess={(person) => handleSelect(person)}
+                activityDate={activityDate}
             />
         </div>
     );

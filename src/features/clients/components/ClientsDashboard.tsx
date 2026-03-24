@@ -12,7 +12,8 @@ import {
     Plus, Users, Mail, Phone, MapPin,
     Search, Filter, ShieldCheck, UserCheck,
     Calculator, Tag as TagIcon, Building2,
-    ChevronLeft, ChevronRight, DollarSign, Activity, CheckCircle2, Clock, TrendingUp, AlertTriangle, ArrowUpDown
+    ChevronLeft, ChevronRight, DollarSign, Activity, CheckCircle2, Clock, TrendingUp, AlertTriangle, ArrowUpDown,
+    LayoutGrid, LayoutList
 } from 'lucide-react';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
 import { useTeamMembers } from '@/features/team/hooks/useTeamMembers';
@@ -21,12 +22,16 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger
+    DialogTrigger,
+    DialogFooter,
+    DialogDescription
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { ClientForm } from './ClientForm';
 import type { Client, AnonymousClient } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClientDataTable } from './ClientDataTable';
+import { SearchCardGrid } from './SearchCardGrid';
 import { SearchFilterSheet, defaultSearchFilters } from './SearchFilterSheet';
 import type { SearchFilters } from './SearchFilterSheet';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
@@ -49,7 +54,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useDeleteClient, useUpdateClient, clientKeys, useSearchTags, useClientDashboardStats } from '../hooks/useClients';
+import { useDeleteClient, useUpdateClient, clientKeys, useClientDashboardStats, useAddInteraction } from '../hooks/useClients';
 import { useQueryClient } from '@tanstack/react-query';
 import { MoreVertical, Edit2, Trash2, Ban, Archive, CheckCircle } from 'lucide-react';
 
@@ -107,6 +112,22 @@ export function ClientsDashboard() {
     const debouncedSearch = useDebounce(search, 300);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | undefined>(undefined);
+    
+    // States for custom dialogs
+    const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; clientId: string | null }>({
+        isOpen: false,
+        clientId: null
+    });
+    const [suspensionPrompt, setSuspensionPrompt] = useState<{
+        isOpen: boolean;
+        clientId: string | null;
+        newStatus: string | null;
+    }>({
+        isOpen: false,
+        clientId: null,
+        newStatus: null
+    });
+    const [suspensionNote, setSuspensionNote] = useState('');
 
     // Filtros
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
@@ -119,10 +140,19 @@ export function ClientsDashboard() {
     const [advancedFilters, setAdvancedFilters] = useState<SearchFilters>(defaultSearchFilters);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [sortBy, setSortBy] = useState<'urgent' | 'recent' | 'budget'>('urgent');
+    const [viewMode, setViewMode] = useState<'table' | 'cards'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('busquedas-view-mode') as 'table' | 'cards') || 'cards';
+        }
+        return 'cards';
+    });
+
+    const handleViewModeChange = (mode: 'table' | 'cards') => {
+        setViewMode(mode);
+        localStorage.setItem('busquedas-view-mode', mode);
+    };
     const [activeCard, setActiveCard] = useState<'critical' | 'active' | 'closed' | null>(null);
     const { data: propertyTypes } = usePropertyTypes();
-    const { data: availableTags } = useSearchTags();
-
     const advancedFilterCount =
         advancedFilters.status.length +
         advancedFilters.propertyTypes.length +
@@ -130,7 +160,7 @@ export function ClientsDashboard() {
         (advancedFilters.budgetMin ? 1 : 0) +
         (advancedFilters.budgetMax ? 1 : 0) +
         advancedFilters.bedrooms.length +
-        advancedFilters.tags.length;
+        (advancedFilters.isMortgageEligible ? 1 : 0);
 
     // Admin Data (Para filtros de Organizaciones)
     const { data: organizations } = useOrganizations({ enabled: isGod || activeTab === 'network' });
@@ -184,7 +214,7 @@ export function ClientsDashboard() {
         budgetMin: advancedFilters.budgetMin,
         budgetMax: advancedFilters.budgetMax,
         bedrooms: advancedFilters.bedrooms.length > 0 ? advancedFilters.bedrooms : undefined,
-        tags: advancedFilters.tags.length > 0 ? advancedFilters.tags : undefined,
+        isMortgageEligible: advancedFilters.isMortgageEligible || undefined,
         isCritical: activeCard === 'critical',
     };
 
@@ -226,19 +256,45 @@ export function ClientsDashboard() {
 
     const updateClient = useUpdateClient();
     const deleteClient = useDeleteClient();
+    const addInteraction = useAddInteraction();
 
     const handleEdit = (client: any) => {
         setSelectedClient(client);
         setIsFormOpen(true);
     };
 
-    const handleStatusChange = async (id: string, newStatus: string) => {
+    const handleStatusChange = async (id: string, newStatus: string, note?: string) => {
         await updateClient.mutateAsync({ id, status: newStatus } as any);
+        if (note && note.trim()) {
+            await addInteraction.mutateAsync({ clientId: id, type: 'nota', content: `[Estado: ${newStatus}] ${note.trim()}` });
+        }
     };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este cliente permanentemente?')) {
-            await deleteClient.mutateAsync(id);
+    const handleStatusChangeRequest = (id: string, newStatus: string) => {
+        if (newStatus === 'inactive') {
+            setSuspensionPrompt({ isOpen: true, clientId: id, newStatus });
+            setSuspensionNote('');
+        } else {
+            handleStatusChange(id, newStatus);
+        }
+    };
+
+    const handleDeleteRequest = (id: string) => {
+        setDeleteConfirm({ isOpen: true, clientId: id });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (deleteConfirm.clientId) {
+            await deleteClient.mutateAsync(deleteConfirm.clientId);
+            setDeleteConfirm({ isOpen: false, clientId: null });
+        }
+    };
+
+    const handleConfirmSuspension = async () => {
+        if (suspensionPrompt.clientId && suspensionPrompt.newStatus) {
+            await handleStatusChange(suspensionPrompt.clientId, suspensionPrompt.newStatus, suspensionNote);
+            setSuspensionPrompt({ isOpen: false, clientId: null, newStatus: null });
+            setSuspensionNote('');
         }
     };
 
@@ -271,6 +327,26 @@ export function ClientsDashboard() {
                         />
                     </div>
 
+                    {/* Toggle vista tabla / cards */}
+                    <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900/50 p-1 gap-0.5">
+                        <motion.button
+                            onClick={() => handleViewModeChange('cards')}
+                            className={`h-8 w-8 rounded-md flex items-center justify-center transition-all ${viewMode === 'cards' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
+                            whileTap={{ scale: 0.9 }}
+                            title="Vista tarjetas"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </motion.button>
+                        <motion.button
+                            onClick={() => handleViewModeChange('table')}
+                            className={`h-8 w-8 rounded-md flex items-center justify-center transition-all ${viewMode === 'table' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}
+                            whileTap={{ scale: 0.9 }}
+                            title="Vista tabla"
+                        >
+                            <LayoutList className="w-4 h-4" />
+                        </motion.button>
+                    </div>
+
                     <Button
                         variant="outline"
                         onClick={() => setIsFilterOpen(true)}
@@ -291,7 +367,6 @@ export function ClientsDashboard() {
                         filters={advancedFilters}
                         setFilters={(f) => { setAdvancedFilters(f); setPage(1); }}
                         propertyTypes={propertyTypes || []}
-                        availableTags={availableTags || []}
                     />
 
                     <Button
@@ -461,7 +536,7 @@ export function ClientsDashboard() {
                                                         setPage(1);
                                                     }
                                                 }}
-                                                className={`p-4 rounded-xl border transition-all ${criticalCount > 0 ? 'bg-red-500/10 cursor-pointer hover:bg-red-500/20' : 'bg-slate-800/10 border-slate-700/30'} ${activeCard === 'critical' ? 'border-red-500 ring-1 ring-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-red-500/30'}`}
+                                                className={`p-4 rounded-xl border backdrop-blur-md transition-all ${criticalCount > 0 ? 'bg-red-950/60 cursor-pointer hover:bg-red-950/70' : 'bg-slate-950/60 border-slate-700/30'} ${activeCard === 'critical' ? 'border-red-500 ring-1 ring-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-red-500/30'}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${criticalCount > 0 ? (activeCard === 'critical' ? 'bg-red-500/30' : 'bg-red-500/20') : 'bg-slate-700/50'}`}>
@@ -479,7 +554,7 @@ export function ClientsDashboard() {
                                                     setActiveCard(prev => prev === 'active' ? null : 'active');
                                                     setPage(1);
                                                 }}
-                                                className={`p-4 rounded-xl border cursor-pointer transition-all ${activeCard === 'active' ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/10 hover:border-emerald-500/30'}`}
+                                                className={`p-4 rounded-xl border cursor-pointer backdrop-blur-md transition-all ${activeCard === 'active' ? 'bg-emerald-950/60 border-emerald-500 ring-1 ring-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-emerald-950/40 border-emerald-500/20 hover:bg-emerald-950/50 hover:border-emerald-500/30'}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${activeCard === 'active' ? 'bg-emerald-500/20' : 'bg-emerald-500/10'}`}>
@@ -496,7 +571,7 @@ export function ClientsDashboard() {
                                                     setActiveCard(prev => prev === 'closed' ? null : 'closed');
                                                     setPage(1);
                                                 }}
-                                                className={`p-4 rounded-xl border cursor-pointer transition-all ${activeCard === 'closed' ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-blue-500/5 border-blue-500/10 hover:bg-blue-500/10 hover:border-blue-500/30'}`}
+                                                className={`p-4 rounded-xl border cursor-pointer backdrop-blur-md transition-all ${activeCard === 'closed' ? 'bg-blue-950/60 border-blue-500 ring-1 ring-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-blue-950/40 border-blue-500/20 hover:bg-blue-500/10 hover:border-blue-500/30'}`}
                                             >
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${activeCard === 'closed' ? 'bg-blue-500/20' : 'bg-blue-500/10'}`}>
@@ -508,7 +583,7 @@ export function ClientsDashboard() {
                                             </motion.div>
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
-                                                className="p-4 rounded-xl border bg-slate-800/10 border-slate-700/30"
+                                                className="p-4 rounded-xl border bg-slate-950/60 border-slate-700/30 backdrop-blur-md"
                                             >
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${attentionRate > 80 ? 'bg-emerald-500/10' : attentionRate > 50 ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
@@ -520,7 +595,7 @@ export function ClientsDashboard() {
                                                     {attentionRate}%
                                                 </span>
                                             </motion.div>
-                                            <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/20 backdrop-blur-md">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
                                                         <Clock className="w-3.5 h-3.5 text-amber-400" />
@@ -597,15 +672,41 @@ export function ClientsDashboard() {
                                     )}
                                 </div>
                             ) : (
-                                <ClientDataTable
-                                    clients={clients}
-                                    scope={activeTab === 'global' ? 'office' : (activeTab as any)}
-                                    // Hack visual: Si es Global, usamos el formato 'office' que muestra datos completos
-                                    // Si es network, usa el formato network (protegido)
-                                    onEdit={handleEdit}
-                                    onDelete={handleDelete}
-                                    onStatusChange={handleStatusChange}
-                                />
+                                <AnimatePresence mode="wait">
+                                    {viewMode === 'cards' ? (
+                                        <motion.div
+                                            key="cards-view"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.15 }}
+                                        >
+                                            <SearchCardGrid
+                                                clients={clients as any}
+                                                scope={activeTab === 'global' ? 'office' : (activeTab as any)}
+                                                onEdit={handleEdit}
+                                                onDelete={handleDeleteRequest}
+                                                onStatusChange={handleStatusChangeRequest}
+                                            />
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="table-view"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.15 }}
+                                        >
+                                            <ClientDataTable
+                                                clients={clients}
+                                                scope={activeTab === 'global' ? 'office' : (activeTab as any)}
+                                                onEdit={handleEdit}
+                                                onDelete={handleDeleteRequest}
+                                                onStatusChange={handleStatusChangeRequest}
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             )}
                         </div>
 
@@ -648,6 +749,62 @@ export function ClientsDashboard() {
                     </motion.div>
                 </AnimatePresence>
             </Tabs>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteConfirm.isOpen} onOpenChange={(open) => setDeleteConfirm(prev => ({ ...prev, isOpen: open }))}>
+                <AlertDialogContent className="bg-slate-900 border-slate-800">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">¿Estás absolutamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-400">
+                            Esta acción no se puede deshacer. Se eliminará permanentemente la búsqueda y todo su historial de interacciones.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            className="bg-red-600 text-white hover:bg-red-700 border-none"
+                        >
+                            Eliminar Búsqueda
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Suspension Note Prompt Dialog */}
+            <Dialog open={suspensionPrompt.isOpen} onOpenChange={(open) => setSuspensionPrompt(prev => ({ ...prev, isOpen: open }))}>
+                <DialogContent className="bg-slate-900 border-slate-800">
+                    <DialogHeader>
+                        <DialogTitle className="text-white">Suspender Búsqueda</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            Puedes agregar una nota opcional explicando el motivo de la suspensión (ej. "vuelve de viaje el 15/05").
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Textarea
+                            placeholder="Motivo de suspensión..."
+                            value={suspensionNote}
+                            onChange={(e) => setSuspensionNote(e.target.value)}
+                            className="bg-slate-950 border-slate-800 text-white min-h-[100px] focus:ring-purple-500/20"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setSuspensionPrompt({ isOpen: false, clientId: null, newStatus: null })}
+                            className="text-slate-400 hover:text-white"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmSuspension}
+                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                            Confirmar Suspensión
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

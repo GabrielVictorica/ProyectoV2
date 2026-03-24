@@ -30,7 +30,24 @@ export const POINTS_TABLE = {
   acm: 5,
   visita: 2,
   nuevo_contacto: 1, // Nueva persona en CRM (persons)
-  nueva_busqueda: 1,  // Nueva búsqueda cargada (person_searches)
+  nueva_busqueda: 8,  // Nueva búsqueda cargada (person_searches) — incentivada
+} as const;
+
+/** Fecha de corte: búsquedas anteriores a esta fecha valen 1 pt (valor original) */
+export const BUSQUEDA_NEW_SCORING_DATE = '2026-03-23';
+export const BUSQUEDA_OLD_POINTS = 1;
+
+// ─── Bonus NURC (incentivo por calidad de carga) ─────────────────
+
+export const NURC_SCORING = {
+  /** Mínimo de chars por campo para no ser "incompleto" */
+  MIN_CHARS_PER_FIELD: 20,
+  /** Promedio de chars por campo para ser "completo" */
+  IDEAL_AVG_CHARS: 50,
+  /** Bonus parcial: todos ≥ min, promedio < ideal */
+  PARTIAL_BONUS: 2,
+  /** Bonus completo: todos ≥ min, promedio ≥ ideal */
+  COMPLETE_BONUS: 5,
 } as const;
 
 /** Bonus de referido: +5 a reunion_verde, pre_listing, o pre_buying
