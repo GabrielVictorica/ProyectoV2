@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     X, Filter, RotateCcw,
     Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel,
-    DollarSign, Banknote, CreditCard, RefreshCw, Blend, HardHat, Landmark
+    DollarSign, Banknote, CreditCard, RefreshCw, Blend, HardHat, Landmark, LandPlot
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -58,6 +58,7 @@ function getIconForPropertyType(name: string) {
     if (n.includes('campo')) return Tractor;
     if (n.includes('hotel')) return Hotel;
     if (n.includes('en pozo') || n.includes('pozo')) return HardHat;
+    if (n.includes('hectárea') || n.includes('hectarea')) return LandPlot;
     return Building;
 }
 

@@ -487,7 +487,7 @@ export function ClientDataTable({
                                                         }}
                                                         className="gap-2 cursor-pointer focus:bg-white/5"
                                                     >
-                                                        <Copy className="w-3.5 h-3.5" /> Copiar Link
+                                                        <Copy className="w-3.5 h-3.5 text-violet-400" /> Copiar búsqueda
                                                     </DropdownMenuItem>
                                                     {!isActuallyAnonymous && (
                                                         <>

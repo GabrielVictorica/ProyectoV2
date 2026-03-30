@@ -25,8 +25,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCreateClient, useUpdateClient } from '../hooks/useClients';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard, Clock, Eye, Wallet, ShoppingCart, HardHat, Landmark } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, User, Phone, Mail, MapPin, Tag as TagIcon, Target, ChevronRight, ChevronLeft, CheckCircle2, Home, Building, Building2, Store, Briefcase, Map, Car, Warehouse, Tractor, Hotel, DollarSign, RefreshCw, CreditCard, Clock, Eye, Wallet, ShoppingCart, HardHat, Landmark, LandPlot } from 'lucide-react';
+import { ScrollableFormArea } from '@/components/ui/scrollable-form-area';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -319,7 +319,7 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                     }}
                     className="flex flex-col h-full"
                 >
-                    <ScrollArea className="h-[min(500px,65vh)] pr-4">
+                    <ScrollableFormArea className="h-[min(500px,65vh)]" resetKey={currentStep}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={currentStep}
@@ -901,7 +901,7 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                 )}
                             </motion.div>
                         </AnimatePresence>
-                    </ScrollArea>
+                    </ScrollableFormArea>
 
                     {/* Navigation Buttons */}
                     <div className="flex gap-4 pt-8 mt-auto">
@@ -968,5 +968,6 @@ function getIconForPropertyType(name: string) {
     if (lowercaseName.includes('campo')) return Tractor;
     if (lowercaseName.includes('hotel')) return Hotel;
     if (lowercaseName.includes('en pozo') || lowercaseName.includes('pozo')) return HardHat;
+    if (lowercaseName.includes('hectárea') || lowercaseName.includes('hectarea')) return LandPlot;
     return Building;
 }

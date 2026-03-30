@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Home, Building, Building2, Store, Briefcase, Map, Car,
-    Warehouse, Tractor, Hotel, HardHat, Target, Trophy,
+    Warehouse, Tractor, Hotel, HardHat, LandPlot, Target, Trophy,
     DollarSign, RefreshCw, CreditCard, MapPin, User,
     MessageSquare, CheckCircle2, Clock, AlertTriangle, TrendingUp,
-    MoreVertical, Edit2, Trash2, Archive, Ban, Landmark,
+    MoreVertical, Edit2, Trash2, Archive, Ban, Landmark, Copy,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { usePropertyTypes } from '@/features/properties/hooks/useProperties';
 import { useAddInteraction } from '../hooks/useClients';
 import { SearchDetailSheet } from './SearchDetailSheet';
+import { generateSearchClipboardText } from '../utils/clientUtils';
 import type { ClientDisplay } from '../utils/privacy';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ function getIconForPropertyType(name: string) {
     if (n.includes('campo')) return Tractor;
     if (n.includes('hotel')) return Hotel;
     if (n.includes('pozo')) return HardHat;
+    if (n.includes('hectárea') || n.includes('hectarea')) return LandPlot;
     return Building;
 }
 
@@ -224,10 +226,10 @@ function SearchCard({ client, scope, onEdit, onDelete, onStatusChange, propertyT
                                 </div>
                             </div>
 
-                            {/* Acciones rápidas - solo propias */}
-                            {isOwner && (
-                                <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                                    {/* Nota rápida */}
+                            {/* Acciones rápidas */}
+                            <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                {/* Nota rápida - solo propias */}
+                                {isOwner && (
                                     <Popover open={quickPopoverOpen} onOpenChange={setQuickPopoverOpen}>
                                         <PopoverTrigger asChild>
                                             <button
@@ -259,77 +261,98 @@ function SearchCard({ client, scope, onEdit, onDelete, onStatusChange, propertyT
                                             </Button>
                                         </PopoverContent>
                                     </Popover>
+                                )}
 
-                                    {/* Menú de acciones */}
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all">
-                                                <MoreVertical className="w-3.5 h-3.5 text-white/40" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            className="bg-slate-900 border-slate-800 text-white"
-                                            onClick={e => e.stopPropagation()}
+                                {/* Menú de acciones */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all">
+                                            <MoreVertical className="w-3.5 h-3.5 text-white/40" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        className="w-48 bg-slate-900 border-slate-800 text-white"
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {/* Grupo 1: Compartir */}
+                                        <DropdownMenuItem
+                                            className="gap-2 cursor-pointer hover:bg-slate-800 text-white/80"
+                                            onClick={() => {
+                                                const text = generateSearchClipboardText(client, propertyTypes || []);
+                                                navigator.clipboard.writeText(text);
+                                                toast.success('Búsqueda copiada');
+                                            }}
                                         >
-                                            <DropdownMenuLabel className="text-white/40 text-[10px] uppercase tracking-wider">Acciones</DropdownMenuLabel>
-                                            <DropdownMenuSeparator className="bg-slate-800" />
-                                            {onEdit && (
-                                                <DropdownMenuItem
-                                                    className="gap-2 cursor-pointer hover:bg-slate-800 text-white/80"
-                                                    onClick={() => onEdit(client)}
-                                                >
-                                                    <Edit2 className="w-3.5 h-3.5" /> Editar
-                                                </DropdownMenuItem>
-                                            )}
-                                            {onStatusChange && client.status === 'active' && (
-                                                <>
-                                                    <DropdownMenuItem
-                                                        className="gap-2 cursor-pointer hover:bg-amber-500/10 text-amber-400"
-                                                        onClick={() => {
-                                                            onStatusChange(client.id, 'inactive');
-                                                        }}
-                                                    >
-                                                        <Clock className="w-3.5 h-3.5" /> Suspender
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="gap-2 cursor-pointer hover:bg-emerald-500/10 text-emerald-400"
-                                                        onClick={() => onStatusChange(client.id, 'closed')}
-                                                    >
-                                                        <CheckCircle2 className="w-3.5 h-3.5" /> Cerrada (éxito)
-                                                    </DropdownMenuItem>
+                                            <Copy className="w-3.5 h-3.5 text-violet-400" /> Copiar búsqueda
+                                        </DropdownMenuItem>
+
+                                        {isOwner && (
+                                            <>
+                                                {/* Grupo 2: Gestión */}
+                                                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                                                {onEdit && (
                                                     <DropdownMenuItem
                                                         className="gap-2 cursor-pointer hover:bg-slate-800 text-white/80"
-                                                        onClick={() => onStatusChange(client.id, 'archived')}
+                                                        onClick={() => onEdit(client)}
                                                     >
-                                                        <Ban className="w-3.5 h-3.5 text-red-400" /> Perdida
+                                                        <Edit2 className="w-3.5 h-3.5" /> Editar
                                                     </DropdownMenuItem>
-                                                </>
-                                            )}
-                                            {onStatusChange && client.status !== 'active' && (
-                                                <DropdownMenuItem
-                                                    className="gap-2 cursor-pointer hover:bg-emerald-500/10 text-emerald-400"
-                                                    onClick={() => onStatusChange(client.id, 'active')}
-                                                >
-                                                    <TrendingUp className="w-3.5 h-3.5" /> Reactivar Búsqueda
-                                                </DropdownMenuItem>
-                                            )}
-                                            {onDelete && (
-                                                <>
-                                                    <DropdownMenuSeparator className="bg-slate-800" />
-                                                    <DropdownMenuItem
-                                                        className="gap-2 cursor-pointer hover:bg-red-500/10 text-red-400"
-                                                        onClick={() => {
-                                                            onDelete(client.id);
-                                                        }}
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                                                    </DropdownMenuItem>
-                                                </>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            )}
+                                                )}
+
+                                                {/* Grupo 3: Cambiar estado */}
+                                                {onStatusChange && client.status === 'active' && (
+                                                    <>
+                                                        <DropdownMenuSeparator className="bg-white/[0.06]" />
+                                                        <DropdownMenuLabel className="text-white/30 text-[10px] uppercase tracking-wider">Cambiar estado</DropdownMenuLabel>
+                                                        <DropdownMenuItem
+                                                            className="gap-2 cursor-pointer hover:bg-amber-500/10 text-amber-400"
+                                                            onClick={() => onStatusChange(client.id, 'inactive')}
+                                                        >
+                                                            <Clock className="w-3.5 h-3.5" /> Suspender
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="gap-2 cursor-pointer hover:bg-emerald-500/10 text-emerald-400"
+                                                            onClick={() => onStatusChange(client.id, 'closed')}
+                                                        >
+                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Cerrada (éxito)
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="gap-2 cursor-pointer hover:bg-red-500/10 text-red-400/80"
+                                                            onClick={() => onStatusChange(client.id, 'archived')}
+                                                        >
+                                                            <Ban className="w-3.5 h-3.5" /> Perdida
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                                {onStatusChange && client.status !== 'active' && (
+                                                    <>
+                                                        <DropdownMenuSeparator className="bg-white/[0.06]" />
+                                                        <DropdownMenuItem
+                                                            className="gap-2 cursor-pointer hover:bg-emerald-500/10 text-emerald-400"
+                                                            onClick={() => onStatusChange(client.id, 'active')}
+                                                        >
+                                                            <TrendingUp className="w-3.5 h-3.5" /> Reactivar Búsqueda
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+
+                                                {/* Grupo 4: Zona peligrosa */}
+                                                {onDelete && (
+                                                    <>
+                                                        <DropdownMenuSeparator className="bg-white/[0.06]" />
+                                                        <DropdownMenuItem
+                                                            className="gap-2 cursor-pointer hover:bg-red-500/10 text-red-400"
+                                                            onClick={() => onDelete(client.id)}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
 
                         {/* Tipos de propiedad */}

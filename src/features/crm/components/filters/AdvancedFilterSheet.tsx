@@ -34,7 +34,7 @@ const CONTACT_TYPE_OPTIONS = [
 ];
 
 const VINCULO_OPTIONS = [
-    'Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro'
+    'Cliente', 'Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro'
 ];
 
 const HEALTH_OPTIONS = [

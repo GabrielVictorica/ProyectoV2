@@ -46,7 +46,7 @@ const SOURCES = [
 const TAG_GROUPS: MultiSelectOptionGroup[] = [
     {
         label: 'Vínculo / Origen',
-        options: ['Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro']
+        options: ['Cliente', 'Familiar', 'Amigo', 'Colega', 'Referente', 'Conocido', 'Socio', 'Otro']
     },
 ];
 
@@ -82,7 +82,7 @@ import { Person, RelationshipStatus } from '@/features/clients/types';
 import { createPersonAction, updatePersonAction } from '../actions/personActions';
 import { personSchema } from '../schemas/personSchema';
 import { toast } from 'sonner';
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollableFormArea } from '@/components/ui/scrollable-form-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Phone, Mail, User, Briefcase, Heart, Shield, Users, MessageSquare, Settings, Calendar, Hash, MapPin, Tag, Clock, Star, UserCheck, Crown } from 'lucide-react';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -370,7 +370,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                     </TabsList>
 
                                     {/* Tab Content */}
-                                    <ScrollArea className="h-[calc(max(400px,min(600px,75vh))-140px)] p-6">
+                                    <ScrollableFormArea className="h-[calc(max(400px,min(600px,75vh))-140px)] p-6" resetKey={activeTab}>
 
                                         {/* ═══ TAB 1: IDENTIDAD Y COMUNICACIÓN ═══ */}
                                         <TabsContent value="identity" className="m-0 space-y-5" forceMount style={{ display: activeTab === 'identity' ? 'block' : 'none' }}>
@@ -886,7 +886,7 @@ export function PersonFormDialog({ open, onOpenChange, person, initialData, onSu
                                             </TabAnimation>
                                         </TabsContent>
 
-                                    </ScrollArea>
+                                    </ScrollableFormArea>
                                 </Tabs>
                             </div>
 
