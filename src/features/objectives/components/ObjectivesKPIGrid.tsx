@@ -7,7 +7,6 @@ import {
     DollarSign,
     CheckCircle2,
     TrendingUp,
-    Users,
     BarChart3,
     ShieldCheck,
     AlertTriangle,
@@ -30,68 +29,9 @@ export function ObjectivesKPIGrid({
     isLoading,
     variant = 'financial', // Por defecto financiero si no se especifica
 }: ObjectivesKPIGridProps) {
-    // Modo Equipo
+    // Modo Equipo - Las KPIs se integran en el ProgressPanel y OperationalPanel
     if (isTeamView) {
-        if (variant === 'operational') return null; // En team view por defecto mostramos el resumen financiero arriba
-        return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                    <ObjectivesKPICard
-                        title="Meta Total"
-                        value={formatCurrency(teamSummary?.total_team_goal || 0)}
-                        icon={<Target className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="blue"
-                        isString
-                        subtitle={`${teamSummary?.agents_with_goals || 0} agentes con meta`}
-                    />
-                </motion.div>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.05 }}>
-                    <ObjectivesKPICard
-                        title="Ingresos Brutos"
-                        value={formatCurrency(teamSummary?.total_team_income || 0)}
-                        icon={<DollarSign className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="green"
-                        isString
-                        segmentedProgress={{
-                            completed: teamSummary?.total_completed_income || 0,
-                            reserved: teamSummary?.total_reserved_income || 0,
-                            total: teamSummary?.total_team_income || 1,
-                            completedLabel: `Cerrado ${formatCurrency(teamSummary?.total_completed_income || 0)}`,
-                            reservedLabel: `Reservado ${formatCurrency(teamSummary?.total_reserved_income || 0)}`,
-                        }}
-                    />
-                </motion.div>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.1 }}>
-                    <ObjectivesKPICard
-                        title="Puntas Totales"
-                        value={teamSummary?.total_puntas_closed || 0}
-                        icon={<CheckCircle2 className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="green"
-                        segmentedProgress={{
-                            completed: teamSummary?.total_completed_puntas || 0,
-                            reserved: teamSummary?.total_reserved_puntas || 0,
-                            total: teamSummary?.total_puntas_closed || 1,
-                            completedLabel: `${teamSummary?.total_completed_puntas || 0} cerr.`,
-                            reservedLabel: `${teamSummary?.total_reserved_puntas || 0} res.`,
-                        }}
-                    />
-                </motion.div>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
-                    <ObjectivesKPICard
-                        title="Gap al Objetivo"
-                        value={formatCurrency((teamSummary?.total_team_goal || 0) - (teamSummary?.total_team_income || 0))}
-                        icon={<TrendingUp className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="amber"
-                        isString
-                        subtitle={`${teamSummary?.total_puntas_needed || 0} puntas faltantes`}
-                    />
-                </motion.div>
-            </div>
-        );
+        return null;
     }
 
     if (progress) {

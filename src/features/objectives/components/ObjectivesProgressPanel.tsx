@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Zap, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Target, Zap, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Users } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { BorderBeam } from '@/components/ui/border-beam';
 import { NumberTicker } from '@/components/ui/number-ticker';
@@ -47,7 +47,6 @@ export function ObjectivesProgressPanel({
                     exit={{ opacity: 0, y: -20 }}
                 >
                     <Card className="relative bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden rounded-xl">
-                        {/* BorderBeam premium animated light effect */}
                         <BorderBeam
                             size={120}
                             duration={8}
@@ -55,35 +54,109 @@ export function ObjectivesProgressPanel({
                             colorTo="#06b6d4"
                             borderWidth={2}
                         />
-                        <CardContent className="py-12 text-center space-y-8">
-                            <div className="space-y-2">
-                                <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">
-                                    Progreso Colectivo del Equipo
-                                </p>
-                                <p className="text-7xl font-black text-white">
-                                    <NumberTicker
-                                        value={teamSummary?.avg_progress || 0}
-                                        decimalPlaces={1}
-                                        suffix="%"
-                                        delay={0.3}
-                                        className="text-7xl font-black text-white"
-                                    />
-                                </p>
-                            </div>
-                            <div className="max-w-2xl mx-auto">
-                                <div className="relative h-4 w-full bg-slate-800 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(teamSummary?.avg_progress || 0, 100)}%` }}
-                                        transition={{ duration: 1, ease: 'easeOut' }}
-                                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-cyan-400"
-                                    />
-                                </div>
-                                <div className="flex justify-between text-xs text-slate-500 mt-2">
-                                    <span>Ingresos: {formatCurrency(teamSummary?.total_team_income || 0)}</span>
-                                    <span>Meta: {formatCurrency(teamSummary?.total_team_goal || 0)}</span>
-                                </div>
-                            </div>
+                        <CardContent className="py-10 px-6 md:px-10">
+                            {(() => {
+                                const totalGoal = teamSummary?.total_team_goal || 0;
+                                const totalIncome = teamSummary?.total_team_income || 0;
+                                const completedIncome = teamSummary?.total_completed_income || 0;
+                                const reservedIncome = teamSummary?.total_reserved_income || 0;
+                                const gap = totalGoal - totalIncome;
+                                const avgProgress = teamSummary?.avg_progress || 0;
+                                const puntasNeeded = teamSummary?.total_puntas_needed || 0;
+                                const agentsWithGoals = teamSummary?.agents_with_goals || 0;
+
+                                const completedPct = totalGoal > 0 ? Math.min(100, (completedIncome / totalGoal) * 100) : 0;
+                                const reservedPct = totalGoal > 0 ? Math.min(100 - completedPct, (reservedIncome / totalGoal) * 100) : 0;
+
+                                return (
+                                    <div className="space-y-8">
+                                        {/* Top row: Meta + Progreso + Gap */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                                            {/* Meta Total */}
+                                            <div className="text-center md:text-left">
+                                                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
+                                                    Meta Total
+                                                </p>
+                                                <p className="text-3xl md:text-4xl font-black text-blue-400 tracking-tight">
+                                                    {formatCurrency(totalGoal)}
+                                                </p>
+                                                <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 justify-center md:justify-start">
+                                                    <Users className="w-3 h-3" />
+                                                    {agentsWithGoals} agentes con meta
+                                                </p>
+                                            </div>
+
+                                            {/* Progreso Central */}
+                                            <div className="text-center">
+                                                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
+                                                    Progreso del Equipo
+                                                </p>
+                                                <p className="text-5xl md:text-6xl font-black text-white">
+                                                    <NumberTicker
+                                                        value={avgProgress}
+                                                        decimalPlaces={1}
+                                                        suffix="%"
+                                                        delay={0.3}
+                                                        className="text-5xl md:text-6xl font-black text-white"
+                                                    />
+                                                </p>
+                                            </div>
+
+                                            {/* Gap al Objetivo */}
+                                            <div className="text-center md:text-right">
+                                                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
+                                                    Gap al Objetivo
+                                                </p>
+                                                <p className="text-3xl md:text-4xl font-black text-amber-400 tracking-tight">
+                                                    {formatCurrency(gap > 0 ? gap : 0)}
+                                                </p>
+                                                <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 justify-center md:justify-end">
+                                                    <TrendingDown className="w-3 h-3" />
+                                                    {puntasNeeded} puntas faltantes
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div>
+                                            <div className="h-4 w-full bg-slate-800/50 rounded-full overflow-hidden border border-white/5 p-1 flex">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${completedPct}%` }}
+                                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                                    className="h-full rounded-l-full bg-gradient-to-r from-emerald-600 to-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                                />
+                                                {reservedPct > 0 && (
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${reservedPct}%` }}
+                                                        transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+                                                        className="h-full bg-gradient-to-r from-amber-500/70 to-amber-400/50"
+                                                        style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 6px)' }}
+                                                    />
+                                                )}
+                                            </div>
+                                            <div className="flex justify-between items-center mt-2 px-1">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="flex items-center gap-1.5 text-[10px]">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                        <span className="text-emerald-400/70 font-medium">Cerrado {formatCurrency(completedIncome)}</span>
+                                                    </span>
+                                                    {reservedIncome > 0 && (
+                                                        <span className="flex items-center gap-1.5 text-[10px]">
+                                                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                            <span className="text-amber-400/70 font-medium">Reservado {formatCurrency(reservedIncome)}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                    Ingresos: {formatCurrency(totalIncome)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </CardContent>
                     </Card>
                 </motion.div>
