@@ -831,7 +831,7 @@ export async function upsertGoalAction(
 /**
  * Obtener progreso de objetivos de un agente (Admin/Broker access)
  */
-export async function getAgentProgressAction(agentId: string, year: number) {
+export async function getAgentProgressAction(agentId: string, year: number, startDate?: string, endDate?: string) {
     try {
         const supabase = await createClient();
         const adminClient = createAdminClient();
@@ -840,10 +840,9 @@ export async function getAgentProgressAction(agentId: string, year: number) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
-        const [profileResult, targetProfileResult, progressResult] = await Promise.all([
+        const [profileResult, targetProfileResult] = await Promise.all([
             (supabase.from('profiles') as any).select('role, organization_id').eq('id', user.id).single(),
             (adminClient.from('profiles') as any).select('organization_id, reports_to_organization_id').eq('id', agentId).single(),
-            (adminClient.from('view_agent_progress') as any).select('*').eq('agent_id', agentId).eq('year', year).maybeSingle()
         ]);
 
         if (!profileResult.data) return { success: false, error: 'Perfil no encontrado' };
@@ -857,8 +856,81 @@ export async function getAgentProgressAction(agentId: string, year: number) {
         const canSee = userProfile.role === 'god' || user.id === agentId || (userProfile.role === 'parent' && (isSameOrg || reportsToMyOrg));
         if (!canSee) return { success: false, error: 'No autorizado para ver estos objetivos' };
 
+        // Siempre obtener vista + transacciones para métricas operacionales
+        const txSelect = 'gross_commission, actual_price, net_commission, master_commission_amount, office_commission_amount, sides, status, transaction_date';
+
+        let txQuery = (adminClient.from('transactions') as any)
+            .select(txSelect)
+            .eq('agent_id', agentId);
+
+        // Filtro de fechas: período específico o año completo
+        if (startDate && endDate) {
+            txQuery = txQuery.gte('transaction_date', startDate).lte('transaction_date', endDate);
+        } else {
+            txQuery = txQuery.gte('transaction_date', `${year}-01-01`).lte('transaction_date', `${year}-12-31`);
+        }
+
+        const [progressResult, transactionsResult] = await Promise.all([
+            (adminClient.from('view_agent_progress') as any)
+                .select('*').eq('agent_id', agentId).eq('year', year).maybeSingle(),
+            txQuery,
+        ]);
+
         if (progressResult.error) throw progressResult.error;
-        return { success: true, data: progressResult.data };
+        if (transactionsResult.error) throw transactionsResult.error;
+
+        const baseData = progressResult.data;
+        if (!baseData) return { success: true, data: null };
+
+        // Calcular métricas operacionales desde transacciones
+        const txns = (transactionsResult.data || []) as { gross_commission: number; actual_price: number; net_commission: number; master_commission_amount: number; office_commission_amount: number; sides: number; status: string; transaction_date: string }[];
+
+        const nonCancelled = txns.filter(t => t.status !== 'cancelled');
+        const completed = txns.filter(t => t.status === 'completed');
+        const pending = txns.filter(t => t.status === 'pending');
+
+        const operationalMetrics = {
+            operations_count: nonCancelled.length,
+            double_sided_count: nonCancelled.filter(t => t.sides === 2).length,
+            single_sided_count: nonCancelled.filter(t => t.sides === 1).length,
+            total_net_income: nonCancelled.reduce((s, t) => s + Number(t.net_commission || 0), 0),
+            total_master_income: nonCancelled.reduce((s, t) => s + Number(t.master_commission_amount || 0), 0),
+            total_office_income: nonCancelled.reduce((s, t) => s + Number(t.office_commission_amount || 0), 0),
+            completed_sales_volume: completed.reduce((s, t) => s + Number(t.actual_price || 0), 0),
+            reserved_sales_volume: pending.reduce((s, t) => s + Number(t.actual_price || 0), 0),
+        };
+
+        // Si no hay rango de fechas (anual), usar vista pre-agregada + métricas operacionales
+        if (!startDate || !endDate) {
+            return { success: true, data: { ...baseData, ...operationalMetrics } };
+        }
+
+        // Con rango de fechas: recalcular métricas financieras del período
+        const periodIncome = nonCancelled.reduce((s, t) => s + Number(t.gross_commission || 0), 0);
+        const completedIncome = completed.reduce((s, t) => s + Number(t.gross_commission || 0), 0);
+        const reservedIncome = pending.reduce((s, t) => s + Number(t.gross_commission || 0), 0);
+        const periodSalesVolume = nonCancelled.reduce((s, t) => s + Number(t.actual_price || 0), 0);
+
+        const periodData = {
+            ...baseData,
+            ...operationalMetrics,
+            actual_gross_income: periodIncome,
+            actual_puntas_count: nonCancelled.length,
+            completed_gross_income: completedIncome,
+            reserved_gross_income: reservedIncome,
+            completed_puntas_count: completed.length,
+            reserved_puntas_count: pending.length,
+            total_sales_volume: periodSalesVolume,
+            progress_percentage: baseData.annual_billing_goal > 0
+                ? (periodIncome / baseData.annual_billing_goal) * 100
+                : 0,
+            gap_to_goal: Math.max(0, baseData.annual_billing_goal - periodIncome),
+            estimated_puntas_needed: baseData.average_ticket_target > 0 && baseData.average_commission_target > 0
+                ? Math.ceil(Math.max(0, baseData.annual_billing_goal - periodIncome) / (baseData.average_ticket_target * (baseData.average_commission_target / 100)))
+                : 0,
+        };
+
+        return { success: true, data: periodData };
     } catch (err: any) {
         console.error('Error in getAgentProgressAction:', err);
         return { success: false, error: err.message };
@@ -869,7 +941,7 @@ export async function getAgentProgressAction(agentId: string, year: number) {
 /**
  * Obtener resumen de objetivos del equipo (Admin/Broker access)
  */
-export async function getTeamObjectivesSummaryAction(year: number, organizationId?: string) {
+export async function getTeamObjectivesSummaryAction(year: number, organizationId?: string, startDate?: string, endDate?: string) {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -885,16 +957,97 @@ export async function getTeamObjectivesSummaryAction(year: number, organizationI
         const targetOrgId = isGod ? organizationId : userProfile.organization_id;
 
         const adminClient = createAdminClient();
-        let query = adminClient.from('view_team_objectives_summary').select('*').eq('year', year);
 
+        // Siempre obtener transacciones para métricas operacionales
+        const txSelect = 'agent_id, gross_commission, net_commission, master_commission_amount, office_commission_amount, actual_price, sides, status, organization_id, transaction_date';
+
+        let summaryQuery = (adminClient.from('view_team_objectives_summary') as any).select('*').eq('year', year);
         if (targetOrgId && targetOrgId !== 'all') {
-            query = query.eq('organization_id', targetOrgId);
+            summaryQuery = summaryQuery.eq('organization_id', targetOrgId);
         }
 
-        const { data, error } = await (query as any);
-        if (error) throw error;
+        let txnQuery = (adminClient.from('transactions') as any).select(txSelect);
+        if (startDate && endDate) {
+            txnQuery = txnQuery.gte('transaction_date', startDate).lte('transaction_date', endDate);
+        } else {
+            txnQuery = txnQuery.gte('transaction_date', `${year}-01-01`).lte('transaction_date', `${year}-12-31`);
+        }
+        if (targetOrgId && targetOrgId !== 'all') {
+            txnQuery = txnQuery.eq('organization_id', targetOrgId);
+        }
 
-        return { success: true, data };
+        const [summaryResult, txnResult] = await Promise.all([summaryQuery, txnQuery]);
+        if (summaryResult.error) throw summaryResult.error;
+        if (txnResult.error) throw txnResult.error;
+
+        const baseSummaries = (summaryResult.data || []) as any[];
+        const txns = (txnResult.data || []) as { agent_id: string; gross_commission: number; net_commission: number; master_commission_amount: number; office_commission_amount: number; actual_price: number; sides: number; status: string; organization_id: string; transaction_date: string }[];
+
+        // Helper para calcular métricas operacionales de un set de transacciones
+        const calcOperational = (orgTxns: typeof txns) => {
+            const nonCancelled = orgTxns.filter(t => t.status !== 'cancelled');
+            const completed = orgTxns.filter(t => t.status === 'completed');
+            const pending = orgTxns.filter(t => t.status === 'pending');
+
+            return {
+                totalIncome: nonCancelled.reduce((s, t) => s + Number(t.gross_commission || 0), 0),
+                completedIncome: completed.reduce((s, t) => s + Number(t.gross_commission || 0), 0),
+                reservedIncome: pending.reduce((s, t) => s + Number(t.gross_commission || 0), 0),
+                nonCancelledCount: nonCancelled.length,
+                completedCount: completed.length,
+                pendingCount: pending.length,
+                // Métricas operacionales
+                total_sales_volume: nonCancelled.reduce((s, t) => s + Number(t.actual_price || 0), 0),
+                total_operations_count: nonCancelled.length,
+                total_double_sided_count: nonCancelled.filter(t => t.sides === 2).length,
+                total_single_sided_count: nonCancelled.filter(t => t.sides === 1).length,
+                total_net_income: nonCancelled.reduce((s, t) => s + Number(t.net_commission || 0), 0),
+                total_master_income: nonCancelled.reduce((s, t) => s + Number(t.master_commission_amount || 0), 0),
+                total_office_income: nonCancelled.reduce((s, t) => s + Number(t.office_commission_amount || 0), 0),
+                total_completed_volume: completed.reduce((s, t) => s + Number(t.actual_price || 0), 0),
+                total_reserved_volume: pending.reduce((s, t) => s + Number(t.actual_price || 0), 0),
+            };
+        };
+
+        return {
+            success: true,
+            data: baseSummaries.map((summary: any) => {
+                const orgTxns = summary.organization_id
+                    ? txns.filter(t => t.organization_id === summary.organization_id)
+                    : txns;
+
+                const ops = calcOperational(orgTxns);
+
+                const result: any = {
+                    ...summary,
+                    // Métricas operacionales
+                    total_sales_volume: ops.total_sales_volume,
+                    total_operations_count: ops.total_operations_count,
+                    total_double_sided_count: ops.total_double_sided_count,
+                    total_single_sided_count: ops.total_single_sided_count,
+                    total_net_income: ops.total_net_income,
+                    total_master_income: ops.total_master_income,
+                    total_office_income: ops.total_office_income,
+                    total_completed_volume: ops.total_completed_volume,
+                    total_reserved_volume: ops.total_reserved_volume,
+                };
+
+                // Recalcular métricas financieras si hay filtro de período
+                if (startDate && endDate) {
+                    result.total_team_income = ops.totalIncome;
+                    result.total_completed_income = ops.completedIncome;
+                    result.total_reserved_income = ops.reservedIncome;
+                    result.total_puntas_closed = ops.nonCancelledCount;
+                    result.total_completed_puntas = ops.completedCount;
+                    result.total_reserved_puntas = ops.pendingCount;
+                    result.avg_progress = summary.total_team_goal > 0
+                        ? (ops.totalIncome / summary.total_team_goal) * 100
+                        : 0;
+                }
+
+                return result;
+            }),
+        };
     } catch (err: any) {
         console.error('Error in getTeamObjectivesSummaryAction:', err);
         return { success: false, error: err.message };

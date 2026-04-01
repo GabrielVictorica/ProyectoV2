@@ -9,11 +9,12 @@ import {
     useAgentSplit,
 } from '../hooks/useObjectives';
 import { GoalSettingDialog } from './GoalSettingDialog';
-import { ObjectivesHeader } from './ObjectivesHeader';
+import { ObjectivesHeader, type PeriodFilter } from './ObjectivesHeader';
 import { ObjectivesKPIGrid } from './ObjectivesKPIGrid';
 import { ObjectivesProgressPanel } from './ObjectivesProgressPanel';
 import { ObjectivesListingsFunnel } from './ObjectivesListingsFunnel';
 import { ObjectivesAgentTable } from './ObjectivesAgentTable';
+import { ObjectivesOperationalPanel } from './ObjectivesOperationalPanel';
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
@@ -31,6 +32,7 @@ export function ObjectivesPage() {
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [selectedAgentId, setSelectedAgentId] = useState<string>('all');
+    const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('annual');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
 
@@ -70,12 +72,14 @@ export function ObjectivesPage() {
     // Hooks de Objetivos
     const { progress, isLoading: isLoadingIndividual } = useObjectives(
         selectedYear,
-        effectiveAgentId
+        effectiveAgentId,
+        selectedPeriod
     );
 
     const { data: teamSummary, isLoading: isLoadingTeam } = useTeamObjectivesSummary(
         selectedYear,
-        effectiveOrgId
+        effectiveOrgId,
+        selectedPeriod
     );
 
     const { data: agentsList, isLoading: isLoadingAgentsList } = useAgentsObjectivesList(
@@ -107,6 +111,7 @@ export function ObjectivesPage() {
     const handleResetFilters = () => {
         setSelectedYear(currentYear);
         setSelectedOrg('all');
+        setSelectedPeriod('annual');
         setSelectedAgentId(isGodOrParent ? 'all' : (auth?.profile?.id || 'all'));
     };
 
@@ -121,6 +126,7 @@ export function ObjectivesPage() {
     const hasActiveFilters =
         selectedYear !== currentYear ||
         selectedOrg !== 'all' ||
+        selectedPeriod !== 'annual' ||
         (isGodOrParent && selectedAgentId !== 'all');
 
     return (
@@ -137,6 +143,7 @@ export function ObjectivesPage() {
                 selectedYear={selectedYear}
                 selectedOrg={selectedOrg}
                 selectedAgentId={selectedAgentId}
+                selectedPeriod={selectedPeriod}
                 years={years}
                 organizations={organizations || []}
                 filteredAgents={filteredAgents}
@@ -144,6 +151,7 @@ export function ObjectivesPage() {
                 onYearChange={setSelectedYear}
                 onOrgChange={setSelectedOrg}
                 onAgentChange={handleSelectAgent}
+                onPeriodChange={setSelectedPeriod}
                 onBack={handleBack}
                 onResetFilters={handleResetFilters}
                 onOpenDialog={() => setIsDialogOpen(true)}
@@ -181,6 +189,22 @@ export function ObjectivesPage() {
                     progress={progress || null}
                     isLoading={isLoading}
                     onOpenDialog={() => setIsDialogOpen(true)}
+                />
+            </motion.div>
+
+            {/* Panel Operacional (Volumen, Facturación, Operaciones, Desglose) */}
+            <motion.div
+                key={`operational-panel-${isTeamView}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.15 }}
+            >
+                <ObjectivesOperationalPanel
+                    isTeamView={isTeamView}
+                    teamSummary={teamSummary || null}
+                    progress={progress || null}
+                    isLoading={isLoading}
+                    userRole={userRole}
                 />
             </motion.div>
 

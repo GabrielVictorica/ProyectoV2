@@ -23,7 +23,7 @@ interface ObjectivesAgentTableProps {
     onSelectAgent: (agentId: string) => void;
 }
 
-type SortKey = 'name' | 'goal' | 'billed' | 'progress' | 'puntas' | 'needed' | 'capt' | 'pl' | 'nc' | 'status';
+type SortKey = 'name' | 'goal' | 'billed' | 'progress' | 'puntas' | 'needed' | 'capt' | 'status' | 'volume' | 'ops';
 type SortDir = 'asc' | 'desc';
 
 // Ranking medals for top 3
@@ -65,6 +65,16 @@ const AgentTableRow = memo(function AgentTableRow({
                     )}
                     <span>{agent.first_name} {agent.last_name}</span>
                 </div>
+            </TableCell>
+
+            {/* Volumen */}
+            <TableCell className="text-slate-300">
+                {formatCurrency(agent.total_sales_volume || 0)}
+            </TableCell>
+
+            {/* Operaciones */}
+            <TableCell className="text-center">
+                <span className="text-slate-300">{agent.operations_count || 0}</span>
             </TableCell>
 
             {/* Meta */}
@@ -135,16 +145,6 @@ const AgentTableRow = memo(function AgentTableRow({
             {/* Capt. Obj */}
             <TableCell className="text-center text-slate-300">
                 {agent.listings_goal_annual || 0}
-            </TableCell>
-
-            {/* PL (Sem) */}
-            <TableCell className="text-center font-bold text-purple-400">
-                {(agent.required_prelistings_weekly || 0).toFixed(1)}
-            </TableCell>
-
-            {/* N.C. Sem */}
-            <TableCell className="text-center font-bold text-blue-400">
-                {(agent.weekly_pl_pb_target || 0).toFixed(1)}
             </TableCell>
 
             {/* Estado */}
@@ -251,6 +251,14 @@ export function ObjectivesAgentTable({
                     return sortDir === 'asc'
                         ? (valA as string).localeCompare(valB as string)
                         : (valB as string).localeCompare(valA as string);
+                case 'volume':
+                    valA = a.total_sales_volume || 0;
+                    valB = b.total_sales_volume || 0;
+                    break;
+                case 'ops':
+                    valA = a.operations_count || 0;
+                    valB = b.operations_count || 0;
+                    break;
                 case 'goal':
                     valA = a.annual_billing_goal;
                     valB = b.annual_billing_goal;
@@ -274,14 +282,6 @@ export function ObjectivesAgentTable({
                 case 'capt':
                     valA = a.listings_goal_annual;
                     valB = b.listings_goal_annual;
-                    break;
-                case 'pl':
-                    valA = a.required_prelistings_weekly;
-                    valB = b.required_prelistings_weekly;
-                    break;
-                case 'nc':
-                    valA = a.weekly_pl_pb_target;
-                    valB = b.weekly_pl_pb_target;
                     break;
                 case 'status':
                     valA = (a.run_rate_projection || 0) >= a.annual_billing_goal ? 1 : 0;
@@ -349,14 +349,14 @@ export function ObjectivesAgentTable({
                             <TableHeader>
                                 <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
                                     <SortableHead label="Agente" sortKey="name" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
+                                    <SortableHead label="Volumen" sortKey="volume" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
+                                    <SortableHead label="Ops" sortKey="ops" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center" title="Operaciones" />
                                     <SortableHead label="Meta" sortKey="goal" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
                                     <SortableHead label="Facturado" sortKey="billed" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
                                     <SortableHead label="Progreso" sortKey="progress" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
                                     <SortableHead label="Puntas" sortKey="puntas" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center" />
                                     <SortableHead label="Necesarias" sortKey="needed" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center" />
                                     <SortableHead label="Capt. Obj" sortKey="capt" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center text-purple-300" />
-                                    <SortableHead label="PL (Sem)" sortKey="pl" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center text-purple-300 font-bold" />
-                                    <SortableHead label="N.C. Sem" sortKey="nc" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} className="text-center" title="Número Crítico Semanal: Suma de Prelisting + Prebuying" />
                                     <SortableHead label="Estado" sortKey="status" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
                                 </TableRow>
                             </TableHeader>

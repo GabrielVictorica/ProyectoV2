@@ -31,6 +31,8 @@ interface Agent {
     last_name: string;
 }
 
+export type PeriodFilter = 'annual' | 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'S1' | 'S2';
+
 interface ObjectivesHeaderProps {
     isTeamView: boolean;
     isGod: boolean;
@@ -38,6 +40,7 @@ interface ObjectivesHeaderProps {
     selectedYear: number;
     selectedOrg: string;
     selectedAgentId: string | undefined;
+    selectedPeriod: PeriodFilter;
     years: number[];
     organizations: Organization[];
     filteredAgents: Agent[];
@@ -45,6 +48,7 @@ interface ObjectivesHeaderProps {
     onYearChange: (year: number) => void;
     onOrgChange: (org: string) => void;
     onAgentChange: (agentId: string) => void;
+    onPeriodChange: (period: PeriodFilter) => void;
     onBack: () => void;
     onResetFilters: () => void;
     onOpenDialog: () => void;
@@ -57,6 +61,7 @@ export function ObjectivesHeader({
     selectedYear,
     selectedOrg,
     selectedAgentId,
+    selectedPeriod,
     years,
     organizations,
     filteredAgents,
@@ -64,6 +69,7 @@ export function ObjectivesHeader({
     onYearChange,
     onOrgChange,
     onAgentChange,
+    onPeriodChange,
     onBack,
     onResetFilters,
     onOpenDialog,
@@ -116,6 +122,25 @@ export function ObjectivesHeader({
                                 {year}
                             </SelectItem>
                         ))}
+                    </SelectContent>
+                </Select>
+
+                {/* Selector Período */}
+                <Select
+                    value={selectedPeriod}
+                    onValueChange={(v) => onPeriodChange(v as PeriodFilter)}
+                >
+                    <SelectTrigger className="w-[130px] bg-slate-800 border-slate-700 text-white">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectItem value="annual" className="text-white hover:bg-slate-700">Año Completo</SelectItem>
+                        <SelectItem value="S1" className="text-white hover:bg-slate-700">1er Semestre</SelectItem>
+                        <SelectItem value="S2" className="text-white hover:bg-slate-700">2do Semestre</SelectItem>
+                        <SelectItem value="Q1" className="text-white hover:bg-slate-700">Q1 (Ene-Mar)</SelectItem>
+                        <SelectItem value="Q2" className="text-white hover:bg-slate-700">Q2 (Abr-Jun)</SelectItem>
+                        <SelectItem value="Q3" className="text-white hover:bg-slate-700">Q3 (Jul-Sep)</SelectItem>
+                        <SelectItem value="Q4" className="text-white hover:bg-slate-700">Q4 (Oct-Dic)</SelectItem>
                     </SelectContent>
                 </Select>
 

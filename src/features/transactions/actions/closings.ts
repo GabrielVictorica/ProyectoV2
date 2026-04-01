@@ -152,22 +152,23 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
     // 6. Aggregation
     const aggregated = metricsData.reduce((acc, m) => {
         const puntas = (m.single_sided_count || 0) + ((m.double_sided_count || 0) * 2);
-
-        // Sumamos al total general
-        acc.totalSalesVolume += (m.total_sales_volume || 0);
-        acc.totalGrossCommission += (m.total_gross_commission || 0);
-        acc.totalNetIncome += (m.total_net_income || 0);
-        acc.totalMasterIncome += (m.total_master_income || 0);
-        acc.totalOfficeIncome += (m.total_office_income || 0);
-        acc.closedDealsCount += (m.closed_deals_count || 0);
-        acc.doubleSidedCount += (m.double_sided_count || 0);
-        acc.singleSidedCount += (m.single_sided_count || 0);
-        acc.totalPuntas += puntas;
-
-        // Sumamos según estado (NULL/undefined = completed para transacciones legacy)
-        // Usamos casting temporal a any para acceder a 'status' que viene del view view_financial_metrics
         const txStatus = (m as any).status || 'completed';
+
+        // Solo sumamos si no es cancelada
+        if (txStatus !== 'cancelled') {
+            acc.totalSalesVolume += (m.total_sales_volume || 0);
+            acc.totalGrossCommission += (m.total_gross_commission || 0);
+            acc.totalNetIncome += (m.total_net_income || 0);
+            acc.totalMasterIncome += (m.total_master_income || 0);
+            acc.totalOfficeIncome += (m.total_office_income || 0);
+            acc.totalDealsCount += (m.closed_deals_count || 0);
+            acc.doubleSidedCount += (m.double_sided_count || 0);
+            acc.singleSidedCount += (m.single_sided_count || 0);
+            acc.totalPuntas += puntas;
+        }
+
         if (txStatus === 'completed') {
+            acc.closedDealsCount += (m.closed_deals_count || 0);
             acc.totalRealVolume += (m.total_sales_volume || 0);
             acc.totalRealCommission += (m.total_gross_commission || 0);
         } else if (txStatus === 'pending') {
@@ -180,11 +181,12 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         return acc;
     }, {
         totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-        totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0,
+        totalOfficeIncome: 0, totalDealsCount: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0,
         totalRealVolume: 0, totalRealCommission: 0, totalProjectedVolume: 0, totalProjectedCommission: 0, totalLostVolume: 0
     });
 
-    const averageTicket = aggregated.closedDealsCount > 0 ? aggregated.totalSalesVolume / aggregated.closedDealsCount : 0;
+    // Ticket promedio = volumen de ventas / cantidad total de operaciones (no canceladas)
+    const averageTicket = aggregated.totalDealsCount > 0 ? aggregated.totalSalesVolume / aggregated.totalDealsCount : 0;
 
     return {
         transactions,

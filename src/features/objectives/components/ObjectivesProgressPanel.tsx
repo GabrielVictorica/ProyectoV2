@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, Zap, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { BorderBeam } from '@/components/ui/border-beam';
+import { NumberTicker } from '@/components/ui/number-ticker';
 import type { ViewAgentProgress, ViewTeamObjectivesSummary } from '../types/supabase';
 
 interface ObjectivesProgressPanelProps {
@@ -44,14 +46,28 @@ export function ObjectivesProgressPanel({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                 >
-                    <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden">
+                    <Card className="relative bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden rounded-xl">
+                        {/* BorderBeam premium animated light effect */}
+                        <BorderBeam
+                            size={120}
+                            duration={8}
+                            colorFrom="#3b82f6"
+                            colorTo="#06b6d4"
+                            borderWidth={2}
+                        />
                         <CardContent className="py-12 text-center space-y-8">
                             <div className="space-y-2">
                                 <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">
                                     Progreso Colectivo del Equipo
                                 </p>
                                 <p className="text-7xl font-black text-white">
-                                    {(teamSummary?.avg_progress || 0).toFixed(1)}%
+                                    <NumberTicker
+                                        value={teamSummary?.avg_progress || 0}
+                                        decimalPlaces={1}
+                                        suffix="%"
+                                        delay={0.3}
+                                        className="text-7xl font-black text-white"
+                                    />
                                 </p>
                             </div>
                             <div className="max-w-2xl mx-auto">
@@ -78,7 +94,15 @@ export function ObjectivesProgressPanel({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                 >
-                    <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden">
+                    <Card className="relative bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden rounded-xl">
+                        {/* BorderBeam premium animated light effect */}
+                        <BorderBeam
+                            size={100}
+                            duration={10}
+                            colorFrom="#8b5cf6"
+                            colorTo="#10b981"
+                            borderWidth={2}
+                        />
                         <CardContent className="py-10 px-6 md:px-10">
                             {(() => {
                                 const isOnTrack = (progress.run_rate_projection || 0) >= progress.annual_billing_goal;

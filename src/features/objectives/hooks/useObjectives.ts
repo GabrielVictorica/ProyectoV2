@@ -17,11 +17,28 @@ import type {
     AgentWithProgress,
 } from '../types/supabase';
 
+import type { PeriodFilter } from '../components/ObjectivesHeader';
+
 // Query Keys
 export const AGENT_PROGRESS_KEY = 'agent-progress';
 export const TEAM_OBJECTIVES_SUMMARY_KEY = 'team-objectives-summary';
 export const AGENTS_OBJECTIVES_LIST_KEY = 'agents-objectives-list';
 export const AGENT_HISTORY_KEY = 'agent-history';
+
+/** Calcula rango de fechas para un período dentro de un año */
+export function getPeriodDateRange(year: number, period: PeriodFilter): { startDate?: string; endDate?: string } {
+    if (period === 'annual') return {};
+    const ranges: Record<string, [string, string]> = {
+        Q1: [`${year}-01-01`, `${year}-03-31`],
+        Q2: [`${year}-04-01`, `${year}-06-30`],
+        Q3: [`${year}-07-01`, `${year}-09-30`],
+        Q4: [`${year}-10-01`, `${year}-12-31`],
+        S1: [`${year}-01-01`, `${year}-06-30`],
+        S2: [`${year}-07-01`, `${year}-12-31`],
+    };
+    const [startDate, endDate] = ranges[period];
+    return { startDate, endDate };
+}
 
 // Re-exportar tipos para compatibilidad
 export type { ViewAgentProgress as AgentProgress, ViewTeamObjectivesSummary as TeamObjectivesSummary, HistoricalAverage };
@@ -29,15 +46,15 @@ export type { ViewAgentProgress as AgentProgress, ViewTeamObjectivesSummary as T
 /**
  * Fetchers para permitir prefetching
  */
-export const fetchAgentProgress = async (agentId: string, year: number) => {
+export const fetchAgentProgress = async (agentId: string, year: number, startDate?: string, endDate?: string) => {
     if (!agentId) return null;
-    const result = await getAgentProgressAction(agentId, year);
+    const result = await getAgentProgressAction(agentId, year, startDate, endDate);
     if (!result.success) throw new Error(result.error);
     return result.data as ViewAgentProgress | null;
 };
 
-export const fetchTeamObjectivesSummary = async (year: number, organizationId?: string) => {
-    const result = await getTeamObjectivesSummaryAction(year, organizationId);
+export const fetchTeamObjectivesSummary = async (year: number, organizationId?: string, startDate?: string, endDate?: string) => {
+    const result = await getTeamObjectivesSummaryAction(year, organizationId, startDate, endDate);
     if (!result.success) throw new Error(result.error);
 
     const data = result.data;
@@ -58,6 +75,16 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         total_reserved_income: acc.total_reserved_income + Number(curr.total_reserved_income || 0),
         total_completed_puntas: acc.total_completed_puntas + Number(curr.total_completed_puntas || 0),
         total_reserved_puntas: acc.total_reserved_puntas + Number(curr.total_reserved_puntas || 0),
+        // Métricas operacionales
+        total_sales_volume: acc.total_sales_volume + Number(curr.total_sales_volume || 0),
+        total_operations_count: acc.total_operations_count + Number(curr.total_operations_count || 0),
+        total_double_sided_count: acc.total_double_sided_count + Number(curr.total_double_sided_count || 0),
+        total_single_sided_count: acc.total_single_sided_count + Number(curr.total_single_sided_count || 0),
+        total_net_income: acc.total_net_income + Number(curr.total_net_income || 0),
+        total_master_income: acc.total_master_income + Number(curr.total_master_income || 0),
+        total_office_income: acc.total_office_income + Number(curr.total_office_income || 0),
+        total_completed_volume: acc.total_completed_volume + Number(curr.total_completed_volume || 0),
+        total_reserved_volume: acc.total_reserved_volume + Number(curr.total_reserved_volume || 0),
     }), {
         year,
         organization_id: null,
@@ -71,6 +98,15 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         total_reserved_income: 0,
         total_completed_puntas: 0,
         total_reserved_puntas: 0,
+        total_sales_volume: 0,
+        total_operations_count: 0,
+        total_double_sided_count: 0,
+        total_single_sided_count: 0,
+        total_net_income: 0,
+        total_master_income: 0,
+        total_office_income: 0,
+        total_completed_volume: 0,
+        total_reserved_volume: 0,
     });
 
     aggregated.avg_progress = aggregated.total_team_goal > 0
@@ -83,14 +119,15 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
 /**
  * Hook principal para obtener el progreso de objetivos de un agente.
  */
-export function useObjectives(year: number, agentId?: string) {
+export function useObjectives(year: number, agentId?: string, period: PeriodFilter = 'annual') {
     const supabase = createClient();
     const queryClient = useQueryClient();
+    const { startDate, endDate } = getPeriodDateRange(year, period);
 
     // 1. Fetch current objective & progress
     const { data: progress, isLoading: isLoadingProgress } = useQuery({
-        queryKey: [AGENT_PROGRESS_KEY, year, agentId],
-        queryFn: () => fetchAgentProgress(agentId!, year),
+        queryKey: [AGENT_PROGRESS_KEY, year, agentId, period],
+        queryFn: () => fetchAgentProgress(agentId!, year, startDate, endDate),
         enabled: !!agentId,
     });
 
@@ -170,10 +207,11 @@ export function useObjectives(year: number, agentId?: string) {
 /**
  * Hook para obtener el resumen agregado de objetivos del equipo.
  */
-export function useTeamObjectivesSummary(year: number, organizationId?: string) {
+export function useTeamObjectivesSummary(year: number, organizationId?: string, period: PeriodFilter = 'annual') {
+    const { startDate, endDate } = getPeriodDateRange(year, period);
     return useQuery({
-        queryKey: [TEAM_OBJECTIVES_SUMMARY_KEY, year, organizationId],
-        queryFn: () => fetchTeamObjectivesSummary(year, organizationId),
+        queryKey: [TEAM_OBJECTIVES_SUMMARY_KEY, year, organizationId, period],
+        queryFn: () => fetchTeamObjectivesSummary(year, organizationId, startDate, endDate),
     });
 }
 
@@ -222,6 +260,10 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
                 reserved_gross_income: row.reserved_gross_income || 0,
                 completed_puntas_count: row.completed_puntas_count || 0,
                 reserved_puntas_count: row.reserved_puntas_count || 0,
+                total_sales_volume: row.total_sales_volume || 0,
+                operations_count: 0, // Se calcula en cliente desde puntas si no disponible
+                double_sided_count: 0,
+                single_sided_count: 0,
             }));
         },
     });
