@@ -5,7 +5,6 @@ import { ObjectivesKPICard } from './ObjectivesKPICard';
 import {
     Target,
     DollarSign,
-    CheckCircle2,
     TrendingUp,
     BarChart3,
     ShieldCheck,
@@ -66,31 +65,9 @@ export function ObjectivesKPIGrid({
         const isCovered = monthlySurplus >= 0;
 
         return (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-                {/* 1. Puntas Totales (Anual) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* 1. Comisión Neta Acumulada */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                    <ObjectivesKPICard
-                        title="Puntas Totales"
-                        value={progress.actual_puntas_count || 0}
-                        icon={<CheckCircle2 className="h-5 w-5" />}
-                        loading={isLoading}
-                        color="blue"
-                        showProgress={true}
-                        progressValue={progress.actual_puntas_count || 0}
-                        progressTotal={Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0))}
-                        subtitle={`Meta Anual: ${Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0))}`}
-                        segmentedProgress={{
-                            completed: progress.completed_puntas_count || 0,
-                            reserved: progress.reserved_puntas_count || 0,
-                            total: Math.ceil((progress.actual_puntas_count || 0) + (progress.estimated_puntas_needed || 0)) || 1,
-                            completedLabel: `${progress.completed_puntas_count || 0} cerradas`,
-                            reservedLabel: `${progress.reserved_puntas_count || 0} reservadas`,
-                        }}
-                    />
-                </motion.div>
-
-                {/* 2. Comisión Neta Acumulada */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.05 }}>
                     <ObjectivesKPICard
                         title="Comisión Neta"
                         value={formatCurrency(netCommissionActual)}
@@ -109,8 +86,8 @@ export function ObjectivesKPIGrid({
                     />
                 </motion.div>
 
-                {/* 3. Ticket Promedio Real vs Objetivo */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.1 }}>
+                {/* 2. Ticket Promedio Real vs Objetivo */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.05 }}>
                     <ObjectivesKPICard
                         title="Ticket Promedio"
                         value={formatCurrency(avgTicketReal)}
@@ -122,8 +99,8 @@ export function ObjectivesKPIGrid({
                     />
                 </motion.div>
 
-                {/* 4. Comisión Promedio por Punta vs Objetivo */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
+                {/* 3. Comisión Promedio por Punta vs Objetivo */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.1 }}>
                     <ObjectivesKPICard
                         title="Comisión x Punta"
                         value={formatCurrency(avgCommPerPunta)}
@@ -135,8 +112,8 @@ export function ObjectivesKPIGrid({
                     />
                 </motion.div>
 
-                {/* 5. Validación Financiera */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.2 }}>
+                {/* 4. Validación Financiera */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
                     <ObjectivesKPICard
                         title="Validación Financiera"
                         value={isCovered ? 'Cubierto' : 'Déficit'}
@@ -158,8 +135,8 @@ export function ObjectivesKPIGrid({
 
     // Empty state - no goal configured
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-            {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
                 <motion.div
                     key={i}
                     initial={{ opacity: 0, y: 10 }}
