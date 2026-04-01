@@ -79,41 +79,53 @@ export function ObjectivesHeader({
     const isCurrentUserSelected = selectedAgentId === currentUserId;
 
     return (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-                {/* Botón Volver (solo cuando God/Parent ve un agente individual) */}
-                {isGodOrParent && !isTeamView && (
+        <div className="space-y-3">
+            {/* Fila 1: Título + Botón Ajustar Meta */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    {isGodOrParent && !isTeamView && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onBack}
+                            className="text-slate-400 hover:text-white hover:bg-slate-800"
+                            title="Volver a vista de equipo"
+                        >
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    )}
+                    <div>
+                        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                            {isTeamView ? 'Objetivos del Equipo' : 'Mis Objetivos'}
+                        </h1>
+                        <p className="text-slate-500 text-sm mt-0.5 flex items-center gap-1.5">
+                            <Target className="h-3.5 w-3.5 text-blue-500" />
+                            {isTeamView
+                                ? 'Supervisión de metas y progreso de todos los agentes'
+                                : 'Administra tus metas financieras y visualiza tu camino al éxito'}
+                        </p>
+                    </div>
+                </div>
+
+                {!isTeamView && selectedAgentId && (
                     <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onBack}
-                        className="text-slate-400 hover:text-white hover:bg-slate-800"
-                        title="Volver a vista de equipo"
+                        onClick={onOpenDialog}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
                     >
-                        <ArrowLeft className="h-5 w-5" />
+                        <Zap className="w-4 h-4 mr-2" />
+                        Ajustar Meta
                     </Button>
                 )}
-                <div>
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                        {isTeamView ? 'Objetivos del Equipo' : 'Mis Objetivos'}
-                    </h1>
-                    <p className="text-slate-400 mt-1 flex items-center gap-2">
-                        <Target className="h-4 w-4 text-blue-500" />
-                        {isTeamView
-                            ? 'Supervisión de metas y progreso de todos los agentes'
-                            : 'Administra tus metas financieras y visualiza tu camino al éxito'}
-                    </p>
-                </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-                {/* Selector Año */}
+            {/* Fila 2: Filtros alineados en una línea */}
+            <div className="flex items-center gap-2 flex-wrap">
                 <Select
                     value={String(selectedYear)}
                     onValueChange={(v) => onYearChange(parseInt(v))}
                 >
-                    <SelectTrigger className="w-[120px] bg-slate-800 border-slate-700 text-white">
-                        <Calendar className="h-4 w-4 mr-2" />
+                    <SelectTrigger className="w-[110px] h-9 bg-slate-800/60 border-slate-700/50 text-white text-sm">
+                        <Calendar className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
@@ -125,12 +137,11 @@ export function ObjectivesHeader({
                     </SelectContent>
                 </Select>
 
-                {/* Selector Período */}
                 <Select
                     value={selectedPeriod}
                     onValueChange={(v) => onPeriodChange(v as PeriodFilter)}
                 >
-                    <SelectTrigger className="w-[130px] bg-slate-800 border-slate-700 text-white">
+                    <SelectTrigger className="w-[130px] h-9 bg-slate-800/60 border-slate-700/50 text-white text-sm">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
@@ -144,11 +155,10 @@ export function ObjectivesHeader({
                     </SelectContent>
                 </Select>
 
-                {/* Selector Org (Solo Dios) */}
                 {isGod && (
                     <Select value={selectedOrg} onValueChange={onOrgChange}>
-                        <SelectTrigger className="w-[160px] bg-slate-800 border-slate-700 text-white">
-                            <Building2 className="h-4 w-4 mr-2" />
+                        <SelectTrigger className="w-[150px] h-9 bg-slate-800/60 border-slate-700/50 text-white text-sm">
+                            <Building2 className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
                             <SelectValue placeholder="Inmobiliaria" />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-800 border-slate-700">
@@ -162,68 +172,55 @@ export function ObjectivesHeader({
                     </Select>
                 )}
 
-                {/* Selector Agente (God/Parent) */}
                 {isGodOrParent && (
-                    <div className="flex items-center gap-2">
-                        <Select
-                            value={selectedAgentId || 'all'}
-                            onValueChange={(v) => onAgentChange(v === 'all' ? 'all' : v)}
-                        >
-                            <SelectTrigger className="w-[180px] bg-slate-800 border-slate-700 text-white">
-                                <Users className="h-4 w-4 mr-2" />
-                                <SelectValue placeholder="Agente" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-slate-800 border-slate-700">
-                                <SelectItem value="all" className="text-white">Todo el Equipo</SelectItem>
-                                {filteredAgents.map((ag) => (
-                                    <SelectItem key={ag.id} value={ag.id} className="text-white">
-                                        {ag.first_name} {ag.last_name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Botón Mis Objetivos (Acceso rápido) */}
-                        <Button
-                            variant={isCurrentUserSelected ? 'default' : 'outline'}
-                            onClick={() => {
-                                if (currentUserId) {
-                                    onAgentChange(currentUserId);
-                                }
-                            }}
-                            className={`border-slate-700 ${isCurrentUserSelected
-                                ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                                }`}
-                            disabled={isCurrentUserSelected}
-                        >
-                            <UserCircle className="h-4 w-4 mr-2" />
-                            Mis Objetivos
-                        </Button>
-                    </div>
+                    <Select
+                        value={selectedAgentId || 'all'}
+                        onValueChange={(v) => onAgentChange(v === 'all' ? 'all' : v)}
+                    >
+                        <SelectTrigger className="w-[170px] h-9 bg-slate-800/60 border-slate-700/50 text-white text-sm">
+                            <Users className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                            <SelectValue placeholder="Agente" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all" className="text-white">Todo el Equipo</SelectItem>
+                            {filteredAgents.map((ag) => (
+                                <SelectItem key={ag.id} value={ag.id} className="text-white">
+                                    {ag.first_name} {ag.last_name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 )}
 
-                {/* Botón Limpiar Filtros */}
+                {isGodOrParent && (
+                    <Button
+                        variant={isCurrentUserSelected ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                            if (currentUserId) {
+                                onAgentChange(currentUserId);
+                            }
+                        }}
+                        className={`h-9 border-slate-700/50 ${isCurrentUserSelected
+                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
+                        disabled={isCurrentUserSelected}
+                    >
+                        <UserCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Mis Objetivos
+                    </Button>
+                )}
+
                 {hasActiveFilters && (
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={onResetFilters}
-                        className="text-slate-500 hover:text-white"
+                        className="h-9 w-9 text-slate-500 hover:text-white"
                         title="Limpiar filtros"
                     >
-                        <RefreshCw className="h-4 w-4" />
-                    </Button>
-                )}
-
-                {/* Botón Ajustar (Solo vista individual) */}
-                {!isTeamView && selectedAgentId && (
-                    <Button
-                        onClick={onOpenDialog}
-                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
-                    >
-                        <Zap className="w-4 h-4 mr-2" />
-                        Ajustar Meta
+                        <RefreshCw className="h-3.5 w-3.5" />
                     </Button>
                 )}
             </div>

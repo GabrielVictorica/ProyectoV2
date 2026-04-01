@@ -25,7 +25,8 @@ import {
 import { useObjectives } from '../hooks/useObjectives';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { OBJECTIVES_DEFAULTS } from '../lib/constants';
-import { Loader2, Calculator, Target, TrendingUp, Lock, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Calculator, Target, TrendingUp, Lock, AlertTriangle, Info, ChevronDown, DollarSign, Percent, BarChart3, Settings2 } from 'lucide-react';
+import { ScrollableFormArea } from '@/components/ui/scrollable-form-area';
 
 const goalSchema = z.object({
     annualBillingGoal: z.coerce.number().min(0, 'La meta debe ser mayor a 0'),
@@ -66,10 +67,16 @@ export function GoalSettingDialog({
     const isGod = auth?.profile?.role === 'god';
     const { progress, history, upsertGoal, isLoading } = useObjectives(year, agentId);
     const [step, setStep] = useState(1);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [captacionesMode, setCaptacionesMode] = useState<'standard' | 'custom'>('standard');
 
     // Reset step when dialog closes
     useEffect(() => {
-        if (!open) setStep(1);
+        if (!open) {
+            setStep(1);
+            setShowAdvanced(false);
+            setCaptacionesMode('standard');
+        }
     }, [open]);
 
     const form = useForm<GoalFormData>({
@@ -118,8 +125,13 @@ export function GoalSettingDialog({
 
     const onSubmit = async (data: GoalFormData) => {
         try {
+            // En modo estándar, usar el mínimo calculado automáticamente
+            const finalData = captacionesMode === 'standard'
+                ? { ...data, listingsGoalAnnual: minimumListings > 0 ? minimumListings : (data.listingsGoalAnnual || 0) }
+                : data;
+
             await upsertGoal.mutateAsync({
-                ...data,
+                ...finalData,
                 agentId,
                 year,
             });
@@ -176,11 +188,11 @@ export function GoalSettingDialog({
 
     const { estimatedPuntas, minimumListings, requiredPlPbAnnual, weeklyPlPb, netIncome, requiredPlForListings, weeklyPlForListings, listingsGoal, weeksForListings, hasDateRange, isBelowMinimum } = calculations;
 
-    // Auto-fill listings goal with minimum when entering Step 3
+    // Siempre arranca en estándar; el agente elige si quiere personalizar
     useEffect(() => {
-        if (step === 3 && minimumListings > 0) {
-            const currentListings = form.getValues('listingsGoalAnnual') || 0;
-            if (currentListings < minimumListings) {
+        if (step === 3) {
+            setCaptacionesMode('standard');
+            if (minimumListings > 0) {
                 form.setValue('listingsGoalAnnual', minimumListings);
             }
         }
@@ -200,7 +212,40 @@ export function GoalSettingDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+                {/* Stepper visual */}
+                <div className="flex items-center justify-center gap-2 pt-2">
+                    {[
+                        { n: 1, label: 'Meta' },
+                        { n: 2, label: 'Simulador' },
+                        { n: 3, label: 'Captaciones' },
+                    ].map((s, i) => (
+                        <div key={s.n} className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-1">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                                    step === s.n
+                                        ? 'bg-blue-600 text-white scale-110 shadow-lg shadow-blue-500/30'
+                                        : step > s.n
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-800 text-slate-500 border border-slate-700'
+                                }`}>
+                                    {step > s.n ? '✓' : s.n}
+                                </div>
+                                <span className={`text-[9px] font-medium uppercase tracking-wider ${
+                                    step === s.n ? 'text-blue-400' : step > s.n ? 'text-emerald-400' : 'text-slate-600'
+                                }`}>{s.label}</span>
+                            </div>
+                            {i < 2 && (
+                                <div className={`w-12 h-px mb-4 transition-colors duration-300 ${
+                                    step > s.n ? 'bg-emerald-600' : 'bg-slate-800'
+                                }`} />
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <form onSubmit={form.handleSubmit(onSubmit)}>
+                <ScrollableFormArea className="max-h-[60vh]" resetKey={step}>
+                    <div className="space-y-6 py-2">
                     {step === 1 && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                             <div className="grid gap-2">
@@ -224,11 +269,11 @@ export function GoalSettingDialog({
                                 <div className="grid gap-2">
                                     <Label htmlFor="currency">Moneda</Label>
                                     <Select
-                                        defaultValue="USD"
+                                        value={form.watch('currency')}
                                         onValueChange={(v) => form.setValue('currency', v)}
                                     >
                                         <SelectTrigger className="bg-slate-800/50 border-slate-700">
-                                            <SelectValue placeholder="USD" />
+                                            <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-slate-900 border-slate-800 text-white">
                                             <SelectItem value="USD">USD</SelectItem>
@@ -276,7 +321,7 @@ export function GoalSettingDialog({
                                 <div className="grid gap-2">
                                     <div className="flex justify-between items-center">
                                         <Label htmlFor="averageTicketTarget">Precio Promedio de Venta</Label>
-                                        {history && (
+                                        {history && history.avgTicket > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => form.setValue('averageTicketTarget', Math.round(history.avgTicket))}
@@ -289,15 +334,17 @@ export function GoalSettingDialog({
                                     <Input
                                         id="averageTicketTarget"
                                         type="number"
+                                        placeholder="Ej: 100000"
                                         className="bg-slate-800/50 border-slate-700"
                                         {...form.register('averageTicketTarget')}
                                     />
+                                    <p className="text-[10px] text-slate-500">Valor típico de las propiedades que vendés</p>
                                 </div>
 
                                 <div className="grid gap-2">
                                     <div className="flex justify-between items-center">
                                         <Label htmlFor="averageCommissionTarget">% Comisión Promedio</Label>
-                                        {history && (
+                                        {history && history.avgCommPercent > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => form.setValue('averageCommissionTarget', history.avgCommPercent)}
@@ -311,59 +358,81 @@ export function GoalSettingDialog({
                                         id="averageCommissionTarget"
                                         type="number"
                                         step="0.1"
+                                        placeholder="Ej: 3"
                                         className="bg-slate-800/50 border-slate-700"
                                         {...form.register('averageCommissionTarget')}
                                     />
+                                    <p className="text-[10px] text-slate-500">% que cobrás por cada operación cerrada</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50">
-                                <div className="grid gap-1">
-                                    <Label htmlFor="splitPercentage" className="text-xs flex items-center gap-1">
-                                        Split %
-                                        {!isGod && <Lock className="w-3 h-3 text-slate-500" />}
-                                    </Label>
-                                    <Input
-                                        id="splitPercentage"
-                                        type="number"
-                                        className={`bg-slate-900/50 border-slate-700 h-8 text-sm ${!isGod ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                        disabled={!isGod}
-                                        {...form.register('splitPercentage')}
-                                    />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="conversionRate" className="text-xs">Conversión</Label>
-                                    <Input
-                                        id="conversionRate"
-                                        type="number"
-                                        className="bg-slate-900/50 border-slate-700 h-8 text-sm"
-                                        {...form.register('conversionRate')}
-                                    />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="workingWeeks" className="text-xs">Semanas</Label>
-                                    <Input
-                                        id="workingWeeks"
-                                        type="number"
-                                        className="bg-slate-900/50 border-slate-700 h-8 text-sm"
-                                        {...form.register('workingWeeks')}
-                                    />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="salesEffectivenessRatio" className="text-xs" title="Captaciones necesarias por cada punta cerrada (ej: 2 = necesitas 2 captaciones por venta)">
-                                        Efectividad Venta
-                                    </Label>
-                                    <Input
-                                        id="salesEffectivenessRatio"
-                                        type="number"
-                                        min="1"
-                                        max="20"
-                                        step="1"
-                                        className="bg-slate-900/50 border-slate-700 h-8 text-sm"
-                                        {...form.register('salesEffectivenessRatio')}
-                                    />
-                                    <p className="text-[9px] text-slate-500">Ratio captaciones:punta</p>
-                                </div>
+                            <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdvanced(!showAdvanced)}
+                                    className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-300 transition-colors"
+                                >
+                                    <span className="flex items-center gap-2 uppercase tracking-wider">
+                                        Parámetros avanzados
+                                        <span className="text-[10px] font-normal text-slate-600 normal-case tracking-normal">
+                                            Split {splitPct}% · Conv. {convRate}:1 · {workWeeks} sem.
+                                        </span>
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
+                                </button>
+                                {showAdvanced && (
+                                    <div className="grid grid-cols-2 gap-3 px-4 pb-4 pt-1 border-t border-slate-700/30 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="splitPercentage" className="text-xs flex items-center gap-1">
+                                                Mi porcentaje (Split)
+                                                {!isGod && <Lock className="w-3 h-3 text-slate-500" />}
+                                            </Label>
+                                            <Input
+                                                id="splitPercentage"
+                                                type="number"
+                                                className={`bg-slate-900/50 border-slate-700 h-8 text-sm ${!isGod ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                disabled={!isGod}
+                                                {...form.register('splitPercentage')}
+                                            />
+                                            <p className="text-[9px] text-slate-500">% que te queda de cada comisión</p>
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="conversionRate" className="text-xs">Reuniones por venta</Label>
+                                            <Input
+                                                id="conversionRate"
+                                                type="number"
+                                                className="bg-slate-900/50 border-slate-700 h-8 text-sm"
+                                                {...form.register('conversionRate')}
+                                            />
+                                            <p className="text-[9px] text-slate-500">Reuniones PL/PB para cerrar 1 punta</p>
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="workingWeeks" className="text-xs">Semanas laborales</Label>
+                                            <Input
+                                                id="workingWeeks"
+                                                type="number"
+                                                className="bg-slate-900/50 border-slate-700 h-8 text-sm"
+                                                {...form.register('workingWeeks')}
+                                            />
+                                            <p className="text-[9px] text-slate-500">Semanas activas en el año</p>
+                                        </div>
+                                        <div className="grid gap-1">
+                                            <Label htmlFor="salesEffectivenessRatio" className="text-xs">
+                                                Captaciones por venta
+                                            </Label>
+                                            <Input
+                                                id="salesEffectivenessRatio"
+                                                type="number"
+                                                min="1"
+                                                max="20"
+                                                step="1"
+                                                className="bg-slate-900/50 border-slate-700 h-8 text-sm"
+                                                {...form.register('salesEffectivenessRatio')}
+                                            />
+                                            <p className="text-[9px] text-slate-500">Propiedades captadas para cerrar 1 venta</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border border-white/10 text-center">
@@ -412,125 +481,176 @@ export function GoalSettingDialog({
                     )}
 
                     {step === 3 && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-start gap-3">
-                                <Target className="w-5 h-5 text-purple-400 mt-1" />
-                                <div>
-                                    <h4 className="font-semibold text-purple-200">Motor de Crecimiento</h4>
-                                    <p className="text-sm text-purple-300/80">
-                                        Las captaciones son el combustible de tu negocio.
-                                    </p>
-                                </div>
+                        <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+                            {/* Resumen de pasos anteriores */}
+                            <div className="grid grid-cols-4 gap-2">
+                                {[
+                                    { icon: <DollarSign className="w-3.5 h-3.5" />, label: 'Meta Bruta', value: `$${Number(annualGoal).toLocaleString()}`, color: 'text-blue-400' },
+                                    { icon: <BarChart3 className="w-3.5 h-3.5" />, label: 'Ticket Prom.', value: `$${Number(avgTicket).toLocaleString()}`, color: 'text-cyan-400' },
+                                    { icon: <Percent className="w-3.5 h-3.5" />, label: 'Comisión', value: `${avgComm}%`, color: 'text-purple-400' },
+                                    { icon: <Target className="w-3.5 h-3.5" />, label: 'Puntas', value: `${estimatedPuntas}`, color: 'text-emerald-400' },
+                                ].map((item) => (
+                                    <div key={item.label} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-slate-800/40 border border-slate-700/30">
+                                        <span className={`${item.color} opacity-70`}>{item.icon}</span>
+                                        <span className={`text-sm font-bold ${item.color}`}>{item.value}</span>
+                                        <span className="text-[8px] text-slate-500 uppercase font-medium tracking-wider">{item.label}</span>
+                                    </div>
+                                ))}
                             </div>
 
-                            {/* Banner informativo: cálculo automático */}
-                            {minimumListings > 0 && (
-                                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-                                    <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                                    <div className="text-xs text-blue-300/90">
-                                        <span className="font-semibold">Cálculo automático:</span>{' '}
-                                        Tu facturación requiere <span className="font-bold text-white">{estimatedPuntas}</span> puntas
-                                        {' '}→ Con efectividad <span className="font-bold text-white">{salesEffRatio}:1</span>
-                                        {' '}→ Mínimo <span className="font-bold text-emerald-400">{minimumListings}</span> captaciones
+                            {/* Toggle Estándar / Personalizado */}
+                            <div className="flex rounded-lg bg-slate-800/60 border border-slate-700/50 p-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setCaptacionesMode('standard')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-semibold transition-all duration-200 ${
+                                        captacionesMode === 'standard'
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                                            : 'text-slate-400 hover:text-slate-300'
+                                    }`}
+                                >
+                                    <Target className="w-3.5 h-3.5" />
+                                    Estándar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCaptacionesMode('custom')}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-semibold transition-all duration-200 ${
+                                        captacionesMode === 'custom'
+                                            ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30'
+                                            : 'text-slate-400 hover:text-slate-300'
+                                    }`}
+                                >
+                                    <Settings2 className="w-3.5 h-3.5" />
+                                    Personalizado
+                                </button>
+                            </div>
+
+                            {/* Modo Estándar */}
+                            {captacionesMode === 'standard' && (
+                                <div className="space-y-4 animate-in fade-in duration-200">
+                                    <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-600/15 to-cyan-600/15 border border-emerald-500/20 text-center space-y-3">
+                                        <p className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">Captaciones calculadas automáticamente</p>
+                                        <div className="text-4xl font-black text-white">
+                                            {minimumListings}
+                                        </div>
+                                        <p className="text-slate-400 text-xs">
+                                            captaciones necesarias para alcanzar tu meta
+                                        </p>
+                                        <div className="h-px bg-white/10 w-full" />
+                                        <div className="flex justify-center gap-8 text-center">
+                                            <div>
+                                                <p className="text-[10px] text-slate-400 uppercase font-bold">Puntas</p>
+                                                <p className="text-lg font-bold text-emerald-400">{estimatedPuntas}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-slate-400 uppercase font-bold">Ratio</p>
+                                                <p className="text-lg font-bold text-cyan-400">{salesEffRatio}:1</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-slate-400 uppercase font-bold">PLs/Semana</p>
+                                                <p className="text-lg font-bold text-white">{(workWeeks > 0 ? Math.ceil(minimumListings / (form.watch('plToListingConversionTarget') || 40) * 100) / workWeeks : 0).toFixed(1)}</p>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <p className="text-[10px] text-slate-500 text-center">
+                                        Basado en {estimatedPuntas} puntas × ratio de efectividad {salesEffRatio}:1. Si querés ajustar esto, cambiá a <button type="button" onClick={() => setCaptacionesMode('custom')} className="text-purple-400 hover:underline font-semibold">Personalizado</button>.
+                                    </p>
                                 </div>
                             )}
 
-                            <div className="space-y-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="listingsGoalAnnual">
-                                        Meta de Captaciones (Listings) {hasDateRange ? 'del Periodo' : 'Anuales'}
-                                    </Label>
-                                    <Input
-                                        id="listingsGoalAnnual"
-                                        type="number"
-                                        placeholder={hasDateRange ? "Ej: 5 (en este trimestre)" : "Ej: 20 (en el año)"}
-                                        className={`bg-slate-800/50 border-slate-700 ${isBelowMinimum ? 'border-amber-500/50 focus:ring-amber-500/30' : ''}`}
-                                        {...form.register('listingsGoalAnnual')}
-                                    />
-                                    {isBelowMinimum ? (
-                                        <div className="flex items-center gap-1.5 text-xs text-amber-400">
-                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                                            <span>Por debajo del mínimo requerido ({minimumListings}). Podrías no alcanzar tu meta de facturación.</span>
+                            {/* Modo Personalizado */}
+                            {captacionesMode === 'custom' && (
+                                <div className="space-y-4 animate-in fade-in duration-200">
+                                    {/* Banner informativo */}
+                                    {minimumListings > 0 && (
+                                        <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-2">
+                                            <Info className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                                            <p className="text-[11px] text-blue-300/90">
+                                                Mínimo recomendado: <span className="font-bold text-white">{minimumListings}</span> captaciones ({estimatedPuntas} puntas × {salesEffRatio}:1)
+                                            </p>
                                         </div>
-                                    ) : (
-                                        <p className="text-xs text-slate-500">
-                                            {minimumListings > 0
-                                                ? `Mínimo recomendado: ${minimumListings}. Puedes proyectar más captaciones.`
-                                                : `¿Cuántas propiedades quieres captar ${hasDateRange ? 'en este periodo' : 'este año'}?`
-                                            }
-                                        </p>
                                     )}
-                                </div>
 
-                                <div className="grid gap-2">
-                                    <div className="flex justify-between items-center">
-                                        <Label htmlFor="plToListingConversionTarget">Efectividad (PL a Captación)</Label>
-                                        <span className="text-xs text-slate-400">Estándar: 30% - 50%</span>
-                                    </div>
-                                    <div className="relative">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="listingsGoalAnnual">
+                                            Meta de Captaciones {hasDateRange ? 'del Periodo' : 'Anuales'}
+                                        </Label>
                                         <Input
-                                            id="plToListingConversionTarget"
+                                            id="listingsGoalAnnual"
                                             type="number"
-                                            min="1"
-                                            max="100"
-                                            className="bg-slate-800/50 border-slate-700 pr-8"
-                                            {...form.register('plToListingConversionTarget')}
+                                            placeholder={hasDateRange ? "Ej: 5 (en este trimestre)" : "Ej: 20 (en el año)"}
+                                            className={`bg-slate-800/50 border-slate-700 ${isBelowMinimum ? 'border-amber-500/50 focus:ring-amber-500/30' : ''}`}
+                                            {...form.register('listingsGoalAnnual')}
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</span>
+                                        {isBelowMinimum && (
+                                            <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                                <span>Por debajo del mínimo requerido ({minimumListings}).</span>
+                                            </div>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-slate-500">
-                                        Porcentaje de Prelistings que se convierten en Captaciones firmadas.
-                                    </p>
-                                </div>
 
-                                <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="listingsGoalStartDate">Fecha Inicio (Opcional)</Label>
-                                        <Input
-                                            id="listingsGoalStartDate"
-                                            type="date"
-                                            className="bg-slate-800/50 border-slate-700 block w-full"
-                                            {...form.register('listingsGoalStartDate')}
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="listingsGoalEndDate">Fecha Fin (Opcional)</Label>
-                                        <Input
-                                            id="listingsGoalEndDate"
-                                            type="date"
-                                            className="bg-slate-800/50 border-slate-700 block w-full"
-                                            {...form.register('listingsGoalEndDate')}
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-xs text-slate-500 -mt-2">
-                                    Si dejas las fechas vacías, se calculará para todo el año ({workWeeks} semanas laborales).
-                                </p>
-                            </div>
-
-                            {listingsGoal > 0 && (
-                                <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/20 text-center space-y-4">
-                                    <div>
-                                        <p className="text-slate-400 text-xs uppercase tracking-wider font-bold mb-1">Actividad Necesaria</p>
-                                        <div className="text-4xl font-black text-white">
-                                            {requiredPlForListings} <span className="text-lg font-normal text-slate-300">Prelistings/{hasDateRange ? 'periodo' : 'año'}</span>
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="plToListingConversionTarget">Efectividad (PL → Captación)</Label>
+                                            <span className="text-[10px] text-slate-500">Estándar: 30-50%</span>
+                                        </div>
+                                        <div className="relative">
+                                            <Input
+                                                id="plToListingConversionTarget"
+                                                type="number"
+                                                min="1"
+                                                max="100"
+                                                className="bg-slate-800/50 border-slate-700 pr-8"
+                                                {...form.register('plToListingConversionTarget')}
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</span>
                                         </div>
                                     </div>
 
-                                    <div className="h-px bg-white/10 w-full" />
-
-                                    <div className="flex justify-center gap-8">
-                                        <div>
-                                            <p className="text-[10px] text-slate-400 uppercase font-bold">Por Semana</p>
-                                            <p className="text-lg font-bold text-pink-400">{weeklyPlForListings.toFixed(1)} <span className="text-xs text-slate-500">PLs</span></p>
-                                            <p className="text-[9px] text-slate-600">En {Math.round(weeksForListings)} semanas</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="listingsGoalStartDate" className="text-xs">Inicio (Opcional)</Label>
+                                            <Input
+                                                id="listingsGoalStartDate"
+                                                type="date"
+                                                className="bg-slate-800/50 border-slate-700 block w-full h-9 text-sm"
+                                                {...form.register('listingsGoalStartDate')}
+                                            />
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] text-slate-400 uppercase font-bold">Total Captaciones</p>
-                                            <p className="text-lg font-bold text-purple-400">{listingsGoal}</p>
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="listingsGoalEndDate" className="text-xs">Fin (Opcional)</Label>
+                                            <Input
+                                                id="listingsGoalEndDate"
+                                                type="date"
+                                                className="bg-slate-800/50 border-slate-700 block w-full h-9 text-sm"
+                                                {...form.register('listingsGoalEndDate')}
+                                            />
                                         </div>
                                     </div>
+
+                                    {listingsGoal > 0 && (
+                                        <div className="p-4 rounded-xl bg-gradient-to-br from-purple-600/15 to-pink-600/15 border border-purple-500/20 text-center space-y-3">
+                                            <div>
+                                                <p className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mb-1">Actividad Necesaria</p>
+                                                <div className="text-3xl font-black text-white">
+                                                    {requiredPlForListings} <span className="text-sm font-normal text-slate-300">Prelistings/{hasDateRange ? 'periodo' : 'año'}</span>
+                                                </div>
+                                            </div>
+                                            <div className="h-px bg-white/10 w-full" />
+                                            <div className="flex justify-center gap-8">
+                                                <div>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Por Semana</p>
+                                                    <p className="text-lg font-bold text-pink-400">{weeklyPlForListings.toFixed(1)} <span className="text-xs text-slate-500">PLs</span></p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold">Total Captaciones</p>
+                                                    <p className="text-lg font-bold text-purple-400">{listingsGoal}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -563,6 +683,8 @@ export function GoalSettingDialog({
                             </div>
                         </div>
                     )}
+                    </div>
+                </ScrollableFormArea>
                 </form>
             </DialogContent>
         </Dialog>

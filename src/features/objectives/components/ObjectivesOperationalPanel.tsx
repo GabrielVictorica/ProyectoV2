@@ -70,16 +70,17 @@ export function ObjectivesOperationalPanel({
                 { label: 'Reservado', value: formatCurrency(metrics.reservedVolume), color: 'amber' },
             ],
         },
-        {
+        // Facturación Bruta solo en vista de equipo (en individual ya está en KPIs como Comisión Neta)
+        ...(isTeamView ? [{
             title: 'Facturación Bruta',
             icon: <BarChart3 className="h-5 w-5" />,
             mainValue: formatCurrency(metrics.grossCommission),
-            color: 'green',
+            color: 'green' as CardColor,
             details: [
-                { label: 'Cerrado', value: formatCurrency(metrics.completedCommission), color: 'emerald' },
-                { label: 'Reservado', value: formatCurrency(metrics.reservedCommission), color: 'amber' },
+                { label: 'Cerrado', value: formatCurrency(metrics.completedCommission), color: 'emerald' as DetailColor },
+                { label: 'Reservado', value: formatCurrency(metrics.reservedCommission), color: 'amber' as DetailColor },
             ],
-        },
+        }] : []),
         {
             title: 'Operaciones',
             icon: <Handshake className="h-5 w-5" />,
@@ -124,7 +125,7 @@ export function ObjectivesOperationalPanel({
                     Resumen Operacional
                 </h3>
             </div>
-            <div className={`grid grid-cols-1 gap-4 ${isGodOrParent ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'}`}>
+            <div className={`grid grid-cols-1 gap-4 ${isTeamView ? (isGodOrParent ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3') : (isGodOrParent ? 'md:grid-cols-3' : 'md:grid-cols-2')}`}>
                 {cards.map((card, i) => (
                     <motion.div
                         key={card.title}
