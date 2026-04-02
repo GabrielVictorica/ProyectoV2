@@ -139,7 +139,7 @@ export function ClientsDashboard() {
     // Advanced Filters
     const [advancedFilters, setAdvancedFilters] = useState<SearchFilters>(defaultSearchFilters);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [sortBy, setSortBy] = useState<'urgent' | 'recent' | 'budget'>('urgent');
+    const [sortBy, setSortBy] = useState<'urgent' | 'recent' | 'budget'>('recent');
     const [viewMode, setViewMode] = useState<'table' | 'cards'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('busquedas-view-mode') as 'table' | 'cards') || 'cards';
@@ -241,9 +241,9 @@ export function ClientsDashboard() {
             });
         } else if (sortBy === 'recent') {
             sorted.sort((a: any, b: any) => {
-                const dateA = new Date(a.created_at).getTime();
-                const dateB = new Date(b.created_at).getTime();
-                return dateB - dateA; // Más recientes primero
+                const dateA = new Date(a.last_interaction_at || a.created_at).getTime();
+                const dateB = new Date(b.last_interaction_at || b.created_at).getTime();
+                return dateB - dateA; // Más recientes por interacción primero
             });
         } else if (sortBy === 'budget') {
             sorted.sort((a: any, b: any) => (b.budget_max || 0) - (a.budget_max || 0)); // Mayor presupuesto primero
@@ -524,7 +524,6 @@ export function ClientsDashboard() {
                                         >
                                             {/* Tarjeta de Búsquedas Críticas (Abandonadas) */}
                                             <motion.div
-                                                title="Búsquedas activas sin seguimiento por más de 14 días"
                                                 animate={criticalCount > 0 && activeCard !== 'critical' ? { scale: [1, 1.02, 1], boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 15px rgba(239,68,68,0.3)', '0 0 0px rgba(239,68,68,0)'] } : {}}
                                                 transition={{ duration: 2, repeat: Infinity }}
                                                 whileHover={{ scale: 1.02 }}
@@ -545,6 +544,7 @@ export function ClientsDashboard() {
                                                     <span className={`text-[10px] font-bold uppercase tracking-wider ${criticalCount > 0 ? 'text-red-400/80' : 'text-slate-500'}`}>Críticas</span>
                                                 </div>
                                                 <AnimatedNumber value={criticalCount} className={`text-2xl font-black ${criticalCount > 0 ? 'text-red-400' : 'text-slate-500'}`} />
+                                                <p className="text-[9px] text-slate-500 mt-1">Sin seguimiento &gt;14d</p>
                                             </motion.div>
 
                                             <motion.div
@@ -563,6 +563,7 @@ export function ClientsDashboard() {
                                                     <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider">Activas</span>
                                                 </div>
                                                 <AnimatedNumber value={activeCount} className="text-2xl font-black text-emerald-300" />
+                                                <p className="text-[9px] text-slate-500 mt-1">Seguimiento activo</p>
                                             </motion.div>
                                             <motion.div
                                                 whileHover={{ scale: 1.02 }}
@@ -580,11 +581,12 @@ export function ClientsDashboard() {
                                                     <span className="text-[10px] font-bold text-blue-400/80 uppercase tracking-wider">Cerradas</span>
                                                 </div>
                                                 <AnimatedNumber value={closedCount} className="text-2xl font-black text-blue-300" />
+                                                <p className="text-[9px] text-slate-500 mt-1">Operaciones cerradas</p>
                                             </motion.div>
-                                            <motion.div
-                                                whileHover={{ scale: 1.02 }}
-                                                className="p-4 rounded-xl border bg-slate-950/60 border-slate-700/30 backdrop-blur-md"
-                                            >
+                                             <motion.div
+                                                 whileHover={{ scale: 1.02 }}
+                                                 className="p-4 rounded-xl border bg-slate-950/60 border-slate-700/30 backdrop-blur-md"
+                                             >
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${attentionRate > 80 ? 'bg-emerald-500/10' : attentionRate > 50 ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
                                                         <Activity className={`w-3.5 h-3.5 ${attentionRate > 80 ? 'text-emerald-400' : attentionRate > 50 ? 'text-amber-400' : 'text-red-400'}`} />
@@ -594,8 +596,9 @@ export function ClientsDashboard() {
                                                 <span className={`text-2xl font-black ${attentionRate > 80 ? 'text-emerald-300' : attentionRate > 50 ? 'text-amber-300' : 'text-red-300'}`}>
                                                     {attentionRate}%
                                                 </span>
+                                                <p className="text-[9px] text-slate-500 mt-1">Contacto &lt;14d</p>
                                             </motion.div>
-                                            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/20 backdrop-blur-md">
+                                             <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/20 backdrop-blur-md">
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
                                                         <Clock className="w-3.5 h-3.5 text-amber-400" />
@@ -605,6 +608,7 @@ export function ClientsDashboard() {
                                                 <span className="text-lg font-black text-amber-300">
                                                     {daysSince === 0 ? 'Hoy' : daysSince === 1 ? 'Ayer' : daysSince > 0 ? `Hace ${daysSince}d` : '—'}
                                                 </span>
+                                                <p className="text-[9px] text-slate-500 mt-1">Última actividad</p>
                                             </div>
                                         </motion.div>
 
