@@ -1,7 +1,7 @@
 'use client';
 
 import { useTeamStats } from '@/features/team/hooks/useTeam';
-import { type TeamMember } from '@/features/team/actions/teamActions';
+import { type TeamMemberStats } from '@/features/team/actions/teamStatsActions';
 import { useAuth, usePermissions } from '@/features/auth/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -112,13 +112,13 @@ export default function TeamPage() {
         );
     }
 
-    const nativeMembers = (team as any[])?.filter(m => m.organization_id === auth?.profile?.organization_id) || [];
-    const externalReports = (team as any[])?.filter(m => m.organization_id !== auth?.profile?.organization_id && m.reports_to_organization_id === auth?.profile?.organization_id) || [];
+    const nativeMembers = team?.filter(m => m.organization_id === auth?.profile?.organization_id) || [];
+    const externalReports = team?.filter(m => m.organization_id !== auth?.profile?.organization_id && m.reports_to_organization_id === auth?.profile?.organization_id) || [];
 
     const parents = nativeMembers.filter(m => m.role === 'parent');
     const nativeChildren = nativeMembers.filter(m => m.role === 'child' || m.role === 'god');
 
-    const renderMemberRow = (member: TeamMember, isExternal: boolean = false) => (
+    const renderMemberRow = (member: TeamMemberStats, isExternal: boolean = false) => (
         <TableRow key={member.id} className={cn(
             "border-slate-700/50 hover:bg-slate-700/30 transition-colors group",
             isExternal && "bg-violet-500/5"
@@ -157,16 +157,16 @@ export default function TeamPage() {
             </TableCell>
             <TableCell className="text-center">
                 <Badge className="bg-slate-700/50 text-slate-300 border-slate-600 font-mono">
-                    {(member as any).property_count}
+                    {member.property_count || 0}
                 </Badge>
             </TableCell>
             <TableCell className="text-center">
                 <Badge className="bg-green-500/10 text-green-400 border-green-500/20 font-mono">
-                    {(member as any).sales_count}
+                    {member.sales_count || 0}
                 </Badge>
             </TableCell>
             <TableCell className="text-right text-white font-mono">
-                {formatCurrency((member as any).sales_volume)}
+                {formatCurrency(member.sales_volume || 0)}
             </TableCell>
             <TableCell>
                 <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export default function TeamPage() {
                             <Phone className="h-4 w-4" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={(member as any).email || ''}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-400" title={member.email || ''}>
                         <Mail className="h-4 w-4" />
                     </Button>
                 </div>

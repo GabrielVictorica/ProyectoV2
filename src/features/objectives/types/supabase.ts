@@ -24,7 +24,6 @@ export interface ViewAgentProgress {
     reserved_gross_income: number;
     completed_puntas_count: number;
     reserved_puntas_count: number;
-    total_sales_volume: number;
     progress_percentage: number;
     gap_to_goal: number;
     estimated_puntas_needed: number;
@@ -45,15 +44,16 @@ export interface ViewAgentProgress {
     actual_active_listings_count: number;
     sales_effectiveness_ratio: number;
     minimum_listings_required: number;
-    // Métricas operacionales (para consolidación con Operaciones)
-    operations_count: number;
-    double_sided_count: number;
-    single_sided_count: number;
-    total_net_income: number;
-    total_master_income: number;
-    total_office_income: number;
-    completed_sales_volume: number;
-    reserved_sales_volume: number;
+    // Campos operacionales adicionales
+    operations_count?: number;
+    double_sided_count?: number;
+    single_sided_count?: number;
+    total_sales_volume?: number;
+    completed_sales_volume?: number;
+    reserved_sales_volume?: number;
+    total_net_income?: number;
+    total_master_income?: number;
+    total_office_income?: number;
 }
 
 // Tipos para view_agent_progress_extended (incluye datos de perfil)
@@ -78,16 +78,16 @@ export interface ViewTeamObjectivesSummary {
     total_reserved_income: number;
     total_completed_puntas: number;
     total_reserved_puntas: number;
-    // Métricas operacionales consolidadas
-    total_sales_volume: number;
-    total_operations_count: number;
-    total_double_sided_count: number;
-    total_single_sided_count: number;
-    total_net_income: number;
-    total_master_income: number;
-    total_office_income: number;
-    total_completed_volume: number;
-    total_reserved_volume: number;
+    // Campos operacionales adicionales
+    total_operations_count?: number;
+    total_double_sided_count?: number;
+    total_single_sided_count?: number;
+    total_sales_volume?: number;
+    total_completed_volume?: number;
+    total_reserved_volume?: number;
+    total_net_income?: number;
+    total_master_income?: number;
+    total_office_income?: number;
 }
 
 // Tipos para view_financial_metrics
@@ -131,11 +131,6 @@ export interface AgentWithProgress {
     reserved_gross_income: number;
     completed_puntas_count: number;
     reserved_puntas_count: number;
-    // Métricas operacionales
-    total_sales_volume: number;
-    operations_count: number;
-    double_sided_count: number;
-    single_sided_count: number;
 }
 
 // Tipo para el historial promedio

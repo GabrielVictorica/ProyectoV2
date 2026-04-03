@@ -2,19 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { Database } from '@/types/database.types';
+import type { Database, Profile } from '@/types/database.types';
 
-export interface TeamMemberStats {
-    id: string;
-    first_name: string;
-    last_name: string;
+export interface TeamMemberStats extends Profile {
     email: string;
-    avatar_url: string | null;
-    phone: string | null;
-    role: Database['public']['Enums']['user_role'];
-    organization_id: string;
-    reports_to_organization_id: string | null;
-    is_active: boolean;
     is_external: boolean;
     supervisor_ids: string[];
     property_count: number;

@@ -78,7 +78,7 @@ export async function searchPersonsAction(query: string): Promise<ActionResult<P
         const { data, error } = await sqlQuery.limit(10);
         if (error) throw error;
 
-        return { success: true, data: data as Person[] };
+        return { success: true, data: (data as any) as Person[] };
     } catch (err) {
         console.error('Error in searchPersonsAction:', err);
         return { success: false, error: 'Error al buscar personas' };
@@ -434,7 +434,7 @@ export async function getPersonsAction(filters: {
         const { data, error } = await query;
         if (error) throw error;
 
-        return { success: true, data: (data as unknown) as Person[] };
+        return { success: true, data: (data as any) as Person[] };
     } catch (err) {
         console.error('Error in getPersonsAction:', err);
         return { success: false, error: 'Error al obtener personas' };
@@ -586,7 +586,7 @@ export async function getPersonByIdAction(id: string): Promise<ActionResult<Pers
 
         if (error) throw error;
 
-        return { success: true, data: (data as unknown) as Person };
+        return { success: true, data: (data as any) as Person };
     } catch (err) {
         console.error('Error in getPersonByIdAction:', err);
         return { success: false, error: 'Error al obtener la persona' };
@@ -665,7 +665,7 @@ export async function getPersonHistoryAction(personId: string): Promise<ActionRe
 
         if (error) throw error;
 
-        return { success: true, data: data as PersonHistoryEvent[] };
+        return { success: true, data: (data as any) as PersonHistoryEvent[] };
     } catch (err) {
         console.error('Error in getPersonHistoryAction:', err);
         return { success: false, error: 'Error al obtener el historial' };
@@ -735,7 +735,7 @@ export async function getPersonVisitHistoryAction(personId: string): Promise<Act
 
         if (error) throw error;
 
-        return { success: true, data: (data || []) as PersonHistoryEvent[] };
+        return { success: true, data: (data as any) as PersonHistoryEvent[] };
     } catch (err) {
         console.error('Error in getPersonVisitHistoryAction:', err);
         return { success: false, error: 'Error al obtener historial de visitas' };

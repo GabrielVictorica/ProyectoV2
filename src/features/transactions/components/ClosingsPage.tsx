@@ -44,6 +44,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     DollarSign,
     RefreshCw,
+    Shield,
     BarChart3,
     Handshake,
     Calendar,
@@ -55,7 +56,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-
+import { DynamicTypography } from '@/components/ui/DynamicTypography';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function ClosingsPage() {
@@ -190,40 +191,36 @@ export function ClosingsPage() {
     const activeMetrics = useMemo(() => {
         if (!filteredTransactions) return {
             totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-            totalOfficeIncome: 0, totalDealsCount: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
         };
 
         return filteredTransactions.reduce((acc, tx) => {
             const status = tx.status || 'completed';
-
-            // Solo sumamos si no es cancelada
+            
+            // Solo sumamos al volumen y comisiones si no es caída (o según lógica específica)
             if (status !== 'cancelled') {
                 acc.totalSalesVolume += Number(tx.actual_price || 0);
                 acc.totalGrossCommission += Number(tx.gross_commission || 0);
                 acc.totalNetIncome += Number(tx.net_commission || 0);
                 acc.totalMasterIncome += Number(tx.master_commission_amount || 0);
                 acc.totalOfficeIncome += Number(tx.office_commission_amount || 0);
-
-                // Operaciones y puntas: cuentan TODAS las no canceladas (completed + pending)
-                acc.totalDealsCount += 1;
-                acc.totalPuntas += (tx.sides || 1);
-                if (tx.sides === 2) acc.doubleSidedCount += 1;
-                else acc.singleSidedCount += 1;
-
+                
                 if (status === 'completed') {
                     acc.closedDealsCount += 1;
+                    acc.totalPuntas += (tx.sides || 1);
+                    if (tx.sides === 2) acc.doubleSidedCount += 1;
+                    else acc.singleSidedCount += 1;
                 }
             }
             return acc;
         }, {
             totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-            totalOfficeIncome: 0, totalDealsCount: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
         });
     }, [filteredTransactions]);
 
-    // Ticket promedio = volumen de ventas / cantidad de operaciones (todas las no canceladas)
-    const activeAverageTicket = activeMetrics.totalDealsCount > 0
-        ? activeMetrics.totalSalesVolume / activeMetrics.totalDealsCount
+    const activeAverageTicket = activeMetrics.closedDealsCount > 0 
+        ? activeMetrics.totalSalesVolume / activeMetrics.closedDealsCount 
         : 0;
 
     const breakdownMetrics = useMemo(() => {
@@ -456,7 +453,84 @@ export function ClosingsPage() {
                 </div>
             </div>
 
-            {/* Summary Cards removed - now consolidated in Control y Objetivos tab */}
+            {/* Summary Cards */}
+            <div className={`grid grid-cols-1 gap-4 ${isGodOrParent ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'}`}>
+                {/* Card 1: Volumen de Ventas */}
+                <motion.div variants={itemVariants}>
+                    <SummaryCard
+                        title="Volumen de Ventas"
+                        icon={<DollarSign className="h-5 w-5" />}
+                        mainValue={formatCurrency(activeMetrics.totalSalesVolume)}
+                        loading={isLoading}
+                        color="blue"
+                        details={[
+                            { label: 'Cerrado', value: formatCurrency(breakdownMetrics.realVolume), color: 'emerald' as const },
+                            { label: 'Reservado', value: formatCurrency(breakdownMetrics.projectedVolume), color: 'amber' as const },
+                        ]}
+                    />
+                </motion.div>
+
+                {/* Card 2: Comisiones */}
+                <motion.div variants={itemVariants}>
+                    <SummaryCard
+                        title={role === 'child' ? 'Mi Comisión' : 'Comisiones'}
+                        icon={<BarChart3 className="h-5 w-5" />}
+                        mainValue={formatCurrency(
+                            role === 'child'
+                                ? activeMetrics.totalNetIncome
+                                : activeMetrics.totalGrossCommission
+                        )}
+                        loading={isLoading}
+                        color="green"
+                        details={
+                            role === 'child'
+                                ? [
+                                    { label: 'Neto facturado', value: formatCurrency(activeMetrics.totalNetIncome), color: 'emerald' as const },
+                                ]
+                                : [
+                                    { label: 'Facturado', value: formatCurrency(breakdownMetrics.realCommission), color: 'emerald' as const },
+                                    { label: 'Proyectado', value: formatCurrency(breakdownMetrics.projectedCommission), color: 'amber' as const },
+                                ]
+                        }
+                    />
+                </motion.div>
+
+                {/* Card 3: Operaciones */}
+                <motion.div variants={itemVariants}>
+                    <SummaryCard
+                        title="Operaciones"
+                        icon={<Handshake className="h-5 w-5" />}
+                        mainValue={`${activeMetrics.closedDealsCount}`}
+                        mainSuffix={`· ${activeMetrics.totalPuntas} puntas`}
+                        loading={isLoading}
+                        color="purple"
+                        details={[
+                            { label: 'Cierres', value: String(filteredTransactions.filter(t => (t.status || 'completed') === 'completed' && (selectedTab === 'all' || selectedTab === 'completed')).length), color: 'emerald' as const },
+                            { label: 'Reservas', value: String(filteredTransactions.filter(t => t.status === 'pending' && (selectedTab === 'all' || selectedTab === 'pending')).length), color: 'amber' as const },
+                            { label: 'Ticket Prom.', value: formatCurrency(activeAverageTicket), color: 'slate' as const },
+                        ]}
+                    />
+                </motion.div>
+
+                {/* Card 4: Desglose Financiero (God/Parent only) */}
+                {isGodOrParent && (
+                    <motion.div variants={itemVariants}>
+                        <SummaryCard
+                            title="Desglose Financiero"
+                            icon={<Shield className="h-5 w-5" />}
+                            mainValue={formatCurrency(activeMetrics.totalGrossCommission)}
+                            mainSuffix="bruto"
+                            loading={isLoading}
+                            color="yellow"
+                            details={[
+                                ...(role === 'god' ? [{ label: 'Royalty', value: formatCurrency(activeMetrics.totalMasterIncome), color: 'purple' as const }] : []),
+                                { label: 'Oficina', value: formatCurrency(activeMetrics.totalOfficeIncome), color: 'blue' as const },
+                                { label: 'Agentes', value: formatCurrency(activeMetrics.totalNetIncome), color: 'emerald' as const },
+                            ]}
+                        />
+                    </motion.div>
+                )}
+            </div>
 
             {/* Transactions Table */}
             <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden shadow-2xl">
@@ -641,5 +715,120 @@ export function ClosingsPage() {
                 </CardContent>
             </Card>
         </motion.div>
+    );
+}
+
+// Summary Card Component (replaces individual KPI cards)
+function SummaryCard({
+    title,
+    icon,
+    mainValue,
+    mainSuffix,
+    loading,
+    color,
+    details,
+}: {
+    title: string;
+    icon: React.ReactNode;
+    mainValue: string;
+    mainSuffix?: string;
+    loading: boolean;
+    color: 'green' | 'blue' | 'purple' | 'yellow';
+    details: { label: string; value: string; color: 'emerald' | 'amber' | 'purple' | 'blue' | 'slate' }[];
+}) {
+    const themes = {
+        green: {
+            bg: 'bg-gradient-to-br from-slate-900 to-emerald-950/30',
+            border: 'border-emerald-500/20',
+            text: 'text-emerald-500',
+            glow: 'shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+        },
+        blue: {
+            bg: 'bg-gradient-to-br from-slate-900 to-blue-950/30',
+            border: 'border-blue-500/20',
+            text: 'text-blue-500',
+            glow: 'shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+        },
+        purple: {
+            bg: 'bg-gradient-to-br from-slate-900 to-purple-950/30',
+            border: 'border-purple-500/20',
+            text: 'text-purple-500',
+            glow: 'shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+        },
+        yellow: {
+            bg: 'bg-gradient-to-br from-slate-900 to-amber-950/30',
+            border: 'border-amber-500/20',
+            text: 'text-amber-500',
+            glow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+        },
+    };
+
+    const dotColors: Record<string, string> = {
+        emerald: 'bg-emerald-500',
+        amber: 'bg-amber-500',
+        purple: 'bg-purple-500',
+        blue: 'bg-blue-500',
+        slate: 'bg-slate-500',
+    };
+
+    const textColors: Record<string, string> = {
+        emerald: 'text-emerald-400',
+        amber: 'text-amber-400',
+        purple: 'text-purple-400',
+        blue: 'text-blue-400',
+        slate: 'text-slate-400',
+    };
+
+    const t = themes[color];
+
+    return (
+        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.01] hover:shadow-lg group shadow-md`}>
+            <CardContent className="p-5 relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className={`${t.text} opacity-70`}>{icon}</div>
+                    <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                        {title}
+                    </p>
+                </div>
+
+                {loading ? (
+                    <Skeleton className="h-9 w-40 bg-slate-800/50" />
+                ) : (
+                    <div className="flex items-baseline gap-2 mb-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <DynamicTypography
+                            value={mainValue}
+                            className="text-white font-black tracking-tighter drop-shadow-md"
+                            baseSize="text-2xl"
+                        />
+                        {mainSuffix && (
+                            <span className="text-slate-500 text-xs font-medium">{mainSuffix}</span>
+                        )}
+                    </div>
+                )}
+
+                {/* Inline breakdown */}
+                {!loading && (
+                    <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+                        {details.map((d, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 text-slate-500">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${dotColors[d.color]}`} />
+                                    {d.label}
+                                </span>
+                                <span className={`font-semibold tabular-nums ${textColors[d.color]}`}>
+                                    {d.value}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.05] group-hover:opacity-[0.10] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+                <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
+                    {icon}
+                </div>
+            </div>
+        </Card>
     );
 }

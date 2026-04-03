@@ -14,7 +14,6 @@ import { ObjectivesKPIGrid } from './ObjectivesKPIGrid';
 import { ObjectivesProgressPanel } from './ObjectivesProgressPanel';
 import { ObjectivesListingsFunnel } from './ObjectivesListingsFunnel';
 import { ObjectivesAgentTable } from './ObjectivesAgentTable';
-import { ObjectivesOperationalPanel } from './ObjectivesOperationalPanel';
 import { motion } from 'framer-motion';
 import { BarChart3 } from 'lucide-react';
 import { useOrganizations } from '@/features/admin/hooks/useAdmin';
@@ -189,22 +188,6 @@ export function ObjectivesPage() {
                     progress={progress || null}
                     isLoading={isLoading}
                     onOpenDialog={() => setIsDialogOpen(true)}
-                />
-            </motion.div>
-
-            {/* Panel Operacional (Volumen, Facturación, Operaciones, Desglose) */}
-            <motion.div
-                key={`operational-panel-${isTeamView}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: 0.15 }}
-            >
-                <ObjectivesOperationalPanel
-                    isTeamView={isTeamView}
-                    teamSummary={teamSummary || null}
-                    progress={progress || null}
-                    isLoading={isLoading}
-                    userRole={userRole}
                 />
             </motion.div>
 

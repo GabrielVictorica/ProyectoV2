@@ -1657,3 +1657,11 @@ export type Database = {
     }
   }
 }
+
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Organization = Database['public']['Tables']['organizations']['Row'];
+export type BillingRecord = Database['public']['Tables']['billing_records']['Row'];
+export type UserRole = Database['public']['Enums']['user_role'];
+export type Property = Database['public']['Tables']['properties']['Row'];
+export type PropertyType = Database['public']['Tables']['property_types']['Row'];
+export type PropertyStatus = Database['public']['Tables']['property_statuses']['Row'];

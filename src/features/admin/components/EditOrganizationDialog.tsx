@@ -111,7 +111,7 @@ export function EditOrganizationDialog({ organization, open, onOpenChange, onSuc
             billingPostalCode: parsedBillingAddress.postalCode,
             billingProvince: parsedBillingAddress.province,
             royalty_percentage: organization.royalty_percentage ?? 0,
-            org_status: organization.org_status || 'active',
+            org_status: (organization.org_status as 'active' | 'suspended' | 'pending_payment') || 'active',
         },
     });
 
@@ -140,7 +140,7 @@ export function EditOrganizationDialog({ organization, open, onOpenChange, onSuc
             billingPostalCode: pBilling.postalCode,
             billingProvince: pBilling.province,
             royalty_percentage: organization.royalty_percentage ?? 0,
-            org_status: organization.org_status || 'active',
+            org_status: (organization.org_status as 'active' | 'suspended' | 'pending_payment') || 'active',
         });
     }, [organization, form]);
 

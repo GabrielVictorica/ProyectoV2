@@ -4,7 +4,6 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DynamicTypography } from '@/components/ui/DynamicTypography';
-import { MagicCard } from '@/components/ui/magic-card';
 import { cn } from '@/lib/utils';
 
 interface ObjectivesKPICardProps {
@@ -27,17 +26,27 @@ interface ObjectivesKPICardProps {
     };
 }
 
-const gradientColors: Record<string, string> = {
-    green: 'rgba(16,185,129,0.12)',
-    blue: 'rgba(59,130,246,0.12)',
-    purple: 'rgba(168,85,247,0.12)',
-    yellow: 'rgba(245,158,11,0.12)',
-    cyan: 'rgba(6,182,212,0.12)',
-    amber: 'rgba(245,158,11,0.12)',
-    red: 'rgba(239,68,68,0.12)',
+const colorClasses = {
+    green: 'from-green-500/20 to-emerald-500/20 border-green-500/30',
+    blue: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30',
+    purple: 'from-purple-500/20 to-pink-500/20 border-purple-500/30',
+    yellow: 'from-yellow-500/20 to-orange-500/20 border-yellow-500/30',
+    cyan: 'from-cyan-500/20 to-teal-500/20 border-cyan-500/30',
+    amber: 'from-amber-500/20 to-yellow-500/20 border-amber-500/30',
+    red: 'from-red-500/20 to-rose-500/20 border-red-500/30',
 };
 
-const progressColors: Record<string, string> = {
+const iconColors = {
+    green: 'text-green-400',
+    blue: 'text-blue-400',
+    purple: 'text-purple-400',
+    yellow: 'text-yellow-400',
+    cyan: 'text-cyan-400',
+    amber: 'text-amber-400',
+    red: 'text-red-400',
+};
+
+const progressColors = {
     green: 'bg-green-500',
     blue: 'bg-blue-500',
     purple: 'bg-purple-500',
@@ -81,82 +90,76 @@ export function ObjectivesKPICard({
     const progressColorRaw = progressColors[color] || 'bg-white';
 
     return (
-        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md rounded-xl`}>
-            <MagicCard
-                gradientColor={gradientColors[color] || gradientColors.blue}
-                gradientSize={250}
-                gradientOpacity={1}
-            >
-                <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
-                    <div className="flex flex-col gap-1">
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10 truncate" title={title}>
-                            {title}
-                        </p>
+        <Card className={`relative overflow-hidden border ${t.border} ${t.bg} ${t.glow} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg group shadow-md`}>
+            <CardContent className="p-5 relative z-10 min-h-[100px] flex flex-col justify-center">
+                <div className="flex flex-col gap-1">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest z-10 truncate" title={title}>
+                        {title}
+                    </p>
 
-                        {loading ? (
-                            <Skeleton className="h-8 w-24 bg-slate-800 lg:w-32 mt-1" />
-                        ) : (
-                            <div className="flex flex-col z-10">
-                                <div className="flex items-baseline gap-2">
-                                    <DynamicTypography
-                                        value={isString ? value : typeof value === 'number' ? value.toLocaleString() : value}
-                                        className="text-white font-black tracking-tighter drop-shadow-md"
-                                        baseSize="text-3xl"
-                                    />
-                                    {showProgress && !isString && (
-                                        <div className="flex items-baseline gap-1.5 opacity-80">
-                                            <span className="text-[10px] text-slate-500 font-medium">
-                                                / {progressTotal}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Segmented Progress Bar (Cerrado + Reservado) */}
-                                {segmentedProgress && (
-                                    <div className="mt-2 space-y-1.5 w-full max-w-[90%]">
-                                        <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm flex">
-                                            {segmentedProgress.total > 0 && (
-                                                <>
-                                                    <div
-                                                        className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
-                                                        style={{ width: `${Math.min(100, (segmentedProgress.completed / segmentedProgress.total) * 100)}%` }}
-                                                    />
-                                                    <div
-                                                        className="h-full bg-amber-500/70 transition-all duration-1000 ease-out"
-                                                        style={{ width: `${Math.min(100 - (segmentedProgress.completed / segmentedProgress.total) * 100, (segmentedProgress.reserved / segmentedProgress.total) * 100)}%` }}
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-3 text-[9px] font-medium">
-                                            <span className="flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                                                <span className="text-emerald-400">{segmentedProgress.completedLabel || segmentedProgress.completed}</span>
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                                                <span className="text-amber-400">{segmentedProgress.reservedLabel || segmentedProgress.reserved}</span>
-                                            </span>
-                                        </div>
+                    {loading ? (
+                        <Skeleton className="h-8 w-24 bg-slate-800 lg:w-32 mt-1" />
+                    ) : (
+                        <div className="flex flex-col z-10">
+                            <div className="flex items-baseline gap-2">
+                                <DynamicTypography
+                                    value={isString ? value : typeof value === 'number' ? value.toLocaleString() : value}
+                                    className="text-white font-black tracking-tighter drop-shadow-md"
+                                    baseSize="text-3xl"
+                                />
+                                {showProgress && !isString && (
+                                    <div className="flex items-baseline gap-1.5 opacity-80">
+                                        <span className="text-[10px] text-slate-500 font-medium">
+                                            / {progressTotal}
+                                        </span>
                                     </div>
                                 )}
-
-                                {!showProgress && !segmentedProgress && subtitle && (
-                                    <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1">{subtitle}</p>
-                                )}
                             </div>
-                        )}
-                    </div>
-                </CardContent>
 
-                {/* Watermark Icon - Background Layer */}
-                <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
-                    <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
-                        {icon}
-                    </div>
+                            {/* Segmented Progress Bar (Cerrado + Reservado) */}
+                            {segmentedProgress && (
+                                <div className="mt-2 space-y-1.5 w-full max-w-[90%]">
+                                    <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm flex">
+                                        {segmentedProgress.total > 0 && (
+                                            <>
+                                                <div
+                                                    className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                                                    style={{ width: `${Math.min(100, (segmentedProgress.completed / segmentedProgress.total) * 100)}%` }}
+                                                />
+                                                <div
+                                                    className="h-full bg-amber-500/70 transition-all duration-1000 ease-out"
+                                                    style={{ width: `${Math.min(100 - (segmentedProgress.completed / segmentedProgress.total) * 100, (segmentedProgress.reserved / segmentedProgress.total) * 100)}%` }}
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[9px] font-medium">
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                            <span className="text-emerald-400">{segmentedProgress.completedLabel || segmentedProgress.completed}</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                            <span className="text-amber-400">{segmentedProgress.reservedLabel || segmentedProgress.reserved}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!showProgress && !segmentedProgress && subtitle && (
+                                <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1">{subtitle}</p>
+                            )}
+                        </div>
+                    )}
                 </div>
-            </MagicCard>
+            </CardContent>
+
+            {/* Watermark Icon - Background Layer */}
+            <div className={`absolute -right-6 -bottom-6 opacity-[0.07] group-hover:opacity-[0.12] transition-opacity duration-500 rotate-[-15deg] scale-150 pointer-events-none ${t.text}`}>
+                <div className="w-32 h-32 [&>svg]:w-full [&>svg]:h-full">
+                    {icon}
+                </div>
+            </div>
         </Card>
     );
 }

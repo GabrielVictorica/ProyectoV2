@@ -6,6 +6,11 @@ import type { Profile } from '@/types/database.types';
 export interface TeamMember extends Profile {
     is_external: boolean;
     supervisor_ids: string[];
+    // Estas propiedades vienen de la consulta enriquecida en getTeamMembersAction
+    property_count?: number;
+    sales_count?: number;
+    sales_volume?: number;
+    email?: string;
 }
 
 /**

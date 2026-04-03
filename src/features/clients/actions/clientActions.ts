@@ -398,7 +398,7 @@ export async function getClientsAction(
         const isParent = (profile as any).role === 'parent';
         const isChild = !isGod && !isParent;
 
-        if (filters?.type) query = query.eq('type', filters.type);
+        if (filters?.type) query = query.eq('type', filters.type as any);
         if (filters?.status) query = query.eq('status', filters.status);
 
         // REGLA DE VISIBILIDAD ESTRICTA:
@@ -628,7 +628,7 @@ export async function checkPersonHasSearchAction(
             success: true,
             data: {
                 hasSearch: (data || []).length > 0,
-                searches: (data as Client[]) || []
+                searches: (data as any) || []
             }
         };
     } catch (err) {

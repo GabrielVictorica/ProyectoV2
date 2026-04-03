@@ -75,16 +75,6 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         total_reserved_income: acc.total_reserved_income + Number(curr.total_reserved_income || 0),
         total_completed_puntas: acc.total_completed_puntas + Number(curr.total_completed_puntas || 0),
         total_reserved_puntas: acc.total_reserved_puntas + Number(curr.total_reserved_puntas || 0),
-        // Métricas operacionales
-        total_sales_volume: acc.total_sales_volume + Number(curr.total_sales_volume || 0),
-        total_operations_count: acc.total_operations_count + Number(curr.total_operations_count || 0),
-        total_double_sided_count: acc.total_double_sided_count + Number(curr.total_double_sided_count || 0),
-        total_single_sided_count: acc.total_single_sided_count + Number(curr.total_single_sided_count || 0),
-        total_net_income: acc.total_net_income + Number(curr.total_net_income || 0),
-        total_master_income: acc.total_master_income + Number(curr.total_master_income || 0),
-        total_office_income: acc.total_office_income + Number(curr.total_office_income || 0),
-        total_completed_volume: acc.total_completed_volume + Number(curr.total_completed_volume || 0),
-        total_reserved_volume: acc.total_reserved_volume + Number(curr.total_reserved_volume || 0),
     }), {
         year,
         organization_id: null,
@@ -98,15 +88,6 @@ export const fetchTeamObjectivesSummary = async (year: number, organizationId?: 
         total_reserved_income: 0,
         total_completed_puntas: 0,
         total_reserved_puntas: 0,
-        total_sales_volume: 0,
-        total_operations_count: 0,
-        total_double_sided_count: 0,
-        total_single_sided_count: 0,
-        total_net_income: 0,
-        total_master_income: 0,
-        total_office_income: 0,
-        total_completed_volume: 0,
-        total_reserved_volume: 0,
     });
 
     aggregated.avg_progress = aggregated.total_team_goal > 0
@@ -260,10 +241,6 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
                 reserved_gross_income: row.reserved_gross_income || 0,
                 completed_puntas_count: row.completed_puntas_count || 0,
                 reserved_puntas_count: row.reserved_puntas_count || 0,
-                total_sales_volume: row.total_sales_volume || 0,
-                operations_count: 0, // Se calcula en cliente desde puntas si no disponible
-                double_sided_count: 0,
-                single_sided_count: 0,
             }));
         },
     });
