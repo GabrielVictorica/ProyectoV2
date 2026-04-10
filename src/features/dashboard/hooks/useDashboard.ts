@@ -27,7 +27,7 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
 
     let salesQuery = supabase
         .from('transactions')
-        .select('actual_price, gross_commission, agent_id, profiles(first_name, last_name)')
+        .select('id, actual_price, gross_commission, agent_id, profiles(first_name, last_name), linked_transaction_id')
         .neq('status', 'cancelled');
 
     if (isParent && orgId) {
@@ -52,7 +52,23 @@ export const fetchDashboardStats = async (supabase: any, profile: any, permissio
     ]);
 
     // 3. Procesar datos de transacciones (Ventas y Comisiones)
-    const totalSalesVolume = salesData?.reduce((sum: number, t: any) => sum + (t.actual_price || 0), 0) || 0;
+    // Para el volumen global de la oficina, NO debemos sumar ambas puntas de una misma operación vinculada (doble conteo).
+    let uniqueSalesForVolume = salesData || [];
+    if (isParent) {
+        const seen = new Set<string>();
+        uniqueSalesForVolume = uniqueSalesForVolume.filter((t: any) => {
+            const linkedId = t.linked_transaction_id;
+            if (linkedId) {
+                if (seen.has(t.id)) return false; // Ya contamos la otra punta
+                seen.add(linkedId); // Registrar el par para ignorarlo si aparece luego
+                return true;
+            }
+            return true;
+        });
+    }
+
+    const totalSalesVolume = uniqueSalesForVolume.reduce((sum: number, t: any) => sum + (t.actual_price || 0), 0);
+    // Para las comisiones, sí sumamos todo puesto que cada transacción contiene solo la porción (punta) del agente.
     const totalCommissions = salesData?.reduce((sum: number, t: any) => sum + (t.gross_commission || 0), 0) || 0;
 
     // 4. Calcular Ranking de Agentes si es Broker
