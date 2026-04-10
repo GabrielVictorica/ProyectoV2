@@ -1155,6 +1155,7 @@ export type Database = {
           custom_property_title: string | null
           gross_commission: number
           id: string
+          linked_transaction_id: string | null
           master_commission_amount: number | null
           net_commission: number
           notes: string | null
@@ -1184,6 +1185,7 @@ export type Database = {
           custom_property_title?: string | null
           gross_commission: number
           id?: string
+          linked_transaction_id?: string | null
           master_commission_amount?: number | null
           net_commission?: number
           notes?: string | null
@@ -1213,6 +1215,7 @@ export type Database = {
           custom_property_title?: string | null
           gross_commission?: number
           id?: string
+          linked_transaction_id?: string | null
           master_commission_amount?: number | null
           net_commission?: number
           notes?: string | null
@@ -1304,6 +1307,59 @@ export type Database = {
             columns: ["seller_person_id"]
             isOneToOne: false
             referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dismissed_duplicates: {
+        Row: {
+          id: string
+          transaction_id_a: string
+          transaction_id_b: string
+          dismissed_by: string
+          dismissed_at: string | null
+        }
+        Insert: {
+          id?: string
+          transaction_id_a: string
+          transaction_id_b: string
+          dismissed_by: string
+          dismissed_at?: string | null
+        }
+        Update: {
+          id?: string
+          transaction_id_a?: string
+          transaction_id_b?: string
+          dismissed_by?: string
+          dismissed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dismissed_duplicates_transaction_id_a_fkey"
+            columns: ["transaction_id_a"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dismissed_duplicates_transaction_id_b_fkey"
+            columns: ["transaction_id_b"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dismissed_duplicates_dismissed_by_fkey"
+            columns: ["dismissed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

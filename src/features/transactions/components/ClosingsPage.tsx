@@ -6,6 +6,7 @@ import { useClosingsDashboard, closingsKeys } from '../hooks/useClosings';
 import { useDeleteTransaction } from '../hooks/useTransactions'; // Mantener delete legacy
 import { CloseTransactionDialog } from './CloseTransactionDialog';
 import { ReservationActionMenu } from './ReservationActionMenu';
+import { DuplicateDetectionPanel } from './DuplicateDetectionPanel';
 import { formatCurrency } from '@/lib/formatters';
 import { Pencil, Trash2, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
@@ -99,6 +100,13 @@ export function ClosingsPage() {
     const transactions = dashboardData?.transactions || [];
     const metrics = dashboardData?.aggregatedMetrics;
     const teamMembers = dashboardData?.teamMembers || [];
+    const possibleDuplicates = dashboardData?.possibleDuplicates || [];
+
+    // For god/parent: find already-linked transactions to show in management panel
+    const linkedTransactions = useMemo(() => {
+        if (!isGodOrParent) return [];
+        return transactions.filter((tx: any) => tx._linkedTransactionId);
+    }, [transactions, isGodOrParent]);
     // Extraer organizaciones únicas de las transacciones o perfiles si fuera necesario para GOD, 
     // pero para filtros GOD generalmente necesita todas las organizaciones.
     // El nuevo endpoint NO devuelve lista de organizaciones (solo transactions/metrics/team).
@@ -532,6 +540,15 @@ export function ClosingsPage() {
                 )}
             </div>
 
+            {/* Duplicate Detection Panel - Only god/parent */}
+            {isGodOrParent && (possibleDuplicates.length > 0 || linkedTransactions.length > 0) && (
+                <DuplicateDetectionPanel
+                    possibleDuplicates={possibleDuplicates}
+                    transactions={dashboardData?.transactions || []}
+                    linkedTransactions={linkedTransactions}
+                />
+            )}
+
             {/* Transactions Table */}
             <Card className="bg-slate-900/40 backdrop-blur-xl border-slate-800 overflow-hidden shadow-2xl">
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -605,7 +622,14 @@ export function ClosingsPage() {
                                                 </TableCell>
                                                 {isGodOrParent && (
                                                     <TableCell className="text-white">
-                                                        {tx.agent?.first_name} {tx.agent?.last_name}
+                                                        <div className="flex items-center gap-1">
+                                                            {tx.agent?.first_name} {tx.agent?.last_name}
+                                                            {(tx as any)._linkedAgent && (
+                                                                <span className="text-emerald-400 text-[10px] flex items-center gap-0.5 ml-1" title={`Operación compartida con ${(tx as any)._linkedAgent.first_name} ${(tx as any)._linkedAgent.last_name}`}>
+                                                                    + {(tx as any)._linkedAgent.first_name?.charAt(0)}{(tx as any)._linkedAgent.last_name?.charAt(0)}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                 )}
                                                 <TableCell className="text-white font-sans max-w-[200px] truncate">
