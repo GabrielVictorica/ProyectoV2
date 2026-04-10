@@ -209,8 +209,9 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
                 ])
             );
 
-            // Only check unlinked transactions
-            const unlinked = rawTransactions.filter(t => !(t as any).linked_transaction_id);
+            // Only check unlinked transactions with sides=1
+            // sides=2 means the agent already loaded both sides → impossible to be a duplicate
+            const unlinked = rawTransactions.filter(t => !(t as any).linked_transaction_id && (t.sides || 1) !== 2);
 
             for (let i = 0; i < unlinked.length; i++) {
                 for (let j = i + 1; j < unlinked.length; j++) {

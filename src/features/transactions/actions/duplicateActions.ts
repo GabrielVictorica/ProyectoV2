@@ -22,6 +22,44 @@ export async function linkTransactionsAction(idA: string, idB: string) {
         return { success: false, error: 'Solo administradores pueden vincular operaciones' };
     }
 
+    // Fetch both transactions to validate pre-conditions
+    const { data: txPair, error: fetchError } = await supabase
+        .from('transactions')
+        .select('id, sides, linked_transaction_id, agent_id')
+        .in('id', [idA, idB]);
+
+    if (fetchError || !txPair || txPair.length !== 2) {
+        return { success: false, error: 'No se encontraron ambas operaciones' };
+    }
+
+    const txA = txPair.find(t => t.id === idA);
+    const txB = txPair.find(t => t.id === idB);
+
+    if (!txA || !txB) {
+        return { success: false, error: 'No se encontraron ambas operaciones' };
+    }
+
+    // Validation 1: Cannot link a transaction that already has both sides
+    if ((txA.sides || 1) === 2) {
+        return { success: false, error: `La operación del agente ya tiene ambas puntas (2 lados). No puede ser un duplicado.` };
+    }
+    if ((txB.sides || 1) === 2) {
+        return { success: false, error: `La operación del agente ya tiene ambas puntas (2 lados). No puede ser un duplicado.` };
+    }
+
+    // Validation 2: Cannot link if either is already linked to a different transaction
+    if (txA.linked_transaction_id && txA.linked_transaction_id !== idB) {
+        return { success: false, error: 'La operación A ya está vinculada a otra operación. Desvinculá primero.' };
+    }
+    if (txB.linked_transaction_id && txB.linked_transaction_id !== idA) {
+        return { success: false, error: 'La operación B ya está vinculada a otra operación. Desvinculá primero.' };
+    }
+
+    // Validation 3: Cannot link transactions from the same agent
+    if (txA.agent_id === txB.agent_id) {
+        return { success: false, error: 'No se pueden vincular dos operaciones del mismo agente.' };
+    }
+
     // Set linked_transaction_id bidirectionally
     const { error: err1 } = await supabase
         .from('transactions')
