@@ -158,18 +158,22 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         transactions = rawTransactions;
     } else {
         // God/Parent: deduplicate linked operations
-        const seen = new Set<string>();
-        transactions = rawTransactions.filter(tx => {
+        const keep = new Set<string>();
+        const skip = new Set<string>();
+
+        for (const tx of rawTransactions) {
+            if (skip.has(tx.id)) continue;
+            
             const linkedId = (tx as any).linked_transaction_id;
             if (linkedId) {
-                // If we already kept the other side, skip this one
-                if (seen.has(tx.id)) return false;
-                // Mark the linked side so it gets skipped
-                seen.add(linkedId);
-                return true;
+                keep.add(tx.id);
+                skip.add(linkedId);
+            } else {
+                keep.add(tx.id);
             }
-            return true; // Unlinked transactions always pass
-        });
+        }
+        
+        transactions = rawTransactions.filter(tx => keep.has(tx.id) && !skip.has(tx.id));
 
         // Enrich linked transactions with info from the other agent
         // CRITICAL: Sum commissions from both sides so totals are accurate

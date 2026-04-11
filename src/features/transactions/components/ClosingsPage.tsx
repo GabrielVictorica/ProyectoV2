@@ -187,7 +187,8 @@ export function ClosingsPage() {
                 linkedAgentName.includes(searchLower);
 
             // Filtro local de agente (0ms latency)
-            const matchesAgent = selectedAgent === 'all' || tx.agent_id === selectedAgent || (tx as any)._linkedAgentId === selectedAgent;
+            const linkedAgentId = (tx as any)._linkedAgent?.id || (tx as any)._linkedAgentId;
+            const matchesAgent = selectedAgent === 'all' || tx.agent_id === selectedAgent || linkedAgentId === selectedAgent;
 
             return matchesSearch && matchesAgent;
         });
