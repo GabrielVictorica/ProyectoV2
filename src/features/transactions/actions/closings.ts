@@ -187,6 +187,19 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
                         net_commission: Number(tx.net_commission || 0) + Number(linkedTx.net_commission || 0),
                         office_commission_amount: Number(tx.office_commission_amount || 0) + Number(linkedTx.office_commission_amount || 0),
                         master_commission_amount: Number(tx.master_commission_amount || 0) + Number(linkedTx.master_commission_amount || 0),
+                        
+                        // Retenemos los valores originales de cada lado para poder calcular los KPIs
+                        // individuales cuando se filtre por un agente específico
+                        _original_gross: Number(tx.gross_commission || 0),
+                        _original_net: Number(tx.net_commission || 0),
+                        _original_office: Number(tx.office_commission_amount || 0),
+                        _original_master: Number(tx.master_commission_amount || 0),
+                        
+                        _linked_gross: Number(linkedTx.gross_commission || 0),
+                        _linked_net: Number(linkedTx.net_commission || 0),
+                        _linked_office: Number(linkedTx.office_commission_amount || 0),
+                        _linked_master: Number(linkedTx.master_commission_amount || 0),
+
                         _linkedAgent: linkedTx.agent,
                         _linkedAgentId: linkedTx.agent_id,
                         _linkedTransactionId: linkedId,

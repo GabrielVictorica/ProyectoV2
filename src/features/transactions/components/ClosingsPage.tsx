@@ -173,27 +173,32 @@ export function ClosingsPage() {
     }, [organizations]);
 
 
-    const filteredTransactions = useMemo(() => {
+    const baseFilteredTransactions = useMemo(() => {
         if (!transactions) return [];
         return transactions.filter(tx => {
             const searchLower = searchQuery.toLowerCase();
             const propertyTitle = (tx.property?.title || tx.custom_property_title || '').toLowerCase();
-            const agentName = tx.agent ? `${tx.agent.first_name} ${tx.agent.last_name}`.toLowerCase() : '';
+            const primaryAgentName = tx.agent ? `${tx.agent.first_name} ${tx.agent.last_name}`.toLowerCase() : '';
+            const linkedAgentName = (tx as any)._linkedAgent ? `${(tx as any)._linkedAgent.first_name} ${(tx as any)._linkedAgent.last_name}`.toLowerCase() : '';
 
             const matchesSearch = searchQuery === '' ||
                 propertyTitle.includes(searchLower) ||
-                agentName.includes(searchLower);
-
-            // Filtro local de estado (Instant Tabs)
-            const txStatus = tx.status || 'completed'; // null = completed para legacy
-            const matchesTab = selectedTab === 'all' || txStatus === selectedTab;
+                primaryAgentName.includes(searchLower) ||
+                linkedAgentName.includes(searchLower);
 
             // Filtro local de agente (0ms latency)
-            const matchesAgent = selectedAgent === 'all' || tx.agent_id === selectedAgent;
+            const matchesAgent = selectedAgent === 'all' || tx.agent_id === selectedAgent || (tx as any)._linkedAgentId === selectedAgent;
 
-            return matchesSearch && matchesTab && matchesAgent;
+            return matchesSearch && matchesAgent;
         });
-    }, [transactions, searchQuery, selectedTab, selectedAgent]);
+    }, [transactions, searchQuery, selectedAgent]);
+
+    const filteredTransactions = useMemo(() => {
+        return baseFilteredTransactions.filter(tx => {
+            const txStatus = tx.status || 'completed';
+            return selectedTab === 'all' || txStatus === selectedTab;
+        });
+    }, [baseFilteredTransactions, selectedTab]);
 
     // Calcular métricas agregadas en el cliente para el set filtrado (Instantáneo)
     const activeMetrics = useMemo(() => {
@@ -205,18 +210,31 @@ export function ClosingsPage() {
         return filteredTransactions.reduce((acc, tx) => {
             const status = tx.status || 'completed';
             
+            const isSpecificAgent = selectedAgent !== 'all';
+            const isSecondaryAgent = isSpecificAgent && (tx as any)._linkedAgentId === selectedAgent;
+
+            const gross = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
+            
+            const net = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_net || 0) : Number((tx as any)._original_net || 0)) : Number(tx.net_commission || 0);
+
+            const master = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_master || 0) : Number((tx as any)._original_master || 0)) : Number(tx.master_commission_amount || 0);
+
+            const office = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_office || 0) : Number((tx as any)._original_office || 0)) : Number(tx.office_commission_amount || 0);
+            
+            const puntas = isSpecificAgent && (tx as any)._linkedAgentId ? 1 : (tx.sides || 1);
+
             // Solo sumamos al volumen y comisiones si no es caída (o según lógica específica)
             if (status !== 'cancelled') {
                 acc.totalSalesVolume += Number(tx.actual_price || 0);
-                acc.totalGrossCommission += Number(tx.gross_commission || 0);
-                acc.totalNetIncome += Number(tx.net_commission || 0);
-                acc.totalMasterIncome += Number(tx.master_commission_amount || 0);
-                acc.totalOfficeIncome += Number(tx.office_commission_amount || 0);
+                acc.totalGrossCommission += gross;
+                acc.totalNetIncome += net;
+                acc.totalMasterIncome += master;
+                acc.totalOfficeIncome += office;
                 
                 if (status === 'completed') {
                     acc.closedDealsCount += 1;
-                    acc.totalPuntas += (tx.sides || 1);
-                    if (tx.sides === 2) acc.doubleSidedCount += 1;
+                    acc.totalPuntas += puntas;
+                    if (puntas === 2) acc.doubleSidedCount += 1;
                     else acc.singleSidedCount += 1;
                 }
             }
@@ -237,16 +255,20 @@ export function ClosingsPage() {
         // El desglose por tipo (Cierres vs Reservas) se calcula del set visible del agente si está seleccionado
         const relevantTxs = selectedAgent === 'all' 
             ? transactions 
-            : transactions.filter(t => t.agent_id === selectedAgent);
+            : transactions.filter(t => t.agent_id === selectedAgent || (t as any)._linkedAgentId === selectedAgent);
 
         return relevantTxs.reduce((acc, tx) => {
             const status = tx.status || 'completed';
+            
+            const isSecondaryAgent = selectedAgent !== 'all' && (tx as any)._linkedAgentId === selectedAgent;
+            const gross = selectedAgent !== 'all' && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
+
             if (status === 'completed') {
                 acc.realVolume += Number(tx.actual_price || 0);
-                acc.realCommission += Number(tx.gross_commission || 0);
+                acc.realCommission += gross;
             } else if (status === 'pending') {
                 acc.projectedVolume += Number(tx.actual_price || 0);
-                acc.projectedCommission += Number(tx.gross_commission || 0);
+                acc.projectedCommission += gross;
             }
             return acc;
         }, { realVolume: 0, projectedVolume: 0, realCommission: 0, projectedCommission: 0 });
@@ -513,8 +535,8 @@ export function ClosingsPage() {
                         loading={isLoading}
                         color="purple"
                         details={[
-                            { label: 'Cierres', value: String(filteredTransactions.filter(t => (t.status || 'completed') === 'completed' && (selectedTab === 'all' || selectedTab === 'completed')).length), color: 'emerald' as const },
-                            { label: 'Reservas', value: String(filteredTransactions.filter(t => t.status === 'pending' && (selectedTab === 'all' || selectedTab === 'pending')).length), color: 'amber' as const },
+                            { label: 'Cierres', value: String(baseFilteredTransactions.filter(t => (t.status || 'completed') === 'completed').length), color: 'emerald' as const },
+                            { label: 'Reservas', value: String(baseFilteredTransactions.filter(t => t.status === 'pending').length), color: 'amber' as const },
                             { label: 'Ticket Prom.', value: formatCurrency(activeAverageTicket), color: 'slate' as const },
                         ]}
                     />
@@ -563,16 +585,16 @@ export function ClosingsPage() {
                     >
                         <TabsList className="bg-slate-900 border border-slate-800 p-1">
                             <TabsTrigger value="all" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs">
-                                Todas ({transactions.length})
+                                Todas ({baseFilteredTransactions.length})
                             </TabsTrigger>
                             <TabsTrigger value="pending" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-amber-400">
-                                Reservas ({transactions.filter(t => t.status === 'pending').length})
+                                Reservas ({baseFilteredTransactions.filter(t => t.status === 'pending').length})
                             </TabsTrigger>
                             <TabsTrigger value="completed" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-emerald-400">
-                                Cierres ({transactions.filter(t => (t.status === 'completed' || !t.status)).length})
+                                Cierres ({baseFilteredTransactions.filter(t => (t.status === 'completed' || !t.status)).length})
                             </TabsTrigger>
                             <TabsTrigger value="cancelled" className="data-[state=active]:bg-slate-800 text-[10px] sm:text-xs text-red-400">
-                                Caídas ({transactions.filter(t => t.status === 'cancelled').length})
+                                Caídas ({baseFilteredTransactions.filter(t => t.status === 'cancelled').length})
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
@@ -612,7 +634,17 @@ export function ClosingsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredTransactions.map((tx) => (
+                                        {filteredTransactions.map((tx) => {
+                                            const isSpecificAgent = selectedAgent !== 'all';
+                                            const isSecondaryAgent = isSpecificAgent && (tx as any)._linkedAgentId === selectedAgent;
+                                            
+                                            const displayGross = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
+                                            const displayNet = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_net || 0) : Number((tx as any)._original_net || 0)) : Number(tx.net_commission || 0);
+                                            const displayMaster = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_master || 0) : Number((tx as any)._original_master || 0)) : Number(tx.master_commission_amount || 0);
+                                            const displayOffice = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_office || 0) : Number((tx as any)._original_office || 0)) : Number(tx.office_commission_amount || 0);
+                                            const displaySides = isSpecificAgent && (tx as any)._linkedAgentId ? 1 : (tx.sides || 1);
+
+                                            return (
                                             <TableRow
                                                 key={tx.id}
                                                 className="border-slate-800/50 hover:bg-slate-700/30 font-mono text-xs transition-colors"
@@ -651,23 +683,23 @@ export function ClosingsPage() {
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <Badge variant="outline" className="border-slate-700 text-slate-400 font-mono bg-slate-800/50">
-                                                        {tx.sides}
+                                                        {displaySides}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right text-yellow-400/80 font-bold">
-                                                    {formatCurrency(tx.gross_commission)}
+                                                    {formatCurrency(displayGross)}
                                                 </TableCell>
                                                 <TableCell className="text-right text-green-400/80">
-                                                    {formatCurrency(tx.net_commission)}
+                                                    {formatCurrency(displayNet)}
                                                 </TableCell>
                                                 {role === 'god' && (
                                                     <TableCell className="text-right text-purple-400/80">
-                                                        {formatCurrency(tx.master_commission_amount || 0)}
+                                                        {formatCurrency(displayMaster)}
                                                     </TableCell>
                                                 )}
                                                 {isGodOrParent && (
                                                     <TableCell className="text-right text-blue-400/80">
-                                                        {formatCurrency(tx.office_commission_amount || 0)}
+                                                        {formatCurrency(displayOffice)}
                                                     </TableCell>
                                                 )}
                                                 <TableCell className="text-right">
@@ -713,7 +745,8 @@ export function ClosingsPage() {
                                                     })()}
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>

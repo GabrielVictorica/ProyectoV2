@@ -19,7 +19,8 @@ import {
     Target,
     CalendarDays,
     ChevronRight,
-    Trophy
+    Trophy,
+    FileBarChart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +41,7 @@ const MAIN_ITEMS = [
     { href: '/dashboard/properties', label: 'Propiedades', icon: Building },
     { href: '/dashboard/crm', label: 'Relaciones (CRM)', icon: Handshake },
     { href: '/dashboard/clients', label: 'Búsquedas', icon: Users },
+    { href: '/dashboard/acm', label: 'Tasaciones', icon: FileBarChart },
 ];
 
 const TRACKING_ITEMS = [
@@ -120,6 +122,33 @@ const NavigationLink = memo(({ item, pathname, auth, isParent, role, queryClient
 });
 
 NavigationLink.displayName = 'NavigationLink';
+
+// Item con animación "Próximamente" para features no disponibles aún
+const ComingSoonNavItem = memo(({ item }: { item: { href: string; label: string; icon: any } }) => {
+    return (
+        <div className="relative group flex items-center gap-3 px-4 py-3 rounded-xl text-white/30 cursor-not-allowed overflow-hidden">
+            <item.icon className="h-5 w-5 shrink-0" />
+            <span className="font-medium">{item.label}</span>
+            <motion.div
+                className="ml-auto"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+                <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-400/80 border border-violet-500/20">
+                    Próximamente
+                </span>
+            </motion.div>
+            {/* Shimmer sweep */}
+            <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent pointer-events-none"
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear', repeatDelay: 1 }}
+            />
+        </div>
+    );
+});
+
+ComingSoonNavItem.displayName = 'ComingSoonNavItem';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -211,18 +240,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     {/* Navigation */}
                     <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
                         {/* Main Items */}
-                        {dynamicItems.main.map((item) => (
-                            <NavigationLink
-                                key={item.href}
-                                item={item}
-                                pathname={pathname}
-                                auth={auth}
-                                isParent={isParent}
-                                role={role}
-                                queryClient={queryClient}
-                                supabase={supabase}
-                            />
-                        ))}
+                        {dynamicItems.main.map((item) => {
+                            // Tasaciones: solo god tiene acceso completo, el resto ve "Próximamente"
+                            if (item.href === '/dashboard/acm' && !isGod) {
+                                return <ComingSoonNavItem key={item.href} item={item} />;
+                            }
+                            return (
+                                <NavigationLink
+                                    key={item.href}
+                                    item={item}
+                                    pathname={pathname}
+                                    auth={auth}
+                                    isParent={isParent}
+                                    role={role}
+                                    queryClient={queryClient}
+                                    supabase={supabase}
+                                />
+                            );
+                        })}
 
                         {/* Trakeo Section */}
                         <div className="pt-6 pb-2">
