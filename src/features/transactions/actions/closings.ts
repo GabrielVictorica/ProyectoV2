@@ -161,19 +161,25 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         const keep = new Set<string>();
         const skip = new Set<string>();
 
-        for (const tx of rawTransactions) {
-            if (skip.has(tx.id)) continue;
+        // Deterministic keep/skip logic based on ID alphabetical order to resolve duplicates reliably
+        rawTransactions.forEach(tx => {
+            if (skip.has(tx.id)) return;
             
             const linkedId = (tx as any).linked_transaction_id;
             if (linkedId) {
-                keep.add(tx.id);
-                skip.add(linkedId);
+                if (tx.id < linkedId) {
+                    keep.add(tx.id);
+                    skip.add(linkedId);
+                } else {
+                    keep.add(linkedId);
+                    skip.add(tx.id);
+                }
             } else {
                 keep.add(tx.id);
             }
-        }
+        });
         
-        transactions = rawTransactions.filter(tx => keep.has(tx.id) && !skip.has(tx.id));
+        transactions = rawTransactions.filter(tx => keep.has(tx.id));
 
         // Enrich linked transactions with info from the other agent
         // CRITICAL: Sum commissions from both sides so totals are accurate
