@@ -161,12 +161,18 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
         const keep = new Set<string>();
         const skip = new Set<string>();
 
+        // Build set of IDs actually present in the query results
+        const presentIds = new Set(rawTransactions.map(t => t.id));
+
         // Deterministic keep/skip logic based on ID alphabetical order to resolve duplicates reliably
+        // CRITICAL: Only skip a transaction if the linked one actually exists in rawTransactions,
+        // otherwise the transaction would vanish (e.g. linked tx filtered out by year/org/month)
         rawTransactions.forEach(tx => {
             if (skip.has(tx.id)) return;
-            
+
             const linkedId = (tx as any).linked_transaction_id;
-            if (linkedId) {
+            if (linkedId && presentIds.has(linkedId)) {
+                // Both sides are in the result set — deduplicate deterministically
                 if (tx.id < linkedId) {
                     keep.add(tx.id);
                     skip.add(linkedId);
@@ -175,11 +181,12 @@ export async function getClosingsDashboardDataAction(filters: ClosingsFilters = 
                     skip.add(tx.id);
                 }
             } else {
+                // No link, or linked tx is not in results — always keep
                 keep.add(tx.id);
             }
         });
-        
-        transactions = rawTransactions.filter(tx => keep.has(tx.id));
+
+        transactions = rawTransactions.filter(tx => keep.has(tx.id) && !skip.has(tx.id));
 
         // Enrich linked transactions with info from the other agent
         // CRITICAL: Sum commissions from both sides so totals are accurate

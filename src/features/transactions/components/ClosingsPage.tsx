@@ -201,79 +201,74 @@ export function ClosingsPage() {
         });
     }, [baseFilteredTransactions, selectedTab]);
 
-    // Calcular métricas agregadas en el cliente para el set filtrado (Instantáneo)
+    // Calcular métricas agregadas sobre baseFilteredTransactions (filtrado por agente+búsqueda, NO por tab)
+    // Los KPIs de las tarjetas siempre muestran el panorama completo; el tab solo filtra la tabla.
     const activeMetrics = useMemo(() => {
-        if (!filteredTransactions) return {
+        const empty = {
             totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
+            totalOfficeIncome: 0,
+            // Totales (cierres + reservas)
+            totalOpsCount: 0, totalPuntas: 0,
+            // Desglose por status
+            closedDealsCount: 0, closedPuntas: 0,
+            pendingDealsCount: 0, pendingPuntas: 0,
+            // Desglose volumen/comisión por status
+            closedVolume: 0, closedGross: 0,
+            pendingVolume: 0, pendingGross: 0,
         };
+        if (!baseFilteredTransactions) return empty;
 
-        return filteredTransactions.reduce((acc, tx) => {
+        const isSpecificAgent = selectedAgent !== 'all';
+
+        return baseFilteredTransactions.reduce((acc, tx) => {
             const status = tx.status || 'completed';
-            
-            const isSpecificAgent = selectedAgent !== 'all';
+            const isLinked = !!(tx as any)._linkedAgentId;
             const isSecondaryAgent = isSpecificAgent && (tx as any)._linkedAgentId === selectedAgent;
 
-            const gross = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
-            
-            const net = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_net || 0) : Number((tx as any)._original_net || 0)) : Number(tx.net_commission || 0);
+            const gross = isSpecificAgent && isLinked ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
 
-            const master = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_master || 0) : Number((tx as any)._original_master || 0)) : Number(tx.master_commission_amount || 0);
+            const net = isSpecificAgent && isLinked ? (isSecondaryAgent ? Number((tx as any)._linked_net || 0) : Number((tx as any)._original_net || 0)) : Number(tx.net_commission || 0);
 
-            const office = isSpecificAgent && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_office || 0) : Number((tx as any)._original_office || 0)) : Number(tx.office_commission_amount || 0);
-            
-            const puntas = isSpecificAgent && (tx as any)._linkedAgentId ? 1 : (tx.sides || 1);
+            const master = isSpecificAgent && isLinked ? (isSecondaryAgent ? Number((tx as any)._linked_master || 0) : Number((tx as any)._original_master || 0)) : Number(tx.master_commission_amount || 0);
 
-            // Solo sumamos al volumen y comisiones si no es caída (o según lógica específica)
-            if (status !== 'cancelled') {
-                acc.totalSalesVolume += Number(tx.actual_price || 0);
+            const office = isSpecificAgent && isLinked ? (isSecondaryAgent ? Number((tx as any)._linked_office || 0) : Number((tx as any)._original_office || 0)) : Number(tx.office_commission_amount || 0);
+
+            const puntas = isSpecificAgent && isLinked ? 1 : (tx.sides || 1);
+            const price = Number(tx.actual_price || 0);
+
+            if (status === 'completed') {
+                acc.totalOpsCount += 1;
+                acc.totalPuntas += puntas;
+                acc.closedDealsCount += 1;
+                acc.closedPuntas += puntas;
+                acc.totalSalesVolume += price;
+                acc.closedVolume += price;
                 acc.totalGrossCommission += gross;
+                acc.closedGross += gross;
                 acc.totalNetIncome += net;
                 acc.totalMasterIncome += master;
                 acc.totalOfficeIncome += office;
-                
-                if (status === 'completed') {
-                    acc.closedDealsCount += 1;
-                    acc.totalPuntas += puntas;
-                    if (puntas === 2) acc.doubleSidedCount += 1;
-                    else acc.singleSidedCount += 1;
-                }
-            }
-            return acc;
-        }, {
-            totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
-            totalOfficeIncome: 0, closedDealsCount: 0, doubleSidedCount: 0, singleSidedCount: 0, totalPuntas: 0
-        });
-    }, [filteredTransactions]);
-
-    const activeAverageTicket = activeMetrics.closedDealsCount > 0 
-        ? activeMetrics.totalSalesVolume / activeMetrics.closedDealsCount 
-        : 0;
-
-    const breakdownMetrics = useMemo(() => {
-        if (!transactions) return { realVolume: 0, projectedVolume: 0, realCommission: 0, projectedCommission: 0 };
-        
-        // El desglose por tipo (Cierres vs Reservas) se calcula del set visible del agente si está seleccionado
-        const relevantTxs = selectedAgent === 'all' 
-            ? transactions 
-            : transactions.filter(t => t.agent_id === selectedAgent || (t as any)._linkedAgentId === selectedAgent);
-
-        return relevantTxs.reduce((acc, tx) => {
-            const status = tx.status || 'completed';
-            
-            const isSecondaryAgent = selectedAgent !== 'all' && (tx as any)._linkedAgentId === selectedAgent;
-            const gross = selectedAgent !== 'all' && (tx as any)._linkedAgentId ? (isSecondaryAgent ? Number((tx as any)._linked_gross || 0) : Number((tx as any)._original_gross || 0)) : Number(tx.gross_commission || 0);
-
-            if (status === 'completed') {
-                acc.realVolume += Number(tx.actual_price || 0);
-                acc.realCommission += gross;
             } else if (status === 'pending') {
-                acc.projectedVolume += Number(tx.actual_price || 0);
-                acc.projectedCommission += gross;
+                acc.totalOpsCount += 1;
+                acc.totalPuntas += puntas;
+                acc.pendingDealsCount += 1;
+                acc.pendingPuntas += puntas;
+                acc.totalSalesVolume += price;
+                acc.pendingVolume += price;
+                acc.totalGrossCommission += gross;
+                acc.pendingGross += gross;
+                acc.totalNetIncome += net;
+                acc.totalMasterIncome += master;
+                acc.totalOfficeIncome += office;
             }
+            // cancelled: no suma nada
             return acc;
-        }, { realVolume: 0, projectedVolume: 0, realCommission: 0, projectedCommission: 0 });
-    }, [transactions, selectedAgent]);
+        }, empty);
+    }, [baseFilteredTransactions, selectedAgent]);
+
+    const activeAverageTicket = activeMetrics.closedDealsCount > 0
+        ? activeMetrics.closedVolume / activeMetrics.closedDealsCount
+        : 0;
 
     const handleRefresh = () => {
         // Invalidar la nueva query unificada
@@ -495,8 +490,8 @@ export function ClosingsPage() {
                         loading={isLoading}
                         color="blue"
                         details={[
-                            { label: 'Cerrado', value: formatCurrency(breakdownMetrics.realVolume), color: 'emerald' as const },
-                            { label: 'Reservado', value: formatCurrency(breakdownMetrics.projectedVolume), color: 'amber' as const },
+                            { label: 'Cerrado', value: formatCurrency(activeMetrics.closedVolume), color: 'emerald' as const },
+                            { label: 'Reservado', value: formatCurrency(activeMetrics.pendingVolume), color: 'amber' as const },
                         ]}
                     />
                 </motion.div>
@@ -519,8 +514,8 @@ export function ClosingsPage() {
                                     { label: 'Neto facturado', value: formatCurrency(activeMetrics.totalNetIncome), color: 'emerald' as const },
                                 ]
                                 : [
-                                    { label: 'Facturado', value: formatCurrency(breakdownMetrics.realCommission), color: 'emerald' as const },
-                                    { label: 'Proyectado', value: formatCurrency(breakdownMetrics.projectedCommission), color: 'amber' as const },
+                                    { label: 'Facturado', value: formatCurrency(activeMetrics.closedGross), color: 'emerald' as const },
+                                    { label: 'Proyectado', value: formatCurrency(activeMetrics.pendingGross), color: 'amber' as const },
                                 ]
                         }
                     />
@@ -531,13 +526,13 @@ export function ClosingsPage() {
                     <SummaryCard
                         title="Operaciones"
                         icon={<Handshake className="h-5 w-5" />}
-                        mainValue={`${activeMetrics.closedDealsCount}`}
+                        mainValue={`${activeMetrics.totalOpsCount}`}
                         mainSuffix={`· ${activeMetrics.totalPuntas} puntas`}
                         loading={isLoading}
                         color="purple"
                         details={[
-                            { label: 'Cierres', value: String(baseFilteredTransactions.filter(t => (t.status || 'completed') === 'completed').length), color: 'emerald' as const },
-                            { label: 'Reservas', value: String(baseFilteredTransactions.filter(t => t.status === 'pending').length), color: 'amber' as const },
+                            { label: 'Cierres', value: `${activeMetrics.closedDealsCount} · ${activeMetrics.closedPuntas}p`, color: 'emerald' as const },
+                            { label: 'Reservas', value: `${activeMetrics.pendingDealsCount} · ${activeMetrics.pendingPuntas}p`, color: 'amber' as const },
                             { label: 'Ticket Prom.', value: formatCurrency(activeAverageTicket), color: 'slate' as const },
                         ]}
                     />
