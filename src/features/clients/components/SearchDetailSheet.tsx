@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Sheet,
     SheetContent,
@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { useInteractions, useAddInteraction, useDeleteInteraction } from '../hooks/useClients';
+import { Trash2 } from 'lucide-react';
 import {
     Calendar,
     Target,
@@ -54,8 +57,20 @@ export function SearchDetailSheet({
     onEdit,
 }: SearchDetailSheetProps) {
     const { data: propertyTypes } = usePropertyTypes();
+    const canViewHistory = !!client && !client.is_anonymous;
+    const { data: interactions, isLoading: isLoadingInteractions } = useInteractions(canViewHistory ? client!.id : '');
+    const addInteraction = useAddInteraction();
+    const deleteInteraction = useDeleteInteraction();
+    const [newNote, setNewNote] = useState('');
 
     if (!client) return null;
+
+    const canAddNote = !client.is_anonymous;
+    const handleAddNote = async () => {
+        if (!newNote.trim() || !client) return;
+        await addInteraction.mutateAsync({ clientId: client.id, type: 'nota', content: newNote });
+        setNewNote('');
+    };
 
     const nurc = parseNURC(client.motivation);
     const isActuallyAnonymous = client.is_anonymous;
@@ -306,6 +321,91 @@ export function SearchDetailSheet({
                                 )}
                             </div>
                         </div>
+
+                        {canViewHistory && <Separator className="bg-white/10" />}
+
+                        {/* Historial de Seguimiento — solo para búsquedas no anónimas */}
+                        {canViewHistory && (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2 text-violet-400">
+                                <History className="w-5 h-5" />
+                                Historial de Seguimiento
+                            </h3>
+
+                            {canAddNote && (
+                                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-2">
+                                    <Textarea
+                                        placeholder="Registrar un seguimiento, llamada o nota..."
+                                        className="bg-slate-900/60 border-slate-800 text-sm min-h-[70px] resize-none"
+                                        value={newNote}
+                                        onChange={e => setNewNote(e.target.value)}
+                                    />
+                                    <Button
+                                        size="sm"
+                                        className="w-full bg-violet-600 hover:bg-violet-700 h-8 text-xs"
+                                        onClick={handleAddNote}
+                                        disabled={addInteraction.isPending || !newNote.trim()}
+                                    >
+                                        {addInteraction.isPending ? 'Guardando...' : 'Guardar seguimiento'}
+                                    </Button>
+                                </div>
+                            )}
+
+                            <div className="space-y-4">
+                                {isLoadingInteractions ? (
+                                    <div className="space-y-2">
+                                        {[1, 2].map(i => (
+                                            <div key={i} className="h-16 bg-white/5 animate-pulse rounded-lg" />
+                                        ))}
+                                    </div>
+                                ) : !interactions || interactions.length === 0 ? (
+                                    <div className="py-6 text-center">
+                                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-2">
+                                            <Info className="w-5 h-5 text-white/20" />
+                                        </div>
+                                        <p className="text-xs text-slate-500">No hay seguimientos registrados todavía.</p>
+                                    </div>
+                                ) : (
+                                    interactions.map((item: any) => (
+                                        <div key={item.id} className="relative pl-5 border-l border-white/10">
+                                            <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.5)]" />
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-violet-400">
+                                                    {String(item.type).replace('_', ' ')}
+                                                </span>
+                                                <span className="text-[10px] text-white/30">
+                                                    {format(new Date(item.created_at), 'd MMM HH:mm', { locale: es })}
+                                                </span>
+                                            </div>
+                                            <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+                                                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{item.content}</p>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between text-[10px] text-white/20">
+                                                <div className="flex items-center gap-1">
+                                                    <User className="w-2.5 h-2.5" />
+                                                    {item.agent?.first_name} {item.agent?.last_name}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="flex items-center gap-1 text-rose-400/60 hover:text-rose-400 transition-colors"
+                                                    onClick={() => {
+                                                        if (confirm('¿Eliminar este seguimiento? Se quitará también del historial del CRM.')) {
+                                                            deleteInteraction.mutate({ interactionId: item.id, clientId: client!.id });
+                                                        }
+                                                    }}
+                                                    disabled={deleteInteraction.isPending}
+                                                    title="Eliminar (solo si se cargó por error)"
+                                                >
+                                                    <Trash2 className="w-2.5 h-2.5" />
+                                                    <span>Eliminar</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        )}
                     </div>
                 </ScrollArea>
 

@@ -63,6 +63,8 @@ export function CancelReservationDialog({
             toast.success('Reserva dada de baja con éxito');
             queryClient.invalidateQueries({ queryKey: ['closings-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] });
             onOpenChange(false);
             onSuccess?.();
         } catch (err: any) {

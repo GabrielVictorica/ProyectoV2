@@ -217,7 +217,11 @@ export type PersonHistoryEventType =
     | 'visit_record'
     | 'activity_record'
     | 'search_linked'
-    | 'search_closed';
+    | 'search_closed'
+    | 'search_lost'
+    | 'search_suspended'
+    | 'search_edited'
+    | 'transaction_edited';
 
 export interface PersonHistoryEvent {
     id: string;

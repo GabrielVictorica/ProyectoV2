@@ -149,6 +149,7 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
             toast.success('Actividad creada');
         },
         onError: (error: any) => {
@@ -164,6 +165,7 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
             toast.success('Actividad actualizada');
         },
         onError: (error: any) => {
@@ -179,6 +181,7 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
             toast.success('Actividad eliminada');
         },
         onError: (error: any) => {

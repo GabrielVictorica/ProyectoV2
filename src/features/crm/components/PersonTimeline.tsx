@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     Activity,
     Calendar,
@@ -14,7 +15,10 @@ import {
     MapPin,
     PhoneCall,
     Search,
-    Archive
+    Archive,
+    XCircle,
+    PauseCircle,
+    Pencil,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusLabel } from '../constants/relationshipStatuses';
@@ -23,6 +27,8 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { PersonHistoryEvent } from '@/features/clients/types';
 import { getPersonHistoryAction } from '../actions/personActions';
+
+export const personHistoryKey = (personId: string) => ['crm', 'person-history', personId] as const;
 
 interface PersonTimelineProps {
     personId: string;
@@ -85,27 +91,47 @@ const EVENT_CONFIG = {
     },
     search_closed: {
         icon: Archive,
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        label: 'Búsqueda Cerrada (éxito)'
+    },
+    search_lost: {
+        icon: XCircle,
         color: 'text-rose-400',
         bgColor: 'bg-rose-500/10',
-        label: 'Búsqueda Cerrada'
+        label: 'Búsqueda Perdida'
+    },
+    search_suspended: {
+        icon: PauseCircle,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        label: 'Búsqueda Suspendida'
+    },
+    search_edited: {
+        icon: Pencil,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10',
+        label: 'Búsqueda Editada'
+    },
+    transaction_edited: {
+        icon: Pencil,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10',
+        label: 'Operación Editada'
     }
 };
 
 export function PersonTimeline({ personId }: PersonTimelineProps) {
-    const [events, setEvents] = useState<PersonHistoryEvent[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadHistory = async () => {
-            setLoading(true);
+    const { data: events = [], isLoading: loading } = useQuery<PersonHistoryEvent[]>({
+        queryKey: personHistoryKey(personId),
+        queryFn: async () => {
             const result = await getPersonHistoryAction(personId);
-            if (result.success && result.data) {
-                setEvents(result.data);
-            }
-            setLoading(false);
-        };
-        loadHistory();
-    }, [personId]);
+            if (!result.success) throw new Error(result.error);
+            return result.data || [];
+        },
+        enabled: !!personId,
+        staleTime: 30 * 1000,
+    });
 
     if (loading) {
         return (
@@ -230,8 +256,13 @@ function renderEventDescription(event: PersonHistoryEvent) {
         case 'status_change':
             return `El estado de la relación se actualizó a "${getStatusLabel(event.new_value)}".`;
 
-        case 'contact':
-            return `Interacción rápida registrada con el cliente.`;
+        case 'contact': {
+            const preview = event.metadata?.content_preview;
+            const typeLabel = (event.new_value || 'nota').replace('_', ' ');
+            return preview
+                ? `Seguimiento (${typeLabel}): ${preview}`
+                : `Seguimiento registrado (${typeLabel}).`;
+        }
 
         case 'edit':
             return `Información del perfil actualizada.`;
@@ -266,9 +297,29 @@ function renderEventDescription(event: PersonHistoryEvent) {
             return `Se vinculó una búsqueda de ${searchType}${zonesStr}.`;
         }
 
-        case 'search_closed': {
-            const finalStatus = event.new_value === 'archived' ? 'archivada' : 'cerrada';
-            return `La búsqueda fue ${finalStatus}.`;
+        case 'search_closed':
+            return `La búsqueda se cerró con éxito (cierre/operación concretada).`;
+
+        case 'search_lost':
+            return `La búsqueda se marcó como PERDIDA.`;
+
+        case 'search_suspended':
+            return `La búsqueda se suspendió temporalmente.`;
+
+        case 'search_edited': {
+            const fields = event.metadata?.changed_fields;
+            if (Array.isArray(fields) && fields.length > 0) {
+                return `Se editaron los campos: ${fields.join(', ')}.`;
+            }
+            return `La búsqueda fue editada.`;
+        }
+
+        case 'transaction_edited': {
+            const fields = event.metadata?.changed_fields;
+            if (Array.isArray(fields) && fields.length > 0) {
+                return `Se editaron los campos de la operación: ${fields.join(', ')}.`;
+            }
+            return `La operación fue editada.`;
         }
 
         default:

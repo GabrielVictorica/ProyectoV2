@@ -10,6 +10,7 @@ import {
     getClientsAction,
     getNetworkClientsAction,
     addClientInteractionAction,
+    deleteClientInteractionAction,
     getClientInteractionsAction,
     getClientDashboardStatsAction,
 } from '../actions/clientActions';
@@ -47,6 +48,29 @@ export function useAddInteraction() {
             if (result.success) {
                 toast.success('Nota agregada');
                 queryClient.invalidateQueries({ queryKey: ['client-interactions', variables.clientId] });
+                queryClient.invalidateQueries({ queryKey: clientKeys.all });
+                queryClient.invalidateQueries({ queryKey: ['crm'] });
+            } else {
+                toast.error(result.error);
+            }
+        },
+    });
+}
+
+/**
+ * Mutation para eliminar una interacción/seguimiento (cuando se cargó por error).
+ */
+export function useDeleteInteraction() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ interactionId }: { interactionId: string; clientId: string }) =>
+            deleteClientInteractionAction(interactionId),
+        onSuccess: (result, variables) => {
+            if (result.success) {
+                toast.success('Seguimiento eliminado');
+                queryClient.invalidateQueries({ queryKey: ['client-interactions', variables.clientId] });
+                queryClient.invalidateQueries({ queryKey: ['clients'] });
+                queryClient.invalidateQueries({ queryKey: ['crm'] });
             } else {
                 toast.error(result.error);
             }
@@ -188,6 +212,7 @@ export function useUpdateClient() {
             if (result.success) {
                 toast.success('Búsqueda actualizada correctamente');
                 queryClient.invalidateQueries({ queryKey: clientKeys.all });
+                queryClient.invalidateQueries({ queryKey: ['crm'] });
             } else {
                 toast.error(result.error);
             }
@@ -211,6 +236,7 @@ export function useDeleteClient() {
             if (result.success) {
                 toast.success('Búsqueda eliminada');
                 queryClient.invalidateQueries({ queryKey: clientKeys.all });
+                queryClient.invalidateQueries({ queryKey: ['crm'] });
             } else {
                 toast.error(result.error);
             }

@@ -53,6 +53,112 @@ export async function updatePersonStatusAction(
     return { success: true };
 }
 
+/**
+ * Helper: sincroniza (inserta) los eventos en person_history correspondientes a una actividad.
+ * Si `purgeFirst` es true, borra primero los eventos previos con metadata.activity_id = activityId.
+ */
+async function syncActivityHistory(
+    adminClient: any,
+    supabase: any,
+    activity: any,
+    agentId: string | null,
+    purgeFirst: boolean = false
+): Promise<void> {
+    const activityId = activity?.id;
+    if (!activityId) return;
+
+    if (purgeFirst) {
+        const { error: purgeErr } = await adminClient
+            .from('person_history')
+            .delete()
+            .eq('metadata->>activity_id', activityId);
+        if (purgeErr) console.error('Error purgando person_history de actividad:', purgeErr);
+    }
+
+    const getPersonName = async (id: string) => {
+        const { data: p } = await supabase
+            .from('persons' as any)
+            .select('first_name, last_name')
+            .eq('id', id)
+            .single();
+        return p ? `${(p as any).first_name} ${(p as any).last_name}` : 'Sin nombre';
+    };
+
+    if (activity.type === 'visita' && activity.visit_metadata) {
+        const vm = activity.visit_metadata;
+        const buyerId = vm.buyer_person_id || (vm.punta === 'compradora' ? activity.person_id : null);
+        if (buyerId) {
+            const { error } = await adminClient.from('person_history').insert({
+                person_id: buyerId,
+                event_type: 'visit_record',
+                agent_id: agentId,
+                field_name: 'visit_buyer',
+                new_value: vm.property_address || 'Sin dirección',
+                metadata: {
+                    role: 'buyer',
+                    property_address: vm.property_address,
+                    feedback: vm.buyer_feedback || null,
+                    activity_date: activity.date,
+                    punta: vm.punta,
+                    activity_id: activityId,
+                }
+            });
+            if (error) console.error('Error insertando visit_record buyer:', error);
+            await supabase.from('persons' as any)
+                .update({ last_interaction_at: new Date(activity.date + 'T12:00:00Z').toISOString() } as any)
+                .eq('id', buyerId);
+        }
+        const sellerId = vm.seller_person_id || (vm.punta === 'vendedora' ? activity.person_id : null);
+        if (sellerId) {
+            const buyerName = buyerId ? await getPersonName(buyerId) : 'Comprador externo';
+            const { error } = await adminClient.from('person_history').insert({
+                person_id: sellerId,
+                event_type: 'visit_record',
+                agent_id: agentId,
+                field_name: 'visit_seller',
+                new_value: vm.property_address || 'Sin dirección',
+                metadata: {
+                    role: 'seller',
+                    property_address: vm.property_address,
+                    visitor_name: buyerName,
+                    activity_date: activity.date,
+                    punta: vm.punta,
+                    activity_id: activityId,
+                }
+            });
+            if (error) console.error('Error insertando visit_record seller:', error);
+            await supabase.from('persons' as any)
+                .update({ last_interaction_at: new Date(activity.date + 'T12:00:00Z').toISOString() } as any)
+                .eq('id', sellerId);
+        }
+    } else if (activity.person_id) {
+        const ACTIVITY_LABELS: Record<string, string> = {
+            llamada: 'Llamada',
+            whatsapp: 'WhatsApp',
+            oferta: 'Oferta',
+            captacion: 'Captación',
+            tasacion: 'Tasación',
+            firma: 'Firma',
+            reunion: 'Reunión',
+            visita: 'Visita',
+        };
+        const { error } = await adminClient.from('person_history').insert({
+            person_id: activity.person_id,
+            event_type: activity.type === 'visita' ? 'visit_record' : 'activity_record',
+            agent_id: agentId,
+            field_name: activity.type,
+            new_value: ACTIVITY_LABELS[activity.type] || activity.type,
+            metadata: {
+                activity_type: activity.type,
+                activity_date: activity.date,
+                notes: activity.notes || null,
+                activity_id: activityId,
+            }
+        });
+        if (error) console.error('Error insertando activity_record:', error);
+    }
+}
+
 export async function createActivityAction(data: ActivityInsert) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -82,105 +188,10 @@ export async function createActivityAction(data: ActivityInsert) {
             .eq('id', data.person_id);
     }
 
-    // ── Registro en person_history para actividades vinculadas a persona ──
+    // ── Registro en person_history (helper compartido con update) ──
     const adminClient = createAdminClient();
     const agentId = user?.id || null;
-
-    if (data.type === 'visita' && data.visit_metadata) {
-        // Registro acumulativo de visitas
-        const vm = data.visit_metadata;
-
-        // Helper para obtener nombre de una persona
-        const getPersonName = async (id: string) => {
-            const { data: p } = await supabase
-                .from('persons' as any)
-                .select('first_name, last_name')
-                .eq('id', id)
-                .single();
-            const person = p as any;
-            return person ? `${person.first_name} ${person.last_name}` : 'Sin nombre';
-        };
-
-        // Registrar visita para el COMPRADOR
-        const buyerId = vm.buyer_person_id || (vm.punta === 'compradora' ? data.person_id : null);
-        if (buyerId) {
-            await (adminClient as any)
-                .from('person_history')
-                .insert({
-                    person_id: buyerId,
-                    event_type: 'visit_record',
-                    agent_id: agentId,
-                    field_name: 'visit_buyer',
-                    new_value: vm.property_address || 'Sin dirección',
-                    metadata: {
-                        role: 'buyer',
-                        property_address: vm.property_address,
-                        feedback: vm.buyer_feedback || null,
-                        activity_date: data.date,
-                        punta: vm.punta
-                    }
-                });
-
-            // Actualizar last_interaction_at para el comprador también
-            await supabase
-                .from('persons' as any)
-                .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
-                .eq('id', buyerId);
-        }
-
-        // Registrar visita para el VENDEDOR
-        const sellerId = vm.seller_person_id || (vm.punta === 'vendedora' ? data.person_id : null);
-        if (sellerId) {
-            const buyerName = buyerId ? await getPersonName(buyerId) : 'Comprador externo';
-            await (adminClient as any)
-                .from('person_history')
-                .insert({
-                    person_id: sellerId,
-                    event_type: 'visit_record',
-                    agent_id: agentId,
-                    field_name: 'visit_seller',
-                    new_value: vm.property_address || 'Sin dirección',
-                    metadata: {
-                        role: 'seller',
-                        property_address: vm.property_address,
-                        visitor_name: buyerName,
-                        activity_date: data.date,
-                        punta: vm.punta
-                    }
-                });
-
-            // Actualizar last_interaction_at para el vendedor también
-            await supabase
-                .from('persons' as any)
-                .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
-                .eq('id', sellerId);
-        }
-    } else if (data.person_id && data.type !== 'visita') {
-        // Registro de actividades no-visita (llamada, whatsapp, oferta, captación, etc.)
-        const ACTIVITY_LABELS: Record<string, string> = {
-            llamada: 'Llamada',
-            whatsapp: 'WhatsApp',
-            oferta: 'Oferta',
-            captacion: 'Captación',
-            tasacion: 'Tasación',
-            firma: 'Firma',
-            reunion: 'Reunión',
-        };
-        await (adminClient as any)
-            .from('person_history')
-            .insert({
-                person_id: data.person_id,
-                event_type: 'activity_record',
-                agent_id: agentId,
-                field_name: data.type,
-                new_value: ACTIVITY_LABELS[data.type] || data.type,
-                metadata: {
-                    activity_type: data.type,
-                    activity_date: data.date,
-                    notes: data.notes || null
-                }
-            });
-    }
+    await syncActivityHistory(adminClient, supabase, activity, agentId, false);
 
     revalidatePath('/dashboard/my-week');
     revalidatePath('/dashboard/crm');
@@ -189,6 +200,7 @@ export async function createActivityAction(data: ActivityInsert) {
 
 export async function updateActivityAction(id: string, data: Partial<ActivityInsert>) {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     const { data: activity, error } = await supabase
         .from('activities' as any)
@@ -208,6 +220,11 @@ export async function updateActivityAction(id: string, data: Partial<ActivityIns
             .update({ last_interaction_at: new Date(data.date + 'T12:00:00Z').toISOString() } as any)
             .eq('id', data.person_id);
     }
+
+    // Resincronizar historial: purgar eventos anteriores de esta actividad y recrearlos
+    const adminClient = createAdminClient();
+    const agentId = user?.id || null;
+    await syncActivityHistory(adminClient, supabase, activity, agentId, true);
 
     revalidatePath('/dashboard/my-week');
     revalidatePath('/dashboard/crm');
@@ -232,6 +249,14 @@ export async function deleteActivityAction(id: string) {
     if (error) {
         return { success: false, error: error.message };
     }
+
+    // Purgar entradas de person_history generadas por esta actividad
+    const adminClient = createAdminClient();
+    const { error: purgeErr } = await (adminClient as any)
+        .from('person_history')
+        .delete()
+        .eq('metadata->>activity_id', id);
+    if (purgeErr) console.error('Error purgando person_history de actividad:', purgeErr);
 
     // Revertir estado: buscar la actividad más reciente restante de esta persona
     const deletedActivity = activityToDelete as any;

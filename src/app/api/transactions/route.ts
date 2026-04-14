@@ -473,6 +473,52 @@ export async function PUT(request: NextRequest) {
 
         if (error) throw error;
 
+        // Registrar edición en person_history para cada persona vinculada (cuando cambian campos funcionales)
+        const watchedTxFields: Record<string, string> = {
+            actual_price: 'Precio',
+            sides: 'Puntas',
+            commission_percentage: 'Comisión %',
+            agent_split_percentage: 'Split agente %',
+            transaction_date: 'Fecha de operación',
+            closing_date: 'Fecha de cierre',
+            custom_property_title: 'Propiedad',
+            buyer_person_id: 'Comprador',
+            seller_person_id: 'Vendedor',
+            notes: 'Notas',
+        };
+        const changedTxFields: string[] = [];
+        for (const [col, label] of Object.entries(watchedTxFields)) {
+            if (col in updates && updates[col] !== undefined) {
+                const before = JSON.stringify((currentTx as any)[col] ?? null);
+                const after = JSON.stringify((data as any)[col] ?? null);
+                if (before !== after) changedTxFields.push(label);
+            }
+        }
+
+        const linkedPersonIds = [
+            updates.buyer_person_id || currentTx.buyer_person_id,
+            updates.seller_person_id || currentTx.seller_person_id,
+        ].filter(Boolean);
+
+        if (changedTxFields.length > 0) {
+            for (const pid of linkedPersonIds) {
+                const { error: editErr } = await (adminClient as any)
+                    .from('person_history')
+                    .insert({
+                        person_id: pid,
+                        agent_id: updates.agent_id || currentTx.agent_id,
+                        event_type: 'transaction_edited',
+                        field_name: 'transaction',
+                        new_value: changedTxFields.join(', '),
+                        metadata: {
+                            transaction_id: id,
+                            changed_fields: changedTxFields,
+                        }
+                    });
+                if (editErr) console.error('Error insertando transaction_edited en person_history:', editErr);
+            }
+        }
+
         // Auto-update last_interaction_at for linked persons and their clients
         const txDate = updates.transaction_date || currentTx.transaction_date;
         const personIdsToUpdate = [
@@ -666,6 +712,13 @@ export async function DELETE(request: NextRequest) {
             .from('activities')
             .delete()
             .eq('transaction_id', id);
+
+        // Purgar entradas de person_history generadas por esta transacción
+        const { error: histErr } = await (adminClient as any)
+            .from('person_history')
+            .delete()
+            .eq('metadata->>transaction_id', id);
+        if (histErr) console.error('Error purgando person_history de transacción:', histErr);
 
         return NextResponse.json({ success: true });
     } catch (err) {

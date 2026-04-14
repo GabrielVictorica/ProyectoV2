@@ -67,6 +67,8 @@ export function CloseReservationDialog({
             toast.success('Reserva cerrada con éxito');
             queryClient.invalidateQueries({ queryKey: ['closings-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] });
             onOpenChange(false);
             onSuccess?.();
         } catch (err: any) {

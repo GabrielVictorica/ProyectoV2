@@ -258,6 +258,7 @@ export function useAddTransaction() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
         },
     });
 }
@@ -317,6 +318,7 @@ export function useDeleteTransaction() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['crm'] });
         },
     });
 }

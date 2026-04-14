@@ -281,6 +281,12 @@ export async function updateClientAction(
             updatePayload.agent_id = validatedData.agentId;
         }
 
+        // Obtener estado previo para comparar
+        const { data: prevRow } = await (supabase.from('person_searches') as any)
+            .select('*')
+            .eq('id', validatedData.id)
+            .single();
+
         const { data, error } = await (supabase
             .from('person_searches' as any) as any)
             .update(updatePayload)
@@ -290,27 +296,80 @@ export async function updateClientAction(
 
         if (error) throw error;
 
-        // Registrar en person_history si la búsqueda se cerró/archivó
         const personId = (data as any)?.person_id;
-        if (personId && validatedData.status && (validatedData.status === 'closed' || validatedData.status === 'archived')) {
-            const adminClient = createAdminClient();
-            await (adminClient as any)
-                .from('person_history')
-                .insert({
-                    person_id: personId,
-                    event_type: 'search_closed',
-                    agent_id: user.id,
-                    field_name: 'person_search',
-                    new_value: validatedData.status,
-                    metadata: {
-                        search_id: validatedData.id,
-                        search_type: (data as any)?.search_type,
-                        final_status: validatedData.status,
-                    }
-                });
+        const adminClient = createAdminClient();
+
+        // Registrar en person_history según el cambio de estado
+        if (personId && validatedData.status && prevRow && (prevRow as any).status !== validatedData.status) {
+            const statusToEvent: Record<string, 'search_closed' | 'search_lost' | 'search_suspended'> = {
+                closed: 'search_closed',
+                archived: 'search_lost',
+                inactive: 'search_suspended',
+            };
+            const eventType = statusToEvent[validatedData.status];
+            if (eventType) {
+                const { error: histErr } = await (adminClient as any)
+                    .from('person_history')
+                    .insert({
+                        person_id: personId,
+                        event_type: eventType,
+                        agent_id: user.id,
+                        field_name: 'person_search',
+                        old_value: (prevRow as any).status,
+                        new_value: validatedData.status,
+                        metadata: {
+                            search_id: validatedData.id,
+                            search_type: (data as any)?.search_type,
+                            final_status: validatedData.status,
+                        }
+                    });
+                if (histErr) console.error('Error insertando search status en person_history:', histErr);
+            }
+        }
+
+        // Registrar edición de campos funcionales relevantes (no sólo cambios de estado)
+        if (personId && prevRow) {
+            const watchedFields: Record<string, string> = {
+                budget_min: 'Presupuesto mínimo',
+                budget_max: 'Presupuesto máximo',
+                preferred_zones: 'Zonas preferidas',
+                property_types: 'Tipos de propiedad',
+                bedrooms: 'Ambientes',
+                payment_methods: 'Métodos de pago',
+                motivation: 'Motivación (NURC)',
+                is_mortgage_eligible: 'Apto crédito',
+                is_mortgage_prequalified: 'Precalificado',
+                search_type: 'Tipo de búsqueda',
+            };
+            const changed: string[] = [];
+            for (const [col, label] of Object.entries(watchedFields)) {
+                if (col in updatePayload) {
+                    const before = JSON.stringify((prevRow as any)[col] ?? null);
+                    const after = JSON.stringify((data as any)[col] ?? null);
+                    if (before !== after) changed.push(label);
+                }
+            }
+            if (changed.length > 0) {
+                const { error: editErr } = await (adminClient as any)
+                    .from('person_history')
+                    .insert({
+                        person_id: personId,
+                        event_type: 'search_edited',
+                        agent_id: user.id,
+                        field_name: 'person_search',
+                        new_value: changed.join(', '),
+                        metadata: {
+                            search_id: validatedData.id,
+                            search_type: (data as any)?.search_type,
+                            changed_fields: changed,
+                        }
+                    });
+                if (editErr) console.error('Error insertando edit en person_history:', editErr);
+            }
         }
 
         revalidatePath('/dashboard/clients');
+        revalidatePath('/dashboard/crm');
         return { success: true, data: data as Client };
     } catch (err) {
         console.error('Error in updateClientAction:', err);
@@ -324,6 +383,9 @@ export async function updateClientAction(
 export async function deleteClientAction(id: string): Promise<ActionResult<void>> {
     try {
         const supabase = await createClient();
+        const adminClient = createAdminClient();
+
+        // 1. Borrar la búsqueda primero. Si falla, no debemos tocar el historial.
         const { error } = await supabase
             .from('person_searches')
             .delete()
@@ -331,7 +393,21 @@ export async function deleteClientAction(id: string): Promise<ActionResult<void>
 
         if (error) throw error;
 
+        // 2. Ya borrada, purgar cascada en person_history y client_interactions
+        const { error: purgeErr } = await (adminClient as any)
+            .from('person_history')
+            .delete()
+            .eq('metadata->>search_id', id);
+        if (purgeErr) console.error('Error purgando person_history de búsqueda:', purgeErr);
+
+        const { error: purgeIntErr } = await (adminClient as any)
+            .from('client_interactions')
+            .delete()
+            .eq('client_id', id);
+        if (purgeIntErr) console.error('Error purgando client_interactions:', purgeIntErr);
+
         revalidatePath('/dashboard/clients');
+        revalidatePath('/dashboard/crm');
         return { success: true, data: undefined };
     } catch (err) {
         console.error('Error in deleteClientAction:', err);
@@ -560,6 +636,26 @@ export async function addClientInteractionAction(
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
+        const profile = await getCurrentUserProfile(supabase, user.id);
+        if (!profile) return { success: false, error: 'Perfil no encontrado' };
+
+        // Solo el dueño de la búsqueda, su parent/god de la misma org pueden registrar seguimientos
+        const adminClientGuard = createAdminClient();
+        const { data: guardRow } = await (adminClientGuard as any)
+            .from('person_searches')
+            .select('agent_id, organization_id')
+            .eq('id', clientId)
+            .single();
+        if (!guardRow) return { success: false, error: 'Búsqueda no encontrada' };
+
+        const isGodW = profile.role === 'god';
+        const isParentW = profile.role === 'parent';
+        const sameOrgW = guardRow.organization_id === profile.organization_id;
+        const isOwnerW = guardRow.agent_id === user.id;
+        if (!isGodW && !(isParentW && sameOrgW) && !isOwnerW) {
+            return { success: false, error: 'Sin permisos para registrar seguimientos en esta búsqueda' };
+        }
+
         const { data, error } = await (supabase
             .from('client_interactions' as any)
             .insert({
@@ -573,11 +669,114 @@ export async function addClientInteractionAction(
 
         if (error) throw error;
 
+        // Sincronizar last_interaction_at en la búsqueda y en la persona vinculada
+        const nowIso = new Date().toISOString();
+        const adminClient = createAdminClient();
+
+        const { error: searchSyncError } = await (adminClient as any)
+            .from('person_searches')
+            .update({ last_interaction_at: nowIso })
+            .eq('id', clientId);
+        if (searchSyncError) {
+            console.error('Error syncing person_searches.last_interaction_at:', searchSyncError);
+        }
+
+        const { data: searchRow } = await (adminClient as any)
+            .from('person_searches')
+            .select('person_id, search_type')
+            .eq('id', clientId)
+            .single();
+
+        if (searchRow?.person_id) {
+            const { error: personSyncError } = await (adminClient as any)
+                .from('persons')
+                .update({ last_interaction_at: nowIso })
+                .eq('id', searchRow.person_id);
+            if (personSyncError) {
+                console.error('Error syncing persons.last_interaction_at:', personSyncError);
+            }
+
+            const { error: histErr } = await (adminClient as any)
+                .from('person_history')
+                .insert({
+                    person_id: searchRow.person_id,
+                    event_type: 'contact',
+                    agent_id: user.id,
+                    field_name: 'client_interaction',
+                    new_value: type,
+                    metadata: {
+                        interaction_id: (data as any)?.id,
+                        search_id: clientId,
+                        search_type: searchRow.search_type,
+                        content_preview: content.slice(0, 500),
+                    },
+                });
+            if (histErr) console.error('Error insertando contact en person_history:', histErr);
+        }
+
         revalidatePath('/dashboard/clients');
+        revalidatePath('/dashboard/crm');
         return { success: true, data };
     } catch (err) {
         console.error('Error in addClientInteractionAction:', err);
         return { success: false, error: 'Error al agregar la nota' };
+    }
+}
+
+/**
+ * Elimina una interacción/seguimiento y purga su entrada en person_history.
+ * Uso: cuando se cargó por error. Verifica permisos.
+ */
+export async function deleteClientInteractionAction(interactionId: string): Promise<ActionResult<void>> {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const profile = await getCurrentUserProfile(supabase, user.id);
+        if (!profile) return { success: false, error: 'Perfil no encontrado' };
+
+        const adminClient = createAdminClient();
+        const { data: inter } = await (adminClient as any)
+            .from('client_interactions')
+            .select('id, client_id, agent_id')
+            .eq('id', interactionId)
+            .single();
+        if (!inter) return { success: false, error: 'Interacción no encontrada' };
+
+        const { data: searchRow } = await (adminClient as any)
+            .from('person_searches')
+            .select('agent_id, organization_id')
+            .eq('id', inter.client_id)
+            .single();
+        if (!searchRow) return { success: false, error: 'Búsqueda no encontrada' };
+
+        const isGod = profile.role === 'god';
+        const isParent = profile.role === 'parent';
+        const sameOrg = searchRow.organization_id === profile.organization_id;
+        const isOwner = searchRow.agent_id === user.id || inter.agent_id === user.id;
+        if (!isGod && !(isParent && sameOrg) && !isOwner) {
+            return { success: false, error: 'Sin permisos para eliminar este seguimiento' };
+        }
+
+        const { error: histErr } = await (adminClient as any)
+            .from('person_history')
+            .delete()
+            .eq('metadata->>interaction_id', interactionId);
+        if (histErr) console.error('Error purgando person_history de interacción:', histErr);
+
+        const { error } = await (adminClient as any)
+            .from('client_interactions')
+            .delete()
+            .eq('id', interactionId);
+        if (error) throw error;
+
+        revalidatePath('/dashboard/clients');
+        revalidatePath('/dashboard/crm');
+        return { success: true, data: undefined };
+    } catch (err) {
+        console.error('Error in deleteClientInteractionAction:', err);
+        return { success: false, error: 'Error al eliminar el seguimiento' };
     }
 }
 
@@ -587,6 +786,31 @@ export async function addClientInteractionAction(
 export async function getClientInteractionsAction(clientId: string): Promise<ActionResult<any[]>> {
     try {
         const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: 'No autorizado' };
+
+        const profile = await getCurrentUserProfile(supabase, user.id);
+        if (!profile) return { success: false, error: 'Perfil no encontrado' };
+
+        // Permisos: god ve todo; parent ve su org; child solo sus propias búsquedas
+        const adminClient = createAdminClient();
+        const { data: searchRow } = await (adminClient as any)
+            .from('person_searches')
+            .select('agent_id, organization_id')
+            .eq('id', clientId)
+            .single();
+
+        if (!searchRow) return { success: false, error: 'Búsqueda no encontrada' };
+
+        const isGod = profile.role === 'god';
+        const isParent = profile.role === 'parent';
+        const sameOrg = searchRow.organization_id === profile.organization_id;
+        const isOwner = searchRow.agent_id === user.id;
+
+        if (!isGod && !(isParent && sameOrg) && !isOwner) {
+            return { success: false, error: 'Sin permisos para ver este historial' };
+        }
+
         const { data, error } = await supabase
             .from('client_interactions')
             .select('*, agent:profiles(first_name, last_name)')
