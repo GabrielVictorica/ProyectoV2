@@ -205,13 +205,20 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
     // Filtrar agentes según la organización seleccionada o el rol
     const filteredAgents = useMemo(() => {
         if (!allUsers) return [];
-        return allUsers.filter((u: any) => {
+        const base = allUsers.filter((u: any) => {
             if (isGod) {
                 // God elige organización, mostramos miembros y reportes cross-org de esa oficina
                 return u.organization_id === watchOrgId || u.reports_to_organization_id === watchOrgId;
             }
             // Para Parent, useTeamMembers ya filtró por RLS (miembros + reportes cross-org)
             return true;
+        });
+        // Ordenar: activos primero, inactivos al final (los inactivos aparecen deshabilitados)
+        return [...base].sort((a: any, b: any) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
         });
     }, [allUsers, watchOrgId, isGod]);
 

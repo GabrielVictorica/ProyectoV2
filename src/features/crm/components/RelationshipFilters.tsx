@@ -21,7 +21,7 @@ interface RelationshipFiltersProps {
         isVip: boolean;
     };
     setFilters: (filters: any) => void;
-    agents?: { id: string, first_name: string, last_name: string, organization_id?: string }[];
+    agents?: { id: string, first_name: string, last_name: string, organization_id?: string, is_active?: boolean | null }[];
     availableSources?: string[];
     organizations?: { id: string, name: string }[];
     isGod?: boolean;
@@ -43,8 +43,16 @@ export function RelationshipFilters({
 
     // Dynamic filtering of agents for the selector
     const filteredAgentsForSelector = useMemo(() => {
-        if (!isGod || filters.organizationId === 'all') return agents;
-        return agents.filter(a => a.organization_id === filters.organizationId);
+        const base = (!isGod || filters.organizationId === 'all')
+            ? agents
+            : agents.filter(a => a.organization_id === filters.organizationId);
+        // Ordenar: activos primero, inactivos al final
+        return [...base].sort((a, b) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+        });
     }, [isGod, filters.organizationId, agents]);
 
     // Helper to check if any filter is active (excluding search)
@@ -134,11 +142,14 @@ export function RelationshipFilters({
                                 className="bg-[#09090b] border border-white/[0.08] text-[11px] text-white px-2 py-1.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-violet-500/50 max-w-[150px] transition-all hover:border-white/20"
                             >
                                 <option value="all">Todos los Agentes</option>
-                                {filteredAgentsForSelector.map(agent => (
-                                    <option key={agent.id} value={agent.id}>
-                                        {agent.first_name} {agent.last_name}
-                                    </option>
-                                ))}
+                                {filteredAgentsForSelector.map(agent => {
+                                    const inactive = agent.is_active === false;
+                                    return (
+                                        <option key={agent.id} value={agent.id}>
+                                            {agent.first_name} {agent.last_name}{inactive ? ' (inactivo)' : ''}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     )}

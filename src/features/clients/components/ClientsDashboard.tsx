@@ -170,13 +170,22 @@ export function ClientsDashboard() {
     const { data: allUsers, isLoading: isLoadingTeam } = useTeamMembers();
 
     // Lógica para filtrar agentes en el selector
-    const filteredAgents = (allUsers || []).filter((u: any) => {
-        if (isGod) {
-            return selectedOrg === 'all' ? true : u.organization_id === selectedOrg;
-        }
-        // Parent ya trae solo su equipo en useTeamMembers
-        return true;
-    });
+    const filteredAgents = (allUsers || [])
+        .filter((u: any) => {
+            if (isGod) {
+                return selectedOrg === 'all' ? true : u.organization_id === selectedOrg;
+            }
+            // Parent ya trae solo su equipo en useTeamMembers
+            return true;
+        })
+        // Ordenar: activos primero, inactivos al final
+        .slice()
+        .sort((a: any, b: any) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+        });
 
     // Lógica de queries para useClients
     // Definimos qué parámetros enviar al hook según la pestaña activa
@@ -471,11 +480,14 @@ export function ClientsDashboard() {
                                     ) : filteredAgents.length === 0 ? (
                                         <option disabled>(Sin agentes encontrados)</option>
                                     ) : (
-                                        filteredAgents.map((agent: any) => (
-                                            <option key={agent.id} value={agent.id}>
-                                                {agent.first_name} {agent.last_name}
-                                            </option>
-                                        ))
+                                        filteredAgents.map((agent: any) => {
+                                            const inactive = agent.is_active === false;
+                                            return (
+                                                <option key={agent.id} value={agent.id}>
+                                                    {agent.first_name} {agent.last_name}{inactive ? ' (inactivo)' : ''}
+                                                </option>
+                                            );
+                                        })
                                     )}
                                 </select>
                             )}

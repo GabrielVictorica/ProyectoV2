@@ -48,7 +48,7 @@ export async function getTeamMembersAction() {
     // Fetch Profiles
     const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, role, organization_id, reports_to_organization_id')
+        .select('id, first_name, last_name, role, organization_id, reports_to_organization_id, is_active')
         .order('first_name', { ascending: true })
         .limit(1000); // Límite de seguridad
 

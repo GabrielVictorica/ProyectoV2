@@ -127,11 +127,18 @@ export function ClosingsPage() {
     // Extraer agentes para el selector
     const filteredAgents = useMemo(() => {
         if (!teamMembers) return [];
-        return teamMembers.filter((u: any) => {
+        const base = teamMembers.filter((u: any) => {
             if (role === 'god') {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
             return true;
+        });
+        // Ordenar: activos primero (alfabético), inactivos al final (alfabético)
+        return [...base].sort((a: any, b: any) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
         });
     }, [teamMembers, selectedOrg, role]);
 
@@ -423,15 +430,19 @@ export function ClosingsPage() {
                                 <SelectItem value="all" className="text-white hover:bg-slate-700">
                                     Todos los Agentes
                                 </SelectItem>
-                                {filteredAgents.map((agent: any) => (
-                                    <SelectItem
-                                        key={agent.id}
-                                        value={agent.id}
-                                        className="text-white hover:bg-slate-700"
-                                    >
-                                        {agent.first_name} {agent.last_name}
-                                    </SelectItem>
-                                ))}
+                                {filteredAgents.map((agent: any) => {
+                                    const inactive = agent.is_active === false;
+                                    return (
+                                        <SelectItem
+                                            key={agent.id}
+                                            value={agent.id}
+                                            className={`hover:bg-slate-700 ${inactive ? 'text-slate-500 italic' : 'text-white'}`}
+                                        >
+                                            {agent.first_name} {agent.last_name}
+                                            {inactive && ' (inactivo)'}
+                                        </SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
                     )}

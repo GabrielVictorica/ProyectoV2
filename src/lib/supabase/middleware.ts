@@ -50,6 +50,25 @@ export async function updateSession(request: NextRequest) {
 
     // 2. Si hay usuario
     if (user) {
+        // Bloquear usuarios inactivos (dados de baja). Su sesión queda cerrada
+        // y no pueden acceder al dashboard. La PII y el histórico quedan
+        // intactos en la BD para auditoría.
+        if (isDashboardRoute || isAuthRoute) {
+            const { data: statusProfile } = await supabase
+                .from('profiles')
+                .select('is_active')
+                .eq('id', user.id)
+                .single();
+
+            if (statusProfile && (statusProfile as any).is_active === false) {
+                await supabase.auth.signOut();
+                const url = request.nextUrl.clone();
+                url.pathname = '/login';
+                url.searchParams.set('deactivated', '1');
+                return NextResponse.redirect(url);
+            }
+        }
+
         // Redirigir fuera de login si ya está autenticado
         if (isAuthRoute) {
             const url = request.nextUrl.clone();

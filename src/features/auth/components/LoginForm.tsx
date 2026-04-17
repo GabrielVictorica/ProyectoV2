@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useLogin } from '../hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,8 @@ export function LoginForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { mutate: login, isPending, error } = useLogin();
+    const searchParams = useSearchParams();
+    const deactivated = searchParams?.get('deactivated') === '1';
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,6 +40,13 @@ export function LoginForm() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        {deactivated && !error && (
+                            <Alert className="bg-amber-900/40 border-amber-700 text-amber-100">
+                                <AlertDescription>
+                                    Tu cuenta fue dada de baja por el administrador. Contacta con tu responsable si creés que es un error.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         {error && (
                             <Alert variant="destructive" className="bg-red-900/50 border-red-800">
                                 <AlertDescription>

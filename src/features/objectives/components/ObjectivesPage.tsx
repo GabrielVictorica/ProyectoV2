@@ -97,12 +97,19 @@ export function ObjectivesPage() {
     // Agentes filtrados por organización
     const filteredAgents = useMemo(() => {
         if (!teamMembers) return [];
-        return teamMembers.filter((u) => {
+        const base = teamMembers.filter((u) => {
             if (isGod) {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
             // Parents y Externos ya vienen filtrados por RLS/Server Action
             return true;
+        });
+        // Ordenar: activos primero (alfabético), inactivos al final (alfabético)
+        return [...base].sort((a: any, b: any) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
         });
     }, [teamMembers, isGod, selectedOrg]);
 

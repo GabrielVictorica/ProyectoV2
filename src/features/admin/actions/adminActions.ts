@@ -757,8 +757,23 @@ export async function toggleUserStatusAction(
 
         if (error) throw error;
 
+        // Al dar de baja, forzar cierre global de sesiones para que el token
+        // actual deje de ser válido de inmediato.
+        if (!isActive) {
+            try {
+                await adminClient.auth.admin.signOut(userId, 'global');
+            } catch (signOutErr) {
+                console.error('Error cerrando sesiones del usuario:', signOutErr);
+            }
+        }
+
         revalidatePath('/dashboard/admin/users');
         revalidatePath('/dashboard/team');
+        revalidatePath('/dashboard/competition');
+        revalidatePath('/dashboard/objectives');
+        revalidatePath('/dashboard/closings');
+        revalidatePath('/dashboard/clients');
+        revalidatePath('/dashboard/crm');
 
         return { success: true, data: undefined };
     } catch (err) {

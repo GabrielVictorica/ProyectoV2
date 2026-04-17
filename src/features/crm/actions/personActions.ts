@@ -511,7 +511,7 @@ export async function getExistingSourcesAction(): Promise<ActionResult<string[]>
 /**
  * Obtiene la lista de agentes disponibles para filtrar (solo para roles God/Parent).
  */
-export async function getCRMAgentsAction(): Promise<ActionResult<{ id: string, first_name: string, last_name: string }[]>> {
+export async function getCRMAgentsAction(): Promise<ActionResult<{ id: string, first_name: string, last_name: string, is_active: boolean }[]>> {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -528,7 +528,7 @@ export async function getCRMAgentsAction(): Promise<ActionResult<{ id: string, f
 
         let query = supabase
             .from('profiles' as any)
-            .select('id, first_name, last_name')
+            .select('id, first_name, last_name, is_active')
             .order('first_name', { ascending: true });
 
         // Si es God, puede ver todos. Si es Parent, solo su organización.

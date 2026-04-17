@@ -114,10 +114,17 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
     // Filtrar agentes por org
     const filteredAgents = useMemo(() => {
         if (!allUsers) return [];
-        return (allUsers as any[]).filter((u: any) => {
+        const base = (allUsers as any[]).filter((u: any) => {
             if (isGod) return u.organization_id === selectedOrgId;
             // Para parent/child, useTeamMembers ya filtró por RLS/Action
             return true;
+        });
+        // Ordenar: activos primero, inactivos al final (los inactivos aparecen deshabilitados)
+        return [...base].sort((a: any, b: any) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
         });
     }, [allUsers, selectedOrgId, isGod]);
 
@@ -424,11 +431,14 @@ export function ClientForm({ onSuccess, onCreated, client, mode }: ClientFormPro
                                                                 </FormControl>
                                                                 <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                                                                     <SelectItem value="_self">Yo mismo</SelectItem>
-                                                                    {filteredAgents.filter((a: any) => a.id !== auth?.id).map((agent: any) => (
-                                                                        <SelectItem key={agent.id} value={agent.id}>
-                                                                            {agent.first_name} {agent.last_name}
-                                                                        </SelectItem>
-                                                                    ))}
+                                                                    {filteredAgents.filter((a: any) => a.id !== auth?.id).map((agent: any) => {
+                                                                        const inactive = agent.is_active === false;
+                                                                        return (
+                                                                            <SelectItem key={agent.id} value={agent.id} disabled={inactive} className={inactive ? 'text-slate-500 italic' : ''}>
+                                                                                {agent.first_name} {agent.last_name}{inactive ? ' (inactivo)' : ''}
+                                                                            </SelectItem>
+                                                                        );
+                                                                    })}
                                                                 </SelectContent>
                                                             </Select>
                                                         </FormItem>

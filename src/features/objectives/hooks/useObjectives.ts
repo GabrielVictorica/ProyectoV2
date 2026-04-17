@@ -218,7 +218,20 @@ export function useAgentsObjectivesList(year: number, organizationId?: string) {
             if (error) throw error;
             if (!data || data.length === 0) return [];
 
-            return (data as ViewAgentProgressExtended[]).map((row) => ({
+            // Excluir agentes inactivos del ranking activo de objetivos.
+            // Histórico de comisiones/puntas sigue en el sistema pero no aparece en
+            // la tabla de ranking vigente.
+            const agentIds = (data as ViewAgentProgressExtended[]).map(r => r.agent_id);
+            const { data: activeProfiles } = await supabase
+                .from('profiles')
+                .select('id')
+                .in('id', agentIds)
+                .eq('is_active', true);
+            const activeIds = new Set((activeProfiles || []).map((p: any) => p.id));
+
+            return (data as ViewAgentProgressExtended[])
+                .filter((row) => activeIds.has(row.agent_id))
+                .map((row) => ({
                 agent_id: row.agent_id,
                 first_name: row.first_name,
                 last_name: row.last_name,

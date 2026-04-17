@@ -173,7 +173,7 @@ export async function getCompetitionDataAction(
         ] = await Promise.all([
             adminClient
                 .from('profiles' as any)
-                .select('id, first_name, last_name')
+                .select('id, first_name, last_name, is_active')
                 .in('id', agentIds),
             adminClient
                 .from('activities' as any)
@@ -208,12 +208,24 @@ export async function getCompetitionDataAction(
 
         // Process profiles
         const profiles = profilesRaw as any[] || [];
-        const profileMap: Record<string, { first_name: string; last_name: string }> = {};
+        const profileMap: Record<string, { first_name: string; last_name: string; is_active: boolean }> = {};
         profiles.forEach((p: any) => {
-            profileMap[p.id] = { first_name: p.first_name, last_name: p.last_name };
+            profileMap[p.id] = {
+                first_name: p.first_name,
+                last_name: p.last_name,
+                is_active: p.is_active !== false,
+            };
         });
 
-        const members: CompetitionMember[] = memberRows.map((m: any) => ({
+        // Excluir del ranking activo a miembros cuyo profile.is_active === false
+        // (el histórico de transacciones/actividades previas sigue contando para los activos)
+        const activeMemberRows = memberRows.filter((m: any) => profileMap[m.agent_id]?.is_active !== false);
+        const activeAgentIds = new Set(activeMemberRows.map((m: any) => m.agent_id));
+        // Solo los agentes activos compiten en el ranking. Los inactivos siguen en
+        // `agentIds` para fetches históricos, pero no aportan puntos ni aparecen en MVP/ranking.
+        const scoringAgentIds: string[] = activeMemberRows.map((m: any) => m.agent_id);
+
+        const members: CompetitionMember[] = activeMemberRows.map((m: any) => ({
             agent_id: m.agent_id,
             team: m.team,
             first_name: profileMap[m.agent_id]?.first_name || '',
@@ -270,7 +282,7 @@ export async function getCompetitionDataAction(
         // ── Step 8: Calculate per-agent scores ────────────────────
         const agentScores: Record<string, AgentScore> = {};
 
-        for (const agentId of agentIds) {
+        for (const agentId of scoringAgentIds) {
             const profile = profileMap[agentId] || { first_name: '?', last_name: '?' };
             const team = agentTeamMap[agentId];
 
@@ -397,7 +409,7 @@ export async function getCompetitionDataAction(
             const weekAgentPoints: Record<string, { points: number; plCount: number }> = {};
             const weekPerfectWeeks: { agent_id: string; first_name: string; last_name: string; team: TeamId }[] = [];
 
-            for (const agentId of agentIds) {
+            for (const agentId of scoringAgentIds) {
                 const aa = weekActivities.filter((a: any) => a.agent_id === agentId);
                 const at = weekTransactions.filter((t: any) => t.agent_id === agentId);
                 const ac = weekContacts.filter((c: any) => c.agent_id === agentId);
@@ -500,7 +512,7 @@ export async function getCompetitionDataAction(
             // Team points for the week
             let negroWeek = 0;
             let doradoWeek = 0;
-            for (const agentId of agentIds) {
+            for (const agentId of scoringAgentIds) {
                 const pts = weekAgentPoints[agentId]?.points || 0;
                 if (agentTeamMap[agentId] === 'negro') negroWeek += pts;
                 else doradoWeek += pts;
@@ -516,7 +528,7 @@ export async function getCompetitionDataAction(
             let mvp: WeeklyResult['mvp'] = null;
             let maxPts = 0;
             let maxPl = 0;
-            for (const agentId of agentIds) {
+            for (const agentId of scoringAgentIds) {
                 const { points, plCount } = weekAgentPoints[agentId] || { points: 0, plCount: 0 };
                 if (points > maxPts || (points === maxPts && plCount > maxPl)) {
                     maxPts = points;
@@ -548,7 +560,7 @@ export async function getCompetitionDataAction(
         }
 
         // ── Step 10: Add perfect week bonuses to agent scores ─────
-        for (const agentId of agentIds) {
+        for (const agentId of scoringAgentIds) {
             const count = perfectWeeksByAgent[agentId] || 0;
             if (count > 0 && agentScores[agentId]) {
                 agentScores[agentId].breakdown.perfect_weeks = count * PERFECT_WEEK_BONUS;
@@ -562,7 +574,7 @@ export async function getCompetitionDataAction(
             dorado: { team: 'dorado', totalPoints: 0, facturacion: 0, members: [], perfectWeekBonuses: 0 },
         };
 
-        for (const agentId of agentIds) {
+        for (const agentId of scoringAgentIds) {
             const score = agentScores[agentId];
             if (!score) continue;
             const team = agentTeamMap[agentId];
@@ -571,8 +583,9 @@ export async function getCompetitionDataAction(
             teamScores[team].perfectWeekBonuses += perfectWeeksByAgent[agentId] || 0;
         }
 
-        // Facturación (gross_commission) by team
+        // Facturación (gross_commission) by team — solo cuenta para agentes activos
         for (const t of transactions) {
+            if (!activeAgentIds.has(t.agent_id)) continue;
             const team = agentTeamMap[t.agent_id];
             if (team) {
                 teamScores[team].facturacion += Number(t.gross_commission) || 0;

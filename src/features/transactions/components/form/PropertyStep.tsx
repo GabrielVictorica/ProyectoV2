@@ -106,11 +106,14 @@ export const PropertyStep: React.FC<PropertyStepProps> = ({
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                                        {filteredAgents.map((u: any) => (
-                                            <SelectItem key={u.id} value={u.id}>
-                                                {u.first_name} {u.last_name}
-                                            </SelectItem>
-                                        ))}
+                                        {filteredAgents.map((u: any) => {
+                                            const inactive = u.is_active === false;
+                                            return (
+                                                <SelectItem key={u.id} value={u.id} disabled={inactive} className={inactive ? 'text-slate-500 italic' : ''}>
+                                                    {u.first_name} {u.last_name}{inactive ? ' (inactivo)' : ''}
+                                                </SelectItem>
+                                            );
+                                        })}
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -142,11 +145,14 @@ export const PropertyStep: React.FC<PropertyStepProps> = ({
                                 </FormControl>
                                 <SelectContent className="bg-slate-800 border-slate-700 text-white">
                                     {filteredAgents
-                                        .map((u: any) => (
-                                            <SelectItem key={u.id} value={u.id}>
-                                                {u.first_name} {u.last_name}
-                                            </SelectItem>
-                                        ))}
+                                        .map((u: any) => {
+                                            const inactive = u.is_active === false;
+                                            return (
+                                                <SelectItem key={u.id} value={u.id} disabled={inactive} className={inactive ? 'text-slate-500 italic' : ''}>
+                                                    {u.first_name} {u.last_name}{inactive ? ' (inactivo)' : ''}
+                                                </SelectItem>
+                                            );
+                                        })}
                                 </SelectContent>
                             </Select>
                             <FormMessage />

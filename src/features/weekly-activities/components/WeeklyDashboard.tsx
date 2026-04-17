@@ -43,12 +43,19 @@ export function WeeklyDashboard() {
     // Filtered users based on role and organization
     const filteredUsers = React.useMemo(() => {
         if (!teamMembers) return [];
-        return (teamMembers as any[]).filter(u => {
+        const base = (teamMembers as any[]).filter(u => {
             if (isGod) {
                 return selectedOrg === 'all' || u.organization_id === selectedOrg;
             }
             // Los Parents y Externos ya vienen filtrados por RLS del Server Action
             return true;
+        });
+        // Ordenar: activos primero, inactivos al final
+        return [...base].sort((a, b) => {
+            const aActive = a.is_active !== false;
+            const bActive = b.is_active !== false;
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
         });
     }, [teamMembers, isGod, selectedOrg]);
 
@@ -193,11 +200,16 @@ export function WeeklyDashboard() {
                                 className="bg-transparent text-sm font-medium text-white/60 focus:outline-none px-3 py-1.5 rounded-xl hover:bg-white/[0.04] cursor-pointer"
                             >
                                 <option value="" disabled className="bg-slate-900">Seleccionar agente</option>
-                                {(filteredUsers as any[]).map(user => (
-                                    <option key={user.id} value={user.id} className="bg-slate-900">
-                                        {user.first_name} {user.last_name} {user.id === auth?.profile?.id ? '(Yo)' : ''}
-                                    </option>
-                                ))}
+                                {(filteredUsers as any[]).map(user => {
+                                    const inactive = user.is_active === false;
+                                    return (
+                                        <option key={user.id} value={user.id} className="bg-slate-900">
+                                            {user.first_name} {user.last_name}
+                                            {user.id === auth?.profile?.id ? ' (Yo)' : ''}
+                                            {inactive ? ' (inactivo)' : ''}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     )}

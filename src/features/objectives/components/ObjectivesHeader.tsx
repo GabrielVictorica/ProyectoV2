@@ -29,6 +29,7 @@ interface Agent {
     id: string;
     first_name: string;
     last_name: string;
+    is_active?: boolean | null;
 }
 
 export type PeriodFilter = 'annual' | 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'S1' | 'S2';
@@ -175,11 +176,14 @@ export function ObjectivesHeader({
                             </SelectTrigger>
                             <SelectContent className="bg-slate-800 border-slate-700">
                                 <SelectItem value="all" className="text-white">Todo el Equipo</SelectItem>
-                                {filteredAgents.map((ag) => (
-                                    <SelectItem key={ag.id} value={ag.id} className="text-white">
-                                        {ag.first_name} {ag.last_name}
-                                    </SelectItem>
-                                ))}
+                                {filteredAgents.map((ag) => {
+                                    const inactive = ag.is_active === false;
+                                    return (
+                                        <SelectItem key={ag.id} value={ag.id} className={inactive ? 'text-slate-500 italic' : 'text-white'}>
+                                            {ag.first_name} {ag.last_name}{inactive ? ' (inactivo)' : ''}
+                                        </SelectItem>
+                                    );
+                                })}
                             </SelectContent>
                         </Select>
 
