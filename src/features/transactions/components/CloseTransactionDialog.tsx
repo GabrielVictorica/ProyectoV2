@@ -53,6 +53,7 @@ const formSchema = z.object({
     commission_percentage: z.coerce.number().min(0).max(100),
     agent_split_percentage: z.coerce.number().min(0).max(100),
     transaction_date: z.string().min(1, 'La fecha es requerida'),
+    closing_date: z.string().optional().nullable(),
     buyer_name: z.string().optional(),
     seller_name: z.string().optional(),
     buyer_person_id: z.string().nullable().optional(),
@@ -188,6 +189,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             commission_percentage: transaction?.commission_percentage || 3,
             agent_split_percentage: transaction?.agent_split_percentage || profile?.default_split_percentage || 45,
             transaction_date: transaction?.transaction_date || new Date().toISOString().split('T')[0],
+            closing_date: (transaction as any)?.closing_date || null,
             buyer_name: transaction?.buyer_name || '',
             seller_name: transaction?.seller_name || '',
             buyer_person_id: transaction?.buyer_person_id || null,
@@ -307,7 +309,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
 
 
         try {
-            const input = {
+            const input: Record<string, any> = {
                 property_id: data.property_id === 'manual' ? null : data.property_id,
                 organization_id: data.organization_id || undefined,
                 agent_id: data.agent_id || undefined,
@@ -326,6 +328,23 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                 status: isEditing ? transaction.status : 'pending',
                 cancellation_reason: null,
             };
+
+            // Fecha de cierre: sólo relevante al editar un cierre existente
+            if (isEditing && transaction.status === 'completed') {
+                if (!data.closing_date) {
+                    toast.error('La fecha de cierre no puede quedar vacía');
+                    return;
+                }
+                if (data.closing_date === data.transaction_date) {
+                    toast.error('La fecha de cierre no puede coincidir con la de reserva');
+                    return;
+                }
+                if (data.closing_date < data.transaction_date) {
+                    toast.error('La fecha de cierre no puede ser anterior a la de reserva');
+                    return;
+                }
+                input.closing_date = data.closing_date;
+            }
 
             if (isEditing) {
                 await updateTransaction({
@@ -419,6 +438,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
             commission_percentage: 3,
             agent_split_percentage: profile?.default_split_percentage || 45,
             transaction_date: new Date().toISOString().split('T')[0],
+            closing_date: null,
             buyer_name: '',
             seller_name: '',
             buyer_person_id: null,
@@ -530,7 +550,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
 
                                     {/* ========== STEP 3: Partes Involucradas ========== */}
                                     {step === 3 && (
-                                        <PartiesStep 
+                                        <PartiesStep
                                             form={form}
                                             watchSides={watchSides}
                                             watchMySide={watchMySide}
@@ -546,6 +566,7 @@ export function CloseTransactionDialog({ propertyId, transaction, onSuccess, tri
                                             watchSplitPercent={watchSplitPercent}
                                             profile={profile}
                                             watchStatus={form.watch('status')}
+                                            showClosingDate={isEditing && transaction?.status === 'completed'}
                                         />
                                     )}
                                 </div>

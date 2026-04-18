@@ -12,12 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, Loader2, Calendar, DollarSign } from 'lucide-react';
+import { CheckCircle2, Loader2, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
 import { closeReservationAction } from '../actions/reservationActions';
 import { toast } from 'sonner';
 import { TransactionWithRelations } from '../hooks/useTransactions';
 import { useQueryClient } from '@tanstack/react-query';
 import { DateMaskedInput } from '@/components/ui/date-masked-input';
+import { format } from 'date-fns';
 
 interface CloseReservationDialogProps {
     transaction: TransactionWithRelations;
@@ -35,15 +36,28 @@ export function CloseReservationDialog({
     const queryClient = useQueryClient();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Solo dos campos visibles
-    const [closingDate, setClosingDate] = useState(
-        new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
-    );
+    // Solo dos campos visibles — fecha en blanco a propósito para evitar que el agente la confirme por inercia
+    const [closingDate, setClosingDate] = useState('');
     const [actualPrice, setActualPrice] = useState(transaction.actual_price || 0);
+
+    const reservationDate = transaction.transaction_date?.substring(0, 10) || '';
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
 
     const handleSubmit = async () => {
         if (!closingDate) {
-            toast.error('Debés ingresar la fecha de cierre');
+            toast.error('Ingresá la fecha de cierre manualmente');
+            return;
+        }
+        if (closingDate === reservationDate) {
+            toast.error('La fecha de cierre no puede ser la misma que la de la reserva');
+            return;
+        }
+        if (closingDate < reservationDate) {
+            toast.error('La fecha de cierre no puede ser anterior a la fecha de reserva');
+            return;
+        }
+        if (closingDate > todayStr) {
+            toast.error('La fecha de cierre no puede ser futura');
             return;
         }
         if (actualPrice <= 0) {
@@ -92,12 +106,30 @@ export function CloseReservationDialog({
                 </DialogHeader>
 
                 {/* Property name preview */}
-                <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-3">
-                    <p className="text-xs text-slate-400">Propiedad</p>
-                    <p className="text-sm font-medium text-white">
-                        {transaction.custom_property_title ||
-                            (transaction.property as any)?.title ||
-                            'Sin título'}
+                <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-3 space-y-1">
+                    <div>
+                        <p className="text-xs text-slate-400">Propiedad</p>
+                        <p className="text-sm font-medium text-white">
+                            {transaction.custom_property_title ||
+                                (transaction.property as any)?.title ||
+                                'Sin título'}
+                        </p>
+                    </div>
+                    {reservationDate && (
+                        <div className="pt-2 border-t border-slate-700/50">
+                            <p className="text-xs text-slate-400">Fecha de reserva</p>
+                            <p className="text-sm font-medium text-amber-300">
+                                {format(new Date(reservationDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Aviso para que el agente NO use la fecha de hoy por defecto */}
+                <div className="flex gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-300">
+                        Ingresá la fecha real del cierre. No puede ser la misma que la fecha de reserva.
                     </p>
                 </div>
 

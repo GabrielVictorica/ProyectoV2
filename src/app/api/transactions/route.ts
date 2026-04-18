@@ -124,7 +124,6 @@ export async function POST(request: NextRequest) {
             notes,
             organization_id, // Solo para GOD
             custom_property_title,
-            status
         } = body;
 
         if (!actual_price) {
@@ -248,15 +247,12 @@ export async function POST(request: NextRequest) {
 
         if (error) throw error;
 
-        // Auto-update last_interaction_at for linked persons and their clients
+        // Toda transacción nueva se crea como 'reserva' (finalStatus === 'pending').
+        // Sincronizar personas vinculadas → relationship_status='reserva' + last_interaction_at.
         const txDate = finalTxDate;
         const personIdsToUpdate = [buyer_person_id, seller_person_id].filter(Boolean);
-        
-        // Determinar estado de CRM: Solo 'reserva' o 'cierre' (si es caída, no forzamos cambio de estado)
-        const newRelationshipStatus = finalStatus === 'pending' ? 'reserva' : (finalStatus === 'cancelled' ? null : 'cierre');
 
         for (const personId of personIdsToUpdate) {
-            // Obtener estado actual para el historial
             const { data: currentPerson } = await (adminClient as any)
                 .from('persons')
                 .select('relationship_status')
@@ -265,64 +261,42 @@ export async function POST(request: NextRequest) {
 
             const oldStatus = currentPerson?.relationship_status;
 
-            // Update person's last_interaction_at AND relationship_status (if applicable)
-            const personUpdateData: Record<string, any> = { 
-                last_interaction_at: txDate, 
-                updated_at: new Date().toISOString() 
-            };
-            if (newRelationshipStatus) {
-                personUpdateData.relationship_status = newRelationshipStatus;
-            }
-
             await (adminClient as any)
                 .from('persons')
-                .update(personUpdateData)
+                .update({
+                    last_interaction_at: txDate,
+                    updated_at: new Date().toISOString(),
+                    relationship_status: 'reserva',
+                })
                 .eq('id', personId);
 
-            // Registrar en historial el cambio de estado atómico (solo si cambió y no es nulo)
-            if (newRelationshipStatus && oldStatus !== newRelationshipStatus) {
+            if (oldStatus !== 'reserva') {
                 await (adminClient as any).from('person_history').insert({
                     person_id: personId,
                     agent_id: finalAgentId,
                     event_type: 'lifecycle_change',
                     field_name: 'relationship_status',
                     old_value: oldStatus,
-                    new_value: newRelationshipStatus,
-                    metadata: { 
-                        action: status === 'pending' ? 'transaction_reservation' : 'transaction_closure',
+                    new_value: 'reserva',
+                    metadata: {
+                        action: 'transaction_reservation',
                         transaction_id: data.id,
                         price: parseFloat(actual_price)
                     }
                 });
             }
 
-            // Solo cerrar búsquedas si es un cierre final (no reserva)
-            if (status !== 'pending') {
-                await (adminClient as any)
-                    .from('person_searches')
-                    .update({
-                        last_interaction_at: txDate,
-                        updated_at: new Date().toISOString(),
-                        status: 'closed'
-                    })
-                    .eq('person_id', personId);
-            } else {
-                // Para reservas, solo actualizar la fecha de interacción
-                await (adminClient as any)
-                    .from('person_searches')
-                    .update({
-                        last_interaction_at: txDate,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('person_id', personId);
-            }
+            // Reserva: sólo actualizamos fecha de interacción, NO cerramos búsquedas
+            await (adminClient as any)
+                .from('person_searches')
+                .update({
+                    last_interaction_at: txDate,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('person_id', personId);
         }
 
-        // Auto-generate activity
-        const activityType = finalStatus === 'pending' ? 'reserva' : 'cierre';
-        const activityNotes = finalStatus === 'pending'
-            ? `Reserva registrada desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`
-            : `Cierre efectivo registrado desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`;
+        // Actividad "reserva" para Mi Semana
         await (adminClient as any)
             .from('activities')
             .insert({
@@ -330,11 +304,11 @@ export async function POST(request: NextRequest) {
                 agent_id: finalAgentId,
                 property_id: property_id || null,
                 client_id: null,
-                type: activityType,
+                type: 'reserva',
                 status: 'completed',
                 date: txDate,
                 time: new Date().toLocaleTimeString('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }),
-                notes: activityNotes,
+                notes: `Reserva registrada desde módulo de Operaciones. Propiedad: ${custom_property_title || 'Propiedad'}`,
                 transaction_id: data.id
             });
 
@@ -451,10 +425,28 @@ export async function PUT(request: NextRequest) {
             if (p) updateData.seller_name = `${p.first_name} ${p.last_name}`.trim();
         }
 
-        // Auto-set closing_date when transitioning from pending to completed
+        // Validar cierre: exigir fecha de cierre explícita y distinta a la de reserva
         if (currentTx.status === 'pending' && updates.status === 'completed') {
-            if (!updateData.closing_date) {
-                updateData.closing_date = updates.transaction_date || currentTx.transaction_date;
+            const txDate = (updates.transaction_date || currentTx.transaction_date || '').substring(0, 10);
+            const closeDate = (updateData.closing_date as string | undefined)?.substring(0, 10);
+
+            if (!closeDate) {
+                return NextResponse.json(
+                    { error: 'Se requiere fecha de cierre para completar la operación.' },
+                    { status: 400 }
+                );
+            }
+            if (closeDate === txDate) {
+                return NextResponse.json(
+                    { error: 'La fecha de cierre no puede ser la misma que la de reserva.' },
+                    { status: 400 }
+                );
+            }
+            if (closeDate < txDate) {
+                return NextResponse.json(
+                    { error: 'La fecha de cierre no puede ser anterior a la fecha de reserva.' },
+                    { status: 400 }
+                );
             }
         }
 
@@ -630,17 +622,15 @@ export async function PUT(request: NextRequest) {
                         .eq('transaction_id', id)
                         .eq('type', 'reserva');
                 } else if (currentTx.status === 'completed') {
-                    // Update both 'reserva' and 'cierre' if transaction date changed,
-                    // but wait! If it's a completed transaction, we should change closing_date not transaction_date typically,
-                    // but if they do change transaction_date, let's update ONLY 'cierre' if there wasn't a 'reserva'.
-                   // Actually, if updates.transaction_date changes, we only update the 'reserva' one if they had a reserva.
+                    // Si cambia la fecha de reserva de una operación ya cerrada, SOLO mover la actividad 'reserva'.
+                    // La actividad 'cierre' sigue su propia fecha (closing_date) y se actualiza abajo si corresponde.
                    await (adminClient as any)
                         .from('activities')
                         .update({
                             date: updates.transaction_date,
                         })
                         .eq('transaction_id', id)
-                        .in('type', ['reserva', 'cierre']); // Just a blanket date update, although closing_date is now separate.
+                        .eq('type', 'reserva');
                 }
             }
             if (updates.closing_date && updates.closing_date !== currentTx.closing_date) {
@@ -682,7 +672,7 @@ export async function DELETE(request: NextRequest) {
         // Obtener transacción actual para verificar permisos
         const { data: currentTx } = await (adminClient as any)
             .from('transactions')
-            .select('agent_id, organization_id')
+            .select('agent_id, organization_id, linked_transaction_id')
             .eq('id', id)
             .single();
 
@@ -700,29 +690,52 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Sin permisos para eliminar esta transacción' }, { status: 403 });
         }
 
-        const { error } = await (adminClient as any)
+        // 1) Desvincular operaciones compartidas: si otra transacción apunta a esta via linked_transaction_id,
+        // preservarla (sólo se elimina la del agente actual, no la del colega).
+        await (adminClient as any)
             .from('transactions')
+            .update({ linked_transaction_id: null })
+            .eq('linked_transaction_id', id);
+
+        // 2) Limpiar dismissed_duplicates donde la transacción participe
+        await (adminClient as any)
+            .from('dismissed_duplicates')
             .delete()
-            .eq('id', id);
+            .or(`transaction_id_a.eq.${id},transaction_id_b.eq.${id}`);
 
-        if (error) throw error;
-
-        // Limpiar la actividad vinculada al borrar la transacción por completo
+        // 3) Limpiar actividades vinculadas (reserva/cierre) antes de eliminar la transacción
         await (adminClient as any)
             .from('activities')
             .delete()
             .eq('transaction_id', id);
 
-        // Purgar entradas de person_history generadas por esta transacción
+        // 4) Purgar entradas de person_history generadas por esta transacción
         const { error: histErr } = await (adminClient as any)
             .from('person_history')
             .delete()
             .eq('metadata->>transaction_id', id);
         if (histErr) console.error('Error purgando person_history de transacción:', histErr);
 
+        // 5) Eliminar la transacción
+        const { error } = await (adminClient as any)
+            .from('transactions')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            // Foreign key violation (23503): algo sigue dependiendo de esta operación
+            if ((error as any).code === '23503') {
+                return NextResponse.json(
+                    { error: 'No se puede eliminar: la operación tiene datos vinculados. Desvinculá primero el duplicado/cierre compartido.' },
+                    { status: 409 }
+                );
+            }
+            throw error;
+        }
+
         return NextResponse.json({ success: true });
-    } catch (err) {
+    } catch (err: any) {
         console.error('Error deleting transaction:', err);
-        return NextResponse.json({ error: 'Error al eliminar' }, { status: 500 });
+        return NextResponse.json({ error: err?.message || 'Error al eliminar' }, { status: 500 });
     }
 }

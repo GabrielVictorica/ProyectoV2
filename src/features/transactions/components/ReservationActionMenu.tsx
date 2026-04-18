@@ -75,7 +75,7 @@ export function ReservationActionMenu({ transaction, onRefresh }: ReservationAct
                                     className="cursor-pointer hover:bg-red-500/10 text-red-400 focus:text-red-400 focus:bg-red-500/10 flex items-center gap-2"
                                 >
                                     <XCircle className="h-4 w-4" />
-                                    Dar de Baja (Se cayó)
+                                    Marcar como Caída (no la elimina)
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator className="bg-slate-800" />
                             </>

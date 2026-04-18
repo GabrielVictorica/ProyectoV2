@@ -49,45 +49,58 @@ export async function cancelReservationAction(
         for (const pid of personIds) {
             if (!pid) continue;
 
-            // Buscar en el historial el último estado antes de 'reserva' o 'cierre'
+            // Estado actual real de la persona (antes de revertir)
+            const { data: personNow } = await adminClient
+                .from('persons')
+                .select('relationship_status')
+                .eq('id', pid)
+                .single();
+            const currentStatus = personNow?.relationship_status || null;
+
+            // Buscar en el historial el último old_value de un cambio a 'reserva'.
+            // Ese era el estado previo real antes de la reserva.
             const { data: history } = await adminClient
                 .from('person_history')
-                .select('old_value')
+                .select('old_value, new_value')
                 .eq('person_id', pid)
                 .eq('field_name', 'relationship_status')
                 .order('created_at', { ascending: false })
-                .limit(5);
+                .limit(10);
 
-            // Intentar encontrar un valor previo que no sea nulo y diferente al actual si es posible
-            let previousStatus = 'prospecto'; // Fallback por defecto
+            // Default: contacto_telefonico (estado válido mínimo), nunca 'prospecto' que no existe
+            let previousStatus: string = 'contacto_telefonico';
             if (history && history.length > 0) {
-                // El primer registro tiene el old_value del cambio más reciente (el que lo puso en reserva)
-                previousStatus = history[0].old_value || 'prospecto';
+                const reservaEntry = history.find((h: any) => h.new_value === 'reserva');
+                if (reservaEntry?.old_value) {
+                    previousStatus = reservaEntry.old_value;
+                }
             }
 
-            // Actualizar persona
-            await adminClient
-                .from('persons')
-                .update({ 
-                    relationship_status: previousStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', pid);
+            // Actualizar persona solo si la reversión aplica (si ya no está en 'reserva' por otra razón, no tocar)
+            if (currentStatus === 'reserva') {
+                await adminClient
+                    .from('persons')
+                    .update({
+                        relationship_status: previousStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', pid);
 
-            // Registrar en historial la caída
-            await adminClient.from('person_history').insert({
-                person_id: pid,
-                agent_id: tx.agent_id,
-                event_type: 'lifecycle_change',
-                field_name: 'relationship_status',
-                old_value: 'reserva',
-                new_value: previousStatus,
-                metadata: { 
-                    action: 'reservation_cancelled',
-                    transaction_id: transactionId,
-                    reason: reason 
-                }
-            });
+                // Registrar en historial la caída con el old_value REAL
+                await adminClient.from('person_history').insert({
+                    person_id: pid,
+                    agent_id: tx.agent_id,
+                    event_type: 'lifecycle_change',
+                    field_name: 'relationship_status',
+                    old_value: currentStatus,
+                    new_value: previousStatus,
+                    metadata: {
+                        action: 'reservation_cancelled',
+                        transaction_id: transactionId,
+                        reason: reason
+                    }
+                });
+            }
 
             // Opcional: Actualizar estado de la búsqueda si es el comprador y se especificó un nuevo estado
             if (pid === tx.buyer_person_id && searchStatus) {
@@ -221,9 +234,17 @@ export async function closeReservationAction(
 
         // 6. Actualizar CRM a 'cierre' y cerrar búsquedas
         for (const pid of personIds) {
+            // Estado real actual antes de pasar a cierre (para registrar old_value correctamente)
+            const { data: personNow } = await adminClient
+                .from('persons')
+                .select('relationship_status')
+                .eq('id', pid)
+                .single();
+            const oldStatus = personNow?.relationship_status || null;
+
             await adminClient
                 .from('persons')
-                .update({ 
+                .update({
                     relationship_status: 'cierre',
                     last_interaction_at: data.closingDate,
                     updated_at: new Date().toISOString()
@@ -256,19 +277,22 @@ export async function closeReservationAction(
                 }
             }
 
-            await adminClient.from('person_history').insert({
-                person_id: pid,
-                agent_id: tx.agent_id,
-                event_type: 'lifecycle_change',
-                field_name: 'relationship_status',
-                old_value: 'reserva',
-                new_value: 'cierre',
-                metadata: { 
-                    action: 'reservation_closed',
-                    transaction_id: transactionId,
-                    final_price: data.actualPrice
-                }
-            });
+            // Sólo registrar historial si el estado efectivamente cambió
+            if (oldStatus !== 'cierre') {
+                await adminClient.from('person_history').insert({
+                    person_id: pid,
+                    agent_id: tx.agent_id,
+                    event_type: 'lifecycle_change',
+                    field_name: 'relationship_status',
+                    old_value: oldStatus,
+                    new_value: 'cierre',
+                    metadata: {
+                        action: 'reservation_closed',
+                        transaction_id: transactionId,
+                        final_price: data.actualPrice
+                    }
+                });
+            }
         }
 
         revalidatePath('/dashboard/operations');

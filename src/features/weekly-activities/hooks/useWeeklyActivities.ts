@@ -45,6 +45,7 @@ export type WeeklyDataMap = Record<string, {
     activities: WeeklyActivity[];
     transactionCount: number;
     reservaCount: number;
+    reservaCancelledCount: number;
     cierreCount: number;
     transactions: any[];
 }>;
@@ -82,7 +83,7 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
                 const day = new Date(weekStart);
                 day.setDate(weekStart.getDate() + i);
                 const dateStr = day.toISOString().split('T')[0];
-                map[dateStr] = { activities: [], transactionCount: 0, reservaCount: 0, cierreCount: 0, transactions: [] };
+                map[dateStr] = { activities: [], transactionCount: 0, reservaCount: 0, reservaCancelledCount: 0, cierreCount: 0, transactions: [] };
             }
 
             (activities as any[])?.forEach(act => {
@@ -123,6 +124,9 @@ export function useWeeklyActivities(weekStart: Date, agentId?: string) {
                 // Se muestran todas (pendientes, completadas o canceladas) como registro de actividad realizada
                 if (txDateStr && map[txDateStr]) {
                     map[txDateStr].reservaCount += 1;
+                    if (trans.status === 'cancelled') {
+                        map[txDateStr].reservaCancelledCount += 1;
+                    }
                     map[txDateStr].transactions.push({ ...enhancedTrans, _gridRowType: 'reserva' });
                 }
 

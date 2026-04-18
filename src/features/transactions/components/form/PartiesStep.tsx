@@ -41,6 +41,7 @@ interface PartiesStepProps {
     watchSplitPercent: number;
     profile: any;
     watchStatus: 'pending' | 'completed' | 'cancelled';
+    showClosingDate?: boolean;
 }
 
 export const PartiesStep: React.FC<PartiesStepProps> = ({
@@ -58,7 +59,8 @@ export const PartiesStep: React.FC<PartiesStepProps> = ({
     calculations,
     watchSplitPercent,
     profile,
-    watchStatus
+    watchStatus,
+    showClosingDate
 }) => {
     return (
         <div className="space-y-4 py-1">
@@ -256,24 +258,47 @@ export const PartiesStep: React.FC<PartiesStepProps> = ({
                 })()}
             </div>
 
-            {/* Fecha */}
-            <FormField
-                control={form.control}
-                name="transaction_date"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel className="text-slate-200">Fecha de Operación *</FormLabel>
-                        <FormControl>
-                            <Input
-                                {...field}
-                                type="date"
-                                className="bg-slate-700/50 border-slate-600 text-white"
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
+            {/* Fechas: reserva siempre; cierre sólo al editar una operación cerrada */}
+            <div className={showClosingDate ? 'grid grid-cols-2 gap-4' : ''}>
+                <FormField
+                    control={form.control}
+                    name="transaction_date"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="text-slate-200">Fecha de Reserva *</FormLabel>
+                            <FormControl>
+                                <Input
+                                    {...field}
+                                    type="date"
+                                    className="bg-slate-700/50 border-slate-600 text-white"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                {showClosingDate && (
+                    <FormField
+                        control={form.control}
+                        name="closing_date"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-emerald-300">Fecha de Cierre *</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        {...field}
+                                        value={field.value || ''}
+                                        type="date"
+                                        className="bg-slate-700/50 border-emerald-600/40 text-white"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                 )}
-            />
+            </div>
 
             {/* Notas */}
             <FormField

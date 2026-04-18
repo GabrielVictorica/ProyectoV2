@@ -45,7 +45,7 @@ export function CancelReservationDialog({
 
     const handleSubmit = async () => {
         if (!reason.trim()) {
-            toast.error('Debés ingresar un motivo para la baja');
+            toast.error('Ingresá un motivo para la caída');
             return;
         }
 
@@ -60,7 +60,7 @@ export function CancelReservationDialog({
 
             if (!result.success) throw new Error(result.error || 'Error al dar de baja');
 
-            toast.success('Reserva dada de baja con éxito');
+            toast.success('Reserva marcada como caída');
             queryClient.invalidateQueries({ queryKey: ['closings-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['weekly-activities'] });
             queryClient.invalidateQueries({ queryKey: ['crm'] });
@@ -68,7 +68,7 @@ export function CancelReservationDialog({
             onOpenChange(false);
             onSuccess?.();
         } catch (err: any) {
-            toast.error(err.message || 'Error al dar de baja la reserva');
+            toast.error(err.message || 'Error al marcar la reserva como caída');
         } finally {
             setIsSubmitting(false);
         }
@@ -80,10 +80,10 @@ export function CancelReservationDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-white">
                         <XCircle className="h-5 w-5 text-red-400" />
-                        Dar de Baja (Se cayó)
+                        Marcar como Caída
                     </DialogTitle>
                     <DialogDescription className="text-slate-400">
-                        Marcá esta reserva como caída. El estado del cliente en el CRM se revertirá al anterior.
+                        La reserva queda registrada como caída. El estado del cliente en el CRM vuelve al anterior.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -160,7 +160,7 @@ export function CancelReservationDialog({
                         ) : (
                             <>
                                 <XCircle className="mr-2 h-4 w-4" />
-                                Confirmar Baja
+                                Confirmar Caída
                             </>
                         )}
                     </Button>

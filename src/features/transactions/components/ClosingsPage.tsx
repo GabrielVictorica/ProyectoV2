@@ -214,11 +214,12 @@ export function ClosingsPage() {
         const empty = {
             totalSalesVolume: 0, totalGrossCommission: 0, totalNetIncome: 0, totalMasterIncome: 0,
             totalOfficeIncome: 0,
-            // Totales (cierres + reservas)
+            // Totales (cierres + reservas, NO caídas)
             totalOpsCount: 0, totalPuntas: 0,
             // Desglose por status
             closedDealsCount: 0, closedPuntas: 0,
             pendingDealsCount: 0, pendingPuntas: 0,
+            cancelledDealsCount: 0, cancelledPuntas: 0,
             // Desglose volumen/comisión por status
             closedVolume: 0, closedGross: 0,
             pendingVolume: 0, pendingGross: 0,
@@ -268,7 +269,11 @@ export function ClosingsPage() {
                 acc.totalMasterIncome += master;
                 acc.totalOfficeIncome += office;
             }
-            // cancelled: no suma nada
+            else if (status === 'cancelled') {
+                // Caídas: sólo se cuentan como informativo, NO suman a totales financieros ni a totalOpsCount
+                acc.cancelledDealsCount += 1;
+                acc.cancelledPuntas += puntas;
+            }
             return acc;
         }, empty);
     }, [baseFilteredTransactions, selectedAgent]);
@@ -287,10 +292,10 @@ export function ClosingsPage() {
     const handleDelete = async (id: string) => {
         try {
             await deleteTransaction(id);
-            toast.success('Cierre eliminado con éxito');
+            toast.success('Operación eliminada de tu perfil');
             handleRefresh();
-        } catch (error) {
-            toast.error('Error al eliminar el cierre');
+        } catch (error: any) {
+            toast.error(error?.message || 'No se pudo eliminar la operación');
         }
     };
 
@@ -544,6 +549,9 @@ export function ClosingsPage() {
                         details={[
                             { label: 'Cierres', value: `${activeMetrics.closedDealsCount} · ${activeMetrics.closedPuntas}p`, color: 'emerald' as const },
                             { label: 'Reservas', value: `${activeMetrics.pendingDealsCount} · ${activeMetrics.pendingPuntas}p`, color: 'amber' as const },
+                            ...(activeMetrics.cancelledDealsCount > 0
+                                ? [{ label: 'Caídas', value: `${activeMetrics.cancelledDealsCount} · ${activeMetrics.cancelledPuntas}p`, color: 'red' as const }]
+                                : []),
                             { label: 'Ticket Prom.', value: formatCurrency(activeAverageTicket), color: 'slate' as const },
                         ]}
                     />
@@ -725,15 +733,20 @@ export function ClosingsPage() {
                                                                 />
                                                                 <AlertDialog>
                                                                     <AlertDialogTrigger asChild>
-                                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-900/20">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-900/20"
+                                                                            title="Eliminar operación de mi perfil"
+                                                                        >
                                                                             <Trash2 className="h-3.5 w-3.5" />
                                                                         </Button>
                                                                     </AlertDialogTrigger>
                                                                     <AlertDialogContent className="bg-slate-900 border-slate-800">
                                                                         <AlertDialogHeader>
-                                                                            <AlertDialogTitle>¿Eliminar esta operación?</AlertDialogTitle>
+                                                                            <AlertDialogTitle>¿Eliminar esta operación de tu perfil?</AlertDialogTitle>
                                                                             <AlertDialogDescription className="text-slate-400">
-                                                                                Esta acción no se puede deshacer. Los KPIs se actualizarán automáticamente.
+                                                                                Esta acción no se puede deshacer y solo afecta tu vista. Si la operación está compartida con un colega, a él le seguirá apareciendo. Los KPIs se actualizarán automáticamente.
                                                                             </AlertDialogDescription>
                                                                         </AlertDialogHeader>
                                                                         <AlertDialogFooter>
@@ -798,7 +811,7 @@ function SummaryCard({
     mainSuffix?: string;
     loading: boolean;
     color: 'green' | 'blue' | 'purple' | 'yellow';
-    details: { label: string; value: string; color: 'emerald' | 'amber' | 'purple' | 'blue' | 'slate' }[];
+    details: { label: string; value: string; color: 'emerald' | 'amber' | 'purple' | 'blue' | 'slate' | 'red' }[];
 }) {
     const themes = {
         green: {
@@ -833,6 +846,7 @@ function SummaryCard({
         purple: 'bg-purple-500',
         blue: 'bg-blue-500',
         slate: 'bg-slate-500',
+        red: 'bg-red-500',
     };
 
     const textColors: Record<string, string> = {
@@ -841,6 +855,7 @@ function SummaryCard({
         purple: 'text-purple-400',
         blue: 'text-blue-400',
         slate: 'text-slate-400',
+        red: 'text-red-400',
     };
 
     const t = themes[color];

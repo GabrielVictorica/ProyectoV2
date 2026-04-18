@@ -112,6 +112,7 @@ export interface CreateTransactionInput {
 export interface UpdateTransactionInput {
     id: string;
     transaction_date?: string;
+    closing_date?: string | null;
     actual_price?: number;
     sides?: number;
     commission_percentage?: number;

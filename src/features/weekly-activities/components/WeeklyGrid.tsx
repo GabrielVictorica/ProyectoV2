@@ -144,6 +144,8 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                         }
                                     }
 
+                                    const cancelledReservas = row.id === 'reserva' ? (cellData?.reservaCancelledCount || 0) : 0;
+
                                     return (
                                         <td key={dIdx} className={`p-4 text-center border-r last:border-r-0 border-white/[0.04] relative ${isFuture ? 'opacity-20 pointer-events-none' : ''}`}>
                                             <div className="flex items-center justify-center min-h-[48px]">
@@ -152,9 +154,17 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                         <TooltipTrigger asChild>
                                                             <button
                                                                 onClick={() => handleCellClick(dateStr, row, activities)}
-                                                                className={`h-10 w-10 flex items-center justify-center rounded-xl ${row.bgColor} border border-white/[0.08] hover:border-white/[0.2] transition-all duration-200 group/cell`}
+                                                                className={`h-10 w-10 flex items-center justify-center rounded-xl ${row.bgColor} border border-white/[0.08] hover:border-white/[0.2] transition-all duration-200 group/cell relative`}
                                                             >
                                                                 <span className={`text-sm font-bold ${row.color}`}>{count}</span>
+                                                                {cancelledReservas > 0 && (
+                                                                    <span
+                                                                        title={`${cancelledReservas} caída${cancelledReservas > 1 ? 's' : ''}`}
+                                                                        className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 flex items-center justify-center rounded-full bg-red-500/90 text-[9px] font-bold text-white border border-[#030712]"
+                                                                    >
+                                                                        {cancelledReservas}
+                                                                    </span>
+                                                                )}
                                                             </button>
                                                         </TooltipTrigger>
                                                         <TooltipContent className="bg-[#09090b] border border-white/10 text-white p-3 min-w-[240px] space-y-2 shadow-2xl z-[9999] opacity-100">
@@ -181,30 +191,51 @@ export function WeeklyGrid({ weekStart, data, isLoading, agentId }: WeeklyGridPr
                                                                             </div>
                                                                         ))
                                                                     ) : (
-                                                                        // Reserva: mostrar transacciones
+                                                                        // Reserva: mostrar transacciones (cancelled = caída, visualmente distinguida)
                                                                         (cellData?.transactions || [])
                                                                             .filter(trans => trans._gridRowType === 'reserva')
-                                                                            .map((trans, tIdx) => (
-                                                                                <div key={tIdx} className="text-xs space-y-1 border-l-2 border-indigo-500/50 pl-2 py-0.5">
-                                                                                    <div className="flex justify-between items-start gap-2">
-                                                                                        <p className="font-bold text-white text-sm leading-tight max-w-[160px] truncate">
-                                                                                            {trans.property?.title || 'Propiedad sin título'}
-                                                                                        </p>
-                                                                                        <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
-                                                                                            ${trans.actual_price?.toLocaleString() || '0'}
-                                                                                        </span>
+                                                                            .map((trans, tIdx) => {
+                                                                                const isCancelled = trans.status === 'cancelled';
+                                                                                const isCompleted = trans.status === 'completed';
+                                                                                return (
+                                                                                    <div
+                                                                                        key={tIdx}
+                                                                                        className={`text-xs space-y-1 border-l-2 pl-2 py-0.5 ${
+                                                                                            isCancelled
+                                                                                                ? 'border-red-500/60 opacity-60'
+                                                                                                : isCompleted
+                                                                                                ? 'border-emerald-500/50'
+                                                                                                : 'border-indigo-500/50'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <div className="flex justify-between items-start gap-2">
+                                                                                            <p className={`font-bold text-sm leading-tight max-w-[160px] truncate ${
+                                                                                                isCancelled ? 'text-white/70 line-through' : 'text-white'
+                                                                                            }`}>
+                                                                                                {trans.property?.title || 'Propiedad sin título'}
+                                                                                            </p>
+                                                                                            {isCancelled ? (
+                                                                                                <span className="text-[9px] text-red-400 font-medium uppercase tracking-wider px-1.5 py-0.5 bg-red-500/10 rounded border border-red-500/30 shrink-0">
+                                                                                                    Caída
+                                                                                                </span>
+                                                                                            ) : (
+                                                                                                <span className="text-emerald-400 font-mono text-xs whitespace-nowrap">
+                                                                                                    ${trans.actual_price?.toLocaleString() || '0'}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
+                                                                                            <span>Vendedor: {trans.seller_name || '-'}</span>
+                                                                                            <span>Comprador: {trans.buyer_name || '-'}</span>
+                                                                                        </div>
+                                                                                        {trans.notes && (
+                                                                                            <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
+                                                                                                "{trans.notes}"
+                                                                                            </p>
+                                                                                        )}
                                                                                     </div>
-                                                                                    <div className="text-[10px] text-white/50 flex flex-col gap-0.5">
-                                                                                        <span>Vendedor: {trans.seller_name || '-'}</span>
-                                                                                        <span>Comprador: {trans.buyer_name || '-'}</span>
-                                                                                    </div>
-                                                                                    {trans.notes && (
-                                                                                        <p className="text-white/60 italic leading-tight mt-1 line-clamp-2 text-[10px]">
-                                                                                            "{trans.notes}"
-                                                                                        </p>
-                                                                                    )}
-                                                                                </div>
-                                                                            ))
+                                                                                );
+                                                                            })
                                                                     )}
                                                                 </div>
                                                             ) : (
