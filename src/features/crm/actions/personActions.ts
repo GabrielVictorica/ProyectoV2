@@ -59,6 +59,9 @@ async function recordPersonEvent(params: {
 
 /**
  * Busca personas por coincidencia parcial en nombre, teléfono o email.
+ * Para consultas multi-palabra ("Juan Pérez"), matchea nombre y apellido
+ * por tokens en ambos órdenes, para que la búsqueda por nombre completo
+ * funcione igual que la de nombre o apellido por separado.
  */
 export async function searchPersonsAction(query: string): Promise<ActionResult<Person[]>> {
     try {
@@ -66,13 +69,26 @@ export async function searchPersonsAction(query: string): Promise<ActionResult<P
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: 'No autorizado' };
 
-        // El RLS se encargará de filtrar por org/agent basado en el usuario logueado
         let sqlQuery = supabase
             .from('persons')
             .select('*, agent:profiles!persons_agent_id_fkey(first_name, last_name)');
 
-        if (query) {
-            sqlQuery = sqlQuery.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`);
+        // Sanitizamos caracteres que rompen la sintaxis de PostgREST (, () \)
+        const cleaned = (query || '').replace(/[,()\\]/g, ' ').trim();
+        const tokens = cleaned.split(/\s+/).filter(Boolean);
+
+        if (tokens.length === 1) {
+            const t = tokens[0];
+            sqlQuery = sqlQuery.or(
+                `first_name.ilike.%${t}%,last_name.ilike.%${t}%,phone.ilike.%${t}%,email.ilike.%${t}%`
+            );
+        } else if (tokens.length >= 2) {
+            const head = tokens[0];
+            const tail = tokens.slice(1).join(' ');
+            // Match "head tail" o "tail head" (permite "Pérez Juan" o "Juan Pérez")
+            sqlQuery = sqlQuery.or(
+                `and(first_name.ilike.%${head}%,last_name.ilike.%${tail}%),and(first_name.ilike.%${tail}%,last_name.ilike.%${head}%)`
+            );
         }
 
         const { data, error } = await sqlQuery.limit(10);

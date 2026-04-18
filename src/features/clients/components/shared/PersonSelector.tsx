@@ -26,7 +26,6 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
     const { isGod, isParent } = usePermissions();
     const showAgentInfo = isGod || isParent;
     const [search, setSearch] = useState('');
-    const [results, setResults] = useState<Person[]>([]);
     const [recentPersons, setRecentPersons] = useState<Person[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -86,14 +85,14 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         }
     }, [isOpen]);
 
-    // Debounce del search
+    // Debounce del search (150ms — imperceptible pero evita disparar una query por tecla)
     const [debouncedSearch, setDebouncedSearch] = useState('');
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        const timer = setTimeout(() => setDebouncedSearch(search), 150);
         return () => clearTimeout(timer);
     }, [search]);
 
-    // Búsqueda cacheada con React Query
+    // Búsqueda cacheada con React Query (sin state duplicado: usamos searchResults directo)
     const { data: searchResults, isFetching: isSearching } = useQuery({
         queryKey: ['persons', 'search', debouncedSearch],
         queryFn: async () => {
@@ -103,16 +102,10 @@ export function PersonSelector({ value, onChange, placeholder = "Buscar persona.
         },
         enabled: debouncedSearch.length >= 2,
         staleTime: 5 * 60 * 1000,
+        placeholderData: (previousData) => previousData,
     });
 
-    useEffect(() => {
-        if (debouncedSearch.length < 2) {
-            setResults([]);
-        } else if (searchResults) {
-            setResults(searchResults);
-        }
-    }, [searchResults, debouncedSearch]);
-
+    const results: Person[] = debouncedSearch.length >= 2 ? (searchResults || []) : [];
     const loading = isResolving || isSearching;
 
     const handleSelect = (person: Person) => {

@@ -221,14 +221,7 @@ export function ActivityDialog({
             visit_metadata: visitMetadata,
         };
 
-        if (editingActivity) {
-            await updateActivity.mutateAsync({ id: editingActivity.id, data });
-        } else {
-            await createActivity.mutateAsync(data as any);
-        }
-
-        // Preguntar si desea actualizar el estado en el CRM
-        // Para visitas, preguntar por cada persona vinculada
+        // Personas a evaluar para actualización de estado CRM
         const personsToUpdateIds: string[] = [];
         if (isVisita) {
             if (buyerPersonId && (punta === 'compradora' || punta === 'ambas')) personsToUpdateIds.push(buyerPersonId);
@@ -237,12 +230,20 @@ export function ActivityDialog({
             personsToUpdateIds.push(personId);
         }
 
+        // Disparar guardado + fetch de estados en paralelo para reducir el delay antes del cartel
+        const savePromise = editingActivity
+            ? updateActivity.mutateAsync({ id: editingActivity.id, data })
+            : createActivity.mutateAsync(data as any);
+
+        const statusPromise = personsToUpdateIds.length > 0
+            ? getPersonsStatusDetailsAction(personsToUpdateIds)
+            : Promise.resolve({ success: true as const, data: [] as any[] });
+
+        const [, res] = await Promise.all([savePromise, statusPromise]);
+
         const newQueue: PendingUpdate[] = [];
 
         if (personsToUpdateIds.length > 0) {
-            // Fetch the ACTUAL current relationships statuses from DB safely
-            const res = await getPersonsStatusDetailsAction(personsToUpdateIds);
-
             if (res.success && res.data) {
                 res.data.forEach((personData: any) => {
                     // Only ask if the person is NOT already in the target state
