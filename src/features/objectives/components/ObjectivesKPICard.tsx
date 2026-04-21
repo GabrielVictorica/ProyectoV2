@@ -24,6 +24,10 @@ interface ObjectivesKPICardProps {
         completedLabel?: string;
         reservedLabel?: string;
     };
+    targetProgress?: {
+        current: number;
+        target: number;
+    };
 }
 
 const colorClasses = {
@@ -68,6 +72,7 @@ export function ObjectivesKPICard({
     progressValue = 0,
     progressTotal = 100,
     segmentedProgress,
+    targetProgress,
 }: ObjectivesKPICardProps) {
     const percentage = progressTotal > 0 ? Math.min(100, (progressValue / progressTotal) * 100) : 0;
     const isCompleted = percentage >= 100;
@@ -146,8 +151,19 @@ export function ObjectivesKPICard({
                                 </div>
                             )}
 
-                            {!showProgress && !segmentedProgress && subtitle && (
-                                <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1">{subtitle}</p>
+                            {targetProgress && targetProgress.target > 0 && !segmentedProgress && (
+                                <div className="mt-2 w-full max-w-[90%]">
+                                    <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full ${progressColorRaw} transition-all duration-1000 ease-out`}
+                                            style={{ width: `${Math.min(100, (targetProgress.current / targetProgress.target) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {!segmentedProgress && subtitle && (
+                                <p className="text-[10px] text-slate-500 font-medium tracking-wide opacity-80 mt-1.5">{subtitle}</p>
                             )}
                         </div>
                     )}

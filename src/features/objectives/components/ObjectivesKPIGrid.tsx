@@ -119,14 +119,28 @@ export function ObjectivesKPIGrid({
         // Comisión Neta acumulada = actual_gross_income * split%
         const netCommissionActual = (progress.actual_gross_income || 0) * (splitPct / 100);
 
-        // Ticket Promedio Real: actual_gross_income / actual_puntas_count (por punta)
-        // Comisión bruta promedio por operación
         const actualPuntas = progress.actual_puntas_count || 0;
-        const avgTicketReal = actualPuntas > 0 ? (progress.actual_gross_income || 0) / actualPuntas : 0;
+        // Ticket Promedio = precio de venta promedio (valor de la propiedad) por punta
+        const avgTicketReal = actualPuntas > 0 ? (progress.total_sales_volume || 0) / actualPuntas : 0;
+        // Comisión bruta promedio por punta
+        const avgCommissionPerPunta = actualPuntas > 0 ? (progress.actual_gross_income || 0) / actualPuntas : 0;
 
-        // Comisión Promedio Real vs Target
-        // Target = ticket_target * (commission_target / 100)
+        // Target comisión por punta = ticket_target * (commission_target / 100)
         const commTargetPerPunta = avgTicketTarget * (avgCommTarget / 100);
+
+        const ticketGap = avgTicketTarget - avgTicketReal;
+        const ticketSubtitle = avgTicketTarget > 0
+            ? avgTicketReal >= avgTicketTarget
+                ? `Meta ${formatCurrency(avgTicketTarget)} · superada por ${formatCurrency(-ticketGap)}`
+                : `Faltan ${formatCurrency(ticketGap)} para meta ${formatCurrency(avgTicketTarget)}`
+            : 'Sin meta definida';
+
+        const commGap = commTargetPerPunta - avgCommissionPerPunta;
+        const commSubtitle = commTargetPerPunta > 0
+            ? avgCommissionPerPunta >= commTargetPerPunta
+                ? `Meta ${formatCurrency(commTargetPerPunta)} · superada por ${formatCurrency(-commGap)}`
+                : `Faltan ${formatCurrency(commGap)} para meta ${formatCurrency(commTargetPerPunta)}`
+            : 'Sin meta definida';
 
         // Validación Financiera
         const netMonthlyIncome = (annualGoal * (splitPct / 100)) / 12;
@@ -170,29 +184,31 @@ export function ObjectivesKPIGrid({
                     />
                 </motion.div>
 
-                {/* 3. Ticket Promedio Real vs Target */}
+                {/* 3. Precio Promedio de Venta vs Meta */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.1 }}>
                     <ObjectivesKPICard
-                        title="Ticket Promedio"
+                        title="Precio Prom. de Venta"
                         value={formatCurrency(avgTicketReal)}
                         icon={<BarChart3 className="h-5 w-5" />}
                         loading={isLoading}
                         color={avgTicketTarget > 0 && avgTicketReal >= avgTicketTarget ? 'green' : 'amber'}
                         isString
-                        subtitle={avgTicketTarget > 0 ? `Target: ${formatCurrency(avgTicketTarget)}` : 'Sin target definido'}
+                        subtitle={ticketSubtitle}
+                        targetProgress={{ current: avgTicketReal, target: avgTicketTarget }}
                     />
                 </motion.div>
 
-                {/* 4. Comisión Promedio por Punta vs Target */}
+                {/* 4. Comisión Promedio por Operación vs Meta */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
                     <ObjectivesKPICard
-                        title="Comisión x Punta"
-                        value={formatCurrency(avgTicketReal > 0 ? avgTicketReal : 0)}
+                        title="Comisión Prom. por Op."
+                        value={formatCurrency(avgCommissionPerPunta)}
                         icon={<TrendingUp className="h-5 w-5" />}
                         loading={isLoading}
-                        color={commTargetPerPunta > 0 && avgTicketReal >= commTargetPerPunta ? 'green' : 'purple'}
+                        color={commTargetPerPunta > 0 && avgCommissionPerPunta >= commTargetPerPunta ? 'green' : 'purple'}
                         isString
-                        subtitle={commTargetPerPunta > 0 ? `Target: ${formatCurrency(commTargetPerPunta)}` : 'Sin target definido'}
+                        subtitle={commSubtitle}
+                        targetProgress={{ current: avgCommissionPerPunta, target: commTargetPerPunta }}
                     />
                 </motion.div>
 
