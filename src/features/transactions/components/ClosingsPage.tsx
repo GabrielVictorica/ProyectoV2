@@ -278,8 +278,10 @@ export function ClosingsPage() {
         }, empty);
     }, [baseFilteredTransactions, selectedAgent]);
 
-    const activeAverageTicket = activeMetrics.closedDealsCount > 0
-        ? activeMetrics.closedVolume / activeMetrics.closedDealsCount
+    // Ticket Promedio = (volumen cierres + reservas) / cantidad de operaciones
+    // Excluye canceladas. No depende de cuántas puntas tenga cada operación.
+    const activeAverageTicket = activeMetrics.totalOpsCount > 0
+        ? activeMetrics.totalSalesVolume / activeMetrics.totalOpsCount
         : 0;
 
     const handleRefresh = () => {

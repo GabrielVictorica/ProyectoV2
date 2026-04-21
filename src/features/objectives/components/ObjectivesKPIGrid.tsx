@@ -119,11 +119,13 @@ export function ObjectivesKPIGrid({
         // Comisión Neta acumulada = actual_gross_income * split%
         const netCommissionActual = (progress.actual_gross_income || 0) * (splitPct / 100);
 
-        const actualPuntas = progress.actual_puntas_count || 0;
-        // Ticket Promedio = precio de venta promedio (valor de la propiedad) por punta
-        const avgTicketReal = actualPuntas > 0 ? (progress.total_sales_volume || 0) / actualPuntas : 0;
-        // Comisión bruta promedio por punta
-        const avgCommissionPerPunta = actualPuntas > 0 ? (progress.actual_gross_income || 0) / actualPuntas : 0;
+        // OJO: actual_puntas_count está mal nombrado en la vista — en realidad cuenta
+        // operaciones (rows de transactions no canceladas), no puntas individuales.
+        const actualOps = progress.actual_puntas_count || 0;
+        // Ticket Promedio = (volumen cierres + reservas) / cantidad de operaciones
+        const avgTicketReal = actualOps > 0 ? (progress.total_sales_volume || 0) / actualOps : 0;
+        // Comisión Promedio por Operación = comisión bruta total / operaciones
+        const avgCommissionPerPunta = actualOps > 0 ? (progress.actual_gross_income || 0) / actualOps : 0;
 
         // Target comisión por punta = ticket_target * (commission_target / 100)
         const commTargetPerPunta = avgTicketTarget * (avgCommTarget / 100);
@@ -184,10 +186,10 @@ export function ObjectivesKPIGrid({
                     />
                 </motion.div>
 
-                {/* 3. Precio Promedio de Venta vs Meta */}
+                {/* 3. Ticket Promedio (cierres + reservas / operaciones) */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.1 }}>
                     <ObjectivesKPICard
-                        title="Precio Prom. de Venta"
+                        title="Ticket Promedio"
                         value={formatCurrency(avgTicketReal)}
                         icon={<BarChart3 className="h-5 w-5" />}
                         loading={isLoading}
@@ -201,7 +203,7 @@ export function ObjectivesKPIGrid({
                 {/* 4. Comisión Promedio por Operación vs Meta */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: 0.15 }}>
                     <ObjectivesKPICard
-                        title="Comisión Prom. por Op."
+                        title="Comisión Promedio"
                         value={formatCurrency(avgCommissionPerPunta)}
                         icon={<TrendingUp className="h-5 w-5" />}
                         loading={isLoading}
